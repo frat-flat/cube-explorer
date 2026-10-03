@@ -16,11 +16,11 @@
     "test:e2e": "playwright test",
     "predev": "node scripts/build-explorer.mjs",
     "prebuild": "node scripts/build-explorer.mjs",
-    "pretypecheck": "node scripts/build-explorer.mjs"
+    "pretypecheck": "node scripts/build-explorer.mjs",
+    "db:setup": "node scripts/db-setup.mjs"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.117.2",
+    "@neondatabase/auth": "0.5.0-beta",
     "@tanstack/react-virtual": "^3.14.13",
     "next": "16.3.8",
     "papaparse": "^5.7.0",
@@ -42,6 +42,7 @@
     "three": "^0.128.0",
     "tsx": "^4.23.15",
     "typescript": "^5",
+    "vite": "^8.3.2",
     "vitest": "^5.0.3"
   }
 }

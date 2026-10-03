@@ -447,10 +447,10 @@ type CellValue =
 - **取り込み**:`/import` で CSV(UTF-8・Shift_JIS)・Excel(.xlsx)を表ごとに取り込む。コードが同じ行は上書きする。親のコードがまだない行はまとめてエラーにする。ひな形の CSV をダウンロードできる
 - **画面**:`/` の入金キューブは、試作(素の JS + three.js r128)をそのまま移したもの(`explorer/`、`scripts/build-explorer.mjs` でまとめる)。立体・潜る・シート・入れ子・課税区分フィルターは試作と同じ動き。スプリント2で React Three Fiber に置き換えるときも、この操作を引き継ぐ
 - **集計の場所**:v0 は入金明細を全件ブラウザに送り、ブラウザで集計する。数万行までを想定する。件数が増えたらクエリエンジン(7章)経由に切り替える
-- **ログイン**:Supabase Auth のメールリンク。`ALLOWED_EMAILS` に入れたメールアドレスの人だけが見られる。全ページと API で確認する(入口は `src/proxy.ts`)。表は RLS を有効にし、Supabase の API から直接は読めないようにする
-- **置き場所**:データベースは Supabase(Pro・東京リージョン)、画面は Vercel(fratflat チーム)
+- **ログイン**:Neon Auth(Better Auth ベース)のメールの6桁コード。`ALLOWED_EMAILS` に入れたメールアドレスの人だけが見られる。全ページと API で確認する(入口は `src/proxy.ts`)。表は RLS を有効にし、データベースの API(Neon の Data API など)を有効にしても直接は読めないようにする
+- **置き場所**:データベースとログインは Neon、画面は Vercel(fratflat チーム)。当初は Supabase(Pro・東京)の予定だったが、無料枠の空きがなく Docker なしで手元でも動かせるよう、2026-10-03 にユーザー判断で Neon に変更。表は RLS を有効にしたまま、アプリはテーブルの持ち主の接続で読む
 - スプリント1の面ビューは `/face` に移す
-- **手元での本番相当環境**(2026-10-03 追加):Supabase の空きができるまでは、`npm run local` で手元に同じ構成(ローカル Supabase の DB と認証、本番ビルド、ログインのメールはローカルの受信箱 Mailpit に届く)を立ち上げて触る。架空のサンプルデータ(`supabase/seed_deposit.sql`)が最初から入っている
+- **手元での本番相当環境**(2026-10-03 追加):`npm run local` で、Neon のデータベースとログインにつないだ本番ビルドを手元で立ち上げる(Docker 不要)。テーブルと架空のサンプルデータ(`supabase/seed_deposit.sql`)は `scripts/db-setup.mjs` が入れる
 
 ### スプリント5：実DBへの接続
 

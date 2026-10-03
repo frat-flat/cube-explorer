@@ -1,13 +1,14 @@
-import { cookies } from "next/headers";
 import { connection } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createNeonAuth } from "@neondatabase/auth/next/server";
 
-// ログインの設定。Supabase の URL と公開キーがあればログイン必須にする。
+// ログインの設定。Neon Auth の URL とクッキー用の秘密の値があればログイン必須にする。
 // ローカル開発(設定なし・本番ビルド以外)だけはログインなしで動かせる。
-export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-export const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-export const authConfigured = Boolean(supabaseUrl && supabaseKey);
+const baseUrl = process.env.NEON_AUTH_BASE_URL ?? "";
+const cookieSecret = process.env.NEON_AUTH_COOKIE_SECRET ?? "";
+export const authConfigured = Boolean(baseUrl && cookieSecret);
 export const authBypassed = !authConfigured && process.env.NODE_ENV !== "production";
+
+export const auth = authConfigured ? createNeonAuth({ baseUrl, cookies: { secret: cookieSecret } }) : null;
 
 /** 見てよいメールアドレス(ALLOWED_EMAILS にカンマ区切り)。空なら誰も入れない */
 export function isAllowedEmail(email: string | undefined | null): boolean {
@@ -19,30 +20,18 @@ export function isAllowedEmail(email: string | undefined | null): boolean {
   return allowed.includes(email.toLowerCase());
 }
 
-export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
-  return createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (list) => {
-        try {
-          list.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-        } catch {
-          // Server Component からは書き込めない。セッションの更新は proxy が受け持つ
-        }
-      },
-    },
-  });
+/** ログイン中の人のメールアドレス(許可の有無は問わない)。ログインしていなければ null */
+export async function sessionEmail(): Promise<string | null> {
+  if (!auth) return null;
+  const { data } = await auth.getSession();
+  return data?.user?.email ?? null;
 }
 
 /** ログイン済みで、見てよい人のメールアドレスを返す。だめなら null */
 export async function currentUserEmail(): Promise<string | null> {
   await connection(); // ログインの確認は毎回のリクエストで行う(ビルド時に固めない)
   if (authBypassed) return "local-dev";
-  if (!authConfigured) return null;
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  const email = data.user?.email ?? null;
+  const email = await sessionEmail();
   return isAllowedEmail(email) ? email : null;
 }
 

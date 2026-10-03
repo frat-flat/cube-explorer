@@ -7,3 +7,4 @@
 .form button:disabled { opacity: .6; }
 .note { font-size: 13px; color: var(--muted); margin: 0; }
 .error { font-size: 13px; color: var(--danger); margin: 0; }
+.form .link { background: none; color: var(--accent); padding: 0 0 0 4px; text-decoration: underline; }

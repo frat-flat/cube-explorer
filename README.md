@@ -38,39 +38,45 @@ http://localhost:3000 を開くと面ビュー(Cube Explorer)が表示されま�
 - `src/components/` 面ビューと軸設定パネル
 - `e2e/` 画面テスト
 
-ローカルの Supabase は DB と認証(ログイン)を使います。ストレージ・Studio などは `supabase/config.toml` で無効にしています。
+`npm run dev` で使うローカルの Supabase は DB だけを使うため、`supabase/config.toml` で認証・ストレージ・Studio などは無効にしています。
 
-## 手元で本番と同じ構成で触る
+## 手元で本番と同じ構成で触る(Docker 不要)
 
-ログインあり・データベースあり・本番ビルドで、サンプルデータ(架空の申込者4・契約者9・法人17・ショップ25・入金明細1,356件)入りの状態を立ち上げます。Docker と Node.js が必要です。
+ログインあり・データベースあり・本番ビルドで、サンプルデータ(架空の申込者4・契約者9・法人17・ショップ25・入金明細1,356件)入りの状態を立ち上げます。データベースとログインは Neon(クラウド)を使うので、PC に必要なのは Node.js だけです。
+
+### 1. Neon の準備(最初の1回だけ)
+
+1. https://neon.com でプロジェクトを作る(リージョンは AWS Asia Pacific (Singapore) が日本から近い)
+2. プロジェクトの「Auth」を開いて Neon Auth を有効にし、Configuration にある **Auth URL** を控える
+3. 同じ画面のサインイン方法で「Email」を有効にし、メールの確認方法を「Verification code」にする
+4. 「Connect」を押し、**Pooled connection** の接続文字列を控える
+
+### 2. 設定を書いて起動する
 
 ```bash
 npm install
-npm run local              # 起動(初回はサンプルデータが自動で入る)
+npm run local              # 初回は .env.local を作って止まるので、下の3つを書いてからもう一度
 npm run local -- --reset   # 取り込んだデータを消して、サンプルデータの状態に戻してから起動
 ```
 
-1. http://localhost:3000 を開くとログイン画面になります
-2. `demo@example.com` を入れて「ログイン用のリンクを送る」
-3. メールは実際には送られず、http://127.0.0.1:54324 の受信箱に届きます。そのリンクを開くとログインできます
+`.env.local` に書くもの:
 
-- ログインできるメールアドレスを変えるときは `ALLOWED_EMAILS=a@example.com npm run local`
-- 許可していないアドレスでリンクを開くと「閲覧の許可がありません」になります(本番と同じ動き)
-- `/import` から CSV・Excel を取り込んで、自分のデータに差し替えて試せます
-- サンプルデータは `supabase/seed_deposit.sql`
-
-## 公開版(Vercel + Supabase)
-
-実データを入れて触るための公開版の設定です。詳しくは DESIGN.md の「公開版 v0」。
-
-| 環境変数 | 内容 |
+| 項目 | 内容 |
 |---|---|
-| `DATABASE_URL` | Supabase の接続文字列(トランザクションプーラー・6543番) |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase プロジェクトの URL(ログインに使う) |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase の公開キー |
-| `ALLOWED_EMAILS` | 見てよいメールアドレス(カンマ区切り) |
+| `DATABASE_URL` | 1-4 の接続文字列 |
+| `NEON_AUTH_BASE_URL` | 1-2 の Auth URL |
+| `ALLOWED_EMAILS` | ログインして見てよいメールアドレス(カンマ区切り) |
 
-- ローカルでは上の3つ(ログイン関係)を設定しなければ、ログインなしで動きます
+`NEON_AUTH_COOKIE_SECRET` は `npm run local` が自動で作ります。起動したら http://localhost:3000 を開き、メールアドレスを入れると届く6桁のコードでログインします。
+
+- 許可していないアドレスでログインすると「閲覧の許可がありません」になります(本番と同じ動き)
+- `/import` から CSV・Excel を取り込んで、自分のデータに差し替えて試せます
+- テーブルとサンプルデータだけ入れ直すときは `npm run db:setup`(`-- --reset` で作り直し)。中身は `supabase/migrations/` と `supabase/seed*.sql`
+
+## 公開版(Vercel + Neon)
+
+公開するときは、Vercel の環境変数に上の表の3つと `NEON_AUTH_COOKIE_SECRET` を入れ、Neon Auth の Trusted domains に公開先のドメインを足します。詳しくは DESIGN.md の「公開版 v0」。
+
+- 環境変数を何も書かずに `npm run dev` すると、ローカルの Supabase の DB を使い、ログインなしで動きます
 - データは `/import` から、申込者 → 契約者 → 法人 → ショップ → 入金明細の順に取り込みます
-- Supabase の Authentication の URL 設定で、公開先の URL と `/auth/callback` をリダイレクト先に許可してください
-
+- Neon Auth の標準のメール送信は開発用です。本番で人を増やすときは、Neon Auth に自前のメール送信(SMTP)を設定します
