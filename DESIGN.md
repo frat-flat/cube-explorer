@@ -154,6 +154,7 @@ create table cube_meta.axes (
   source_table   text,               -- 'stores'
   source_column  text,               -- 'id'
   label_column   text,               -- 'name'(表示名に使う列)
+  key_column     text,               -- source_table の行を特定する列。事実テーブルから結合するときに使う(例: 'id')
   time_grain     text,               -- kind='time' のとき 'day'|'week'|'month'|'year'
   master_key     text                -- 同じ「ものさし」を共有する軸の識別子(比較に使う)
 );
@@ -188,6 +189,19 @@ create table cube_meta.saved_cubes (
 | `columns` | **テーブルの列名そのもの**が目盛りになる | 店舗リストの「項目」軸(地域、開店日、最新引き継ぎ…) |
 
 `columns` 軸があることで、「店舗 × 項目」という普通の一覧表を、そのまま立体の正面として扱える。
+
+#### 事実テーブルから軸への結びつけ(`axis_columns` と `key_column`)
+
+事実テーブル側の `axis_columns` には「この軸を表す、事実テーブルの列」を書く。軸側の定義と組み合わせて、列式は次のように決まる。
+
+| 軸の種類 | 列式 |
+|---|---|
+| `time` | `date_trunc(粒度, 事実.列)`(日本時間で区切る) |
+| `entity` | `事実.列`(マスタの `source_column` の値そのもの。表示名は `label_column` から引く) |
+| `attribute` で `source_table` が事実テーブル自身 | `事実.列` |
+| `attribute` で `source_table` が別テーブル | `source_table` を `key_column = 事実.列` で結合し、`source_table.source_column` |
+
+例:商品カテゴリ軸は `source_table = products, source_column = category, key_column = id`。売上は `axis_columns.product_category = "product_id"` と書き、`join products on products.id = sales.product_id` で `products.category` を使う。結合の仕方を軸に1回書けば、在庫など別の事実テーブルでも同じ軸を使い回せる。
 
 #### `master_key` と比較
 
@@ -249,10 +263,10 @@ type FaceRequest = {
 ### 7.1 SQL生成の流れ
 
 1. CubeSpec をメタデータで検証(存在しない軸・列・集約は拒否)
-2. 各軸の列式を決定(`time` 軸は `date_trunc(grain, 列)`)
-3. `GROUP BY 軸1, 軸2, 軸3` で集約した結果を取得
-4. 面の要求に応じて、サーバー側で残り1軸を集約 or 断面抽出
-5. 表示名を `label_column` から結合して返す
+2. 各軸の列式を決定(5.2「事実テーブルから軸への結びつけ」に従う。`time` 軸は `date_trunc(grain, 列)` で、区切りは日本時間 `Asia/Tokyo`)
+3. 面の要求に応じて、行・列の2軸で `GROUP BY` する。奥行きの軸は、集約なら `GROUP BY` に含めずSQLで潰し、断面ならその値を条件に加える
+   - 3軸で集計してからサーバー側で潰すと、平均・最小・最大などが正しく求まらない(平均の平均になる)ため、SQLの段階で潰す
+4. 表示名を `label_column` から引いて返す
 
 ### 7.2 安全性(必須)
 
@@ -326,7 +340,11 @@ type FaceResponse = {
   rows: { key: string; label: string }[];
   cols: { key: string; label: string }[];
   cells: (CellValue | null)[][];   // rows × cols
-  meta: { truncated: boolean; totalMembers: Record<string, number> };
+  meta: {
+    truncated: boolean;
+    totalMembers: Record<string, number>;
+    depthMembers: { key: string; label: string }[];  // 奥行きの軸の目盛り(断面の値を選ぶのに使う)
+  };
 };
 
 type CellValue =
@@ -409,6 +427,17 @@ type CellValue =
 - 比較エンジンと `/api/cube/compare`
 - 面ビューでコマを2つ選んで比較する画面
 - **完了条件**：「A店・10月」と「B店・10月」を比較し、両店で共通して売れた商品、片方だけで売れた商品、金額差が表示される。共通軸がない組み合わせではその旨が表示される
+
+### スプリント3.5：ダッシュボード
+
+立体の操作に慣れていない人でも、数値とグラフで読めるようにする。
+
+- 面ビューで見ている面を「ダッシュボードに追加」すると、数値カード・棒グラフ・折れ線グラフ・表のいずれかのタイルとして保存する。ダッシュボード画面には3Dを出さない
+- 面の形からグラフの種類を自動で選ぶ(列が時間なら折れ線、それ以外は棒、1マスだけなら数値カード)。あとから手で変えられる
+- タイルをクリックすると、Cube Explorer のその場所(同じ面・同じ階層)を開く
+- メタデータに `cube_meta.dashboards` と `cube_meta.dashboard_tiles`(タイルごとの `FaceRequest`・現在地・グラフ種類・並び順)を追加する。タイルの値は `/api/cube/face` で毎回取り直し、SQLを組み立てる経路は増やさない
+- API:`/api/dashboards`(一覧・作成・タイルの追加と並べ替え)
+- **完了条件**：潜った先の面を含む3つ以上の面をダッシュボードに追加し、3Dを触らずに数値とグラフで読める。タイルから元の場所へ戻れる
 
 ### スプリント5：実DBへの接続
 

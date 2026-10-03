@@ -11,6 +11,7 @@ describe("toAxis", () => {
         source_table: null,
         source_column: null,
         label_column: null,
+        key_column: null,
         time_grain: "month",
         master_key: "calendar_month",
       }),
@@ -21,6 +22,7 @@ describe("toAxis", () => {
       sourceTable: null,
       sourceColumn: null,
       labelColumn: null,
+      keyColumn: null,
       timeGrain: "month",
       masterKey: "calendar_month",
     });
