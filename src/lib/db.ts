@@ -3,7 +3,8 @@ import postgres from "postgres";
 // サーバー側専用の DB 接続。DATABASE_URL がなければローカルの `npx supabase start` の DB を使う
 const globalForDb = globalThis as unknown as { sql?: postgres.Sql };
 
-const url = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+// Neon がくれる接続文字列の channel_binding は postgres.js が扱えず、サーバーへの設定として送ってしまうので外す
+const url = (process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres").replace(/([?&])channel_binding=[^&]*&?/, "$1").replace(/[?&]$/, "");
 const local = /@(127\.0\.0\.1|localhost)[:/]/.test(url);
 
 export const sql =

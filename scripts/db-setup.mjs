@@ -10,13 +10,14 @@ try {
 } catch {
   // .env.local がなければ、環境変数をそのまま使う
 }
-const url = process.env.DATABASE_URL;
+// channel_binding は postgres.js が扱えないので外す(src/lib/db.ts と同じ)
+const url = process.env.DATABASE_URL?.replace(/([?&])channel_binding=[^&]*&?/, "$1").replace(/[?&]$/, "");
 if (!url) {
   console.error("DATABASE_URL がありません。.env.local に Neon の接続文字列を書いてください(README の手順)。");
   process.exit(1);
 }
 const local = /@(127\.0\.0\.1|localhost)[:/]/.test(url);
-const sql = postgres(url, { ssl: local ? false : "require", max: 1, onnotice: () => {} });
+const sql = postgres(url, { ssl: local ? false : "require", max: 1, prepare: !/-pooler\.|:6543\//.test(url), onnotice: () => {} });
 const reset = process.argv.includes("--reset");
 
 try {
