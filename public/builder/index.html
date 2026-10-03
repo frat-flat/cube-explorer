@@ -1,0 +1,1394 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>html,body{margin:0;height:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>キューブ組み立て 試作</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 左にキューブの木(上位・下位)、中央に軸の設定、右にプレビュー。狭い画面では縦に積む */
+:root {
+  --bg: #f3f5f6;
+  --surface: #ffffff;
+  --sunk: #e9edef;
+  --ink: #1b2428;
+  --muted: #5d6b71;
+  --line: #d5dde0;
+  --accent: #0e6a70;
+  --accent-soft: #d9eeef;
+  --on-accent: #ffffff;
+  --warn: #9a4b0c;
+  --warn-soft: #fbead9;
+  --ax-x: #7b4bb3;
+  --ax-y: #2f8a4c;
+  --ax-z: #c2407a;
+  --ax-x-soft: #efe7f8;
+  --ax-y-soft: #e2f3e7;
+  --ax-z-soft: #fae6ef;
+  --stage: #eef2f3;
+  --font-display: "Zen Kaku Gothic New", "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121719; --surface: #1a2124; --sunk: #232c30; --ink: #e3eaec; --muted: #9aa9ae; --line: #33403f;
+    --accent: #5cc3c9; --accent-soft: #1d3a3c; --on-accent: #0b1a1b; --warn: #f0a868; --warn-soft: #3a2a1b;
+    --ax-x: #b48be6; --ax-y: #6fcf8d; --ax-z: #ef7fb0; --ax-x-soft: #2c2338; --ax-y-soft: #1d3125; --ax-z-soft: #3a2230; --stage: #161d20;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121719; --surface: #1a2124; --sunk: #232c30; --ink: #e3eaec; --muted: #9aa9ae; --line: #33403f;
+  --accent: #5cc3c9; --accent-soft: #1d3a3c; --on-accent: #0b1a1b; --warn: #f0a868; --warn-soft: #3a2a1b;
+  --ax-x: #b48be6; --ax-y: #6fcf8d; --ax-z: #ef7fb0; --ax-x-soft: #2c2338; --ax-y-soft: #1d3125; --ax-z-soft: #3a2230; --stage: #161d20;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.6; padding-inline: 0; padding-block: 0; }
+/* 左のサイドバー(画面の切り替えとキューブの木)+右の画面 */
+.app { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: 100%; }
+.side { background: var(--surface); border-right: 1px solid var(--line); padding: 14px 12px; position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; overflow-y: auto; }
+.brand { font-family: var(--font-display); font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.brand .ico { width: 13px; height: 13px; background: var(--accent); transform: rotate(45deg) scale(.85); border-radius: 2px; }
+.menu-btn { display: none; margin-left: auto; }
+.nav { display: grid; gap: 2px; }
+.nav button { border: 0; text-align: left; background: transparent; padding: 7px 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
+.nav button:hover { background: var(--sunk); }
+.nav button[aria-current="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.nav .n { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--sunk); color: var(--ink); font-size: 11px; font-family: var(--font-mono); }
+.nav button[aria-current="true"] .n { background: var(--on-accent); color: var(--accent); }
+.nav-sub { font-size: 11px; letter-spacing: .08em; color: var(--muted); margin: 14px 4px 4px; }
+.side-foot { display: grid; gap: 6px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.main { min-width: 0; padding-inline: 20px; padding-block: 18px 40px; display: grid; gap: 12px; align-content: start; }
+.views { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.views.split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1100px) { .views.split { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding-inline: 16px; }
+  .menu-btn { display: inline-block; }
+  .brand { margin-bottom: 0; }
+  .side:not(.open) .side-body { display: none; }
+  .side.open .brand { margin-bottom: 10px; }
+  .main { padding-inline: 16px; }
+}
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+h1 { font-family: var(--font-display); font-size: 22px; margin: 0; }
+.lead { margin: 2px 0 0; color: var(--muted); max-width: 72ch; }
+.tag { display: inline-block; font-size: 11px; letter-spacing: .06em; padding: 1px 8px; border-radius: 99px; background: var(--warn-soft); color: var(--warn); vertical-align: 3px; margin-left: 6px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 5px 10px; }
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 2px 6px; }
+button.ghost:hover { color: var(--ink); }
+.danger { color: var(--warn); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
+.panel-title { font-size: 12px; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+
+.confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 6px; background: var(--warn-soft); color: var(--warn); }
+.notice { padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); font-size: 13px; margin: 8px 0 0; }
+.notice.warn { background: var(--warn-soft); color: var(--warn); }
+.hint { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+.empty { color: var(--muted); padding: 14px; text-align: center; }
+
+/* キューブの木 */
+.tree { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.tree button { width: 100%; text-align: left; border: 0; background: transparent; padding: 6px 8px; display: flex; gap: 8px; align-items: center; }
+.tree button:hover { background: var(--sunk); }
+.tree button[aria-current="true"] { background: var(--accent-soft); font-weight: 700; }
+.tree .ico { flex: none; width: 11px; height: 11px; background: var(--accent); transform: rotate(45deg) scale(.85); border-radius: 1px; }
+.tree .via { margin-left: auto; font-size: 11px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+.tree-actions { display: grid; gap: 6px; margin-top: 10px; }
+.tpls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.tpl { text-align: left; display: grid; gap: 2px; padding: 10px 12px; }
+.tpl span { font-size: 12px; color: var(--muted); }
+
+/* 設定(中央) */
+.crumbs { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.crumbs button { padding: 0 4px; border: 0; background: none; color: var(--accent); text-decoration: underline; }
+h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 10px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 0 12px; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 7px 12px; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 700; }
+.row { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 6px 10px; align-items: center; margin-bottom: 8px; }
+.row > label { font-size: 13px; color: var(--muted); }
+.axis-card { border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; border-left: 4px solid var(--c); background: var(--c-soft); }
+.axis-card.x { --c: var(--ax-x); --c-soft: var(--ax-x-soft); }
+.axis-card.y { --c: var(--ax-y); --c-soft: var(--ax-y-soft); }
+.axis-card.z { --c: var(--ax-z); --c-soft: var(--ax-z-soft); }
+.axis-card.v { --c: var(--accent); --c-soft: var(--accent-soft); }
+.axis-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.axis-head .badge { font-family: var(--font-mono); font-weight: 500; color: var(--c); font-size: 13px; }
+.axis-head input { flex: 1 1 140px; font-weight: 700; }
+.axis-head .dir { font-size: 12px; color: var(--muted); }
+.members { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.member { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; padding: 1px 2px 1px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); }
+.member button { border: 0; background: none; padding: 0 5px; color: var(--muted); line-height: 1.3; }
+.member .down { color: var(--accent); font-size: 11px; }
+.add-member { display: flex; gap: 6px; flex-wrap: wrap; }
+.add-member input { flex: 1 1 140px; }
+.link-note { font-size: 12px; margin-top: 4px; color: var(--c); }
+.month-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* データ入力 */
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; white-space: nowrap; }
+th { font-size: 12px; font-weight: 400; background: var(--sunk); }
+th.hx { color: var(--ax-x); }
+th.hy { color: var(--ax-y); }
+td input { width: 100%; min-width: 80px; border-color: transparent; background: transparent; padding: 3px 4px; text-align: right; font-family: var(--font-mono); }
+td input:hover { border-color: var(--line); }
+td.v { text-align: right; font-family: var(--font-mono); }
+td.v.zero { color: var(--muted); }
+tr.total td { font-weight: 700; border-top: 2px solid var(--line); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin-bottom: 10px; }
+.tools label { font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+textarea { width: 100%; min-height: 110px; font-family: var(--font-mono); font-size: 12px; }
+.map { display: grid; gap: 6px; margin: 10px 0; }
+.map-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); gap: 8px; align-items: center; }
+.map-row .src { font-family: var(--font-mono); font-size: 12px; padding: 5px 8px; background: var(--sunk); border-radius: 6px; overflow: hidden; text-overflow: ellipsis; }
+
+/* プレビュー */
+.viewer-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
+.viewer-head h2 { margin: 0; }
+.viewer-body { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+.views.split .viewer-body, .viewer.small .viewer-body { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1000px) { .viewer-body { grid-template-columns: minmax(0, 1fr); } }
+.views.split .viewer { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.stage { position: relative; height: min(68vh, 640px); min-height: 320px; border-radius: 8px; background: var(--stage); overflow: hidden; user-select: none; touch-action: none; }
+.stage canvas { display: block; width: 100%; height: 100%; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { position: absolute; transform: translate(-50%, -50%); font-size: 11px; white-space: nowrap; padding: 0 4px; border-radius: 3px; background: color-mix(in srgb, var(--surface) 85%, transparent); }
+.lbl.x { color: var(--ax-x); } .lbl.y { color: var(--ax-y); } .lbl.z { color: var(--ax-z); }
+.lbl.title { font-weight: 700; font-size: 12px; border: 1px solid currentColor; }
+.snap { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; align-items: center; }
+.snap button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.snap .sp { margin-left: auto; font-size: 12px; color: var(--muted); }
+.cellinfo { min-height: 46px; font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--sunk); margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.cellinfo .k { color: var(--muted); font-size: 12px; }
+.cellinfo .x { color: var(--ax-x); } .cellinfo .y { color: var(--ax-y); } .cellinfo .z { color: var(--ax-z); }
+.cellinfo b { font-family: var(--font-mono); }
+.face-title { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+.face-title .x { color: var(--ax-x); } .face-title .y { color: var(--ax-y); } .face-title .z { color: var(--ax-z); }
+.notes { margin-top: 8px; padding-top: 6px; border-top: 1px dashed color-mix(in srgb, var(--c) 40%, transparent); }
+.notes summary { cursor: pointer; font-size: 13px; color: var(--c); display: flex; gap: 8px; align-items: baseline; }
+.note-names { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+.note-name { display: inline-flex; align-items: center; gap: 2px; }
+.note-name input { width: 8.5em; padding: 3px 6px; font-size: 13px; }
+.show-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 13px; margin: 4px 0; }
+.show-row > span:first-child { color: var(--muted); font-size: 12px; }
+.show-row .x { color: var(--ax-x); } .show-row .y { color: var(--ax-y); } .show-row .z { color: var(--ax-z); }
+.chk { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+.note-table td input { text-align: left; font-family: var(--font-body); min-width: 150px; }
+.note-table td:first-child { font-size: 13px; }
+.sub { font-size: 13px; color: var(--c); margin: 8px 0 4px; }
+.compose { display: grid; gap: 6px; }
+.parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.part { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+.pnum { font-family: var(--font-mono); font-size: 11px; color: var(--muted); width: 1.2em; text-align: right; }
+.palts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; flex: 1 1 200px; min-width: 0; }
+.pill { display: inline-flex; align-items: center; font-size: 13px; padding: 1px 2px 1px 8px; border-radius: 99px; background: var(--sunk); }
+.pill button { padding: 0 5px; }
+.or { font-size: 11px; color: var(--muted); padding: 0 2px; }
+.part select { font-size: 12px; padding: 2px 4px; }
+.pmove { display: flex; gap: 0; margin-left: auto; }
+.compose-foot { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; }
+.notes-bar details + details { margin-top: 4px; border-top: 1px solid var(--line); padding-top: 4px; }
+.notes-bar summary { cursor: pointer; font-size: 13px; }
+.notes-bar summary .x { color: var(--ax-x); } .notes-bar summary .y { color: var(--ax-y); } .notes-bar summary .z { color: var(--ax-z); }
+.notes-bar .compose { margin-top: 6px; }
+.bulk { margin-top: 8px; padding: 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--line); }
+.sheet-wrap { max-height: 460px; overflow: auto; }
+.sheet { width: auto; min-width: 100%; }
+.sheet th { position: sticky; top: 0; z-index: 1; padding: 3px; }
+.sheet th select { width: 100%; min-width: 88px; font-size: 12px; padding: 3px 4px; font-weight: 700; }
+.sheet th.hx select { color: var(--ax-x); } .sheet th.hy select { color: var(--ax-y); } .sheet th.hz select { color: var(--ax-z); } .sheet th.hv select { color: var(--accent); }
+.sheet td { padding: 0; border-right: 1px solid var(--line); }
+.sheet td input { min-width: 88px; width: 100%; text-align: left; font-family: var(--font-body); border-radius: 0; padding: 5px 6px; }
+.sheet td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--surface); }
+.sheet .rn { width: 1%; color: var(--muted); font-size: 11px; text-align: right; padding: 0 6px; background: var(--sunk); }
+.tools label input[type=file] { font-size: 12px; }
+.guide { list-style: none; counter-reset: g; display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; padding: 0; font-size: 12px; }
+.guide li { counter-increment: g; padding: 2px 10px 2px 6px; border-radius: 99px; background: var(--sunk); color: var(--muted); }
+.guide li::before { content: counter(g); display: inline-block; width: 16px; height: 16px; line-height: 16px; text-align: center; border-radius: 50%; margin-right: 4px; background: var(--line); color: var(--ink); font-size: 11px; }
+.guide li.now { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.guide li.now::before { background: var(--on-accent); color: var(--accent); }
+.guide-box { font-size: 13px; padding: 8px 12px; border-radius: 6px; background: var(--accent-soft); margin: 0 0 10px; }
+.axis-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.axis-pick button { font-weight: 700; }
+.axis-pick button.x { color: var(--ax-x); } .axis-pick button.y { color: var(--ax-y); } .axis-pick button.z { color: var(--ax-z); }
+.axis-pick button span { font-weight: 400; font-size: 11px; color: var(--muted); margin-left: 4px; }
+.axis-pick button[aria-pressed="true"] { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; background: var(--surface); }
+.msheet { table-layout: fixed; width: 100%; }
+.msheet col.c-rn { width: 40px; } .msheet col.c-add { width: 110px; }
+.msheet th { vertical-align: middle; padding: 6px; height: 44px; }
+.msheet .mh { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.msheet .mh input { flex: 1 1 auto; min-width: 0; width: 100%; font-weight: 700; font-size: 12px; padding: 4px 6px; }
+.msheet .mh .tagb { flex: none; font-size: 10px; padding: 1px 6px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.msheet .mh button { flex: none; padding: 0 6px; }
+.msheet td input { min-width: 0; }
+.msheet th.add { text-align: center; }
+.msheet.hz col.c-lab { width: 220px; }
+.msheet.virt tbody tr:not(.spacer) { height: 35px; }
+.msheet.virt tbody tr.spacer td { padding: 0; border: 0; background: transparent; }
+.msheet.hz thead th { text-align: center; font-size: 11px; height: 32px; }
+.msheet.hz thead th button { padding: 0 4px; }
+.msheet.hz tbody th { background: var(--sunk); position: sticky; left: 0; z-index: 1; }
+.msheet td.draft input { background: color-mix(in srgb, var(--sunk) 50%, transparent); }
+.sheet-wrap.tall { max-height: 70vh; }
+.mtools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mtools .axis-pick { margin-bottom: 0; }
+.seg { display: inline-flex; align-items: center; gap: 0; font-size: 12px; }
+.seg > span { color: var(--muted); margin-right: 8px; }
+.seg button { border-radius: 0; font-size: 12px; padding: 4px 10px; }
+.seg button:first-of-type { border-radius: 6px 0 0 6px; } .seg button:last-of-type { border-radius: 0 6px 6px 0; border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); } .msheet td.rn { text-align: center; }
+.msheet.x th input { color: var(--ax-x); } .msheet.y th input { color: var(--ax-y); } .msheet.z th input { color: var(--ax-z); }
+.msheet th.rn button { font-size: 12px; white-space: nowrap; padding: 3px 8px; }
+.sheet thead th { white-space: nowrap; }
+.sheet th.hx, .sheet th.hy, .sheet th.hz { font-size: 12px; padding: 4px 8px; }
+.sheet th.hz { color: var(--ax-z); }
+.sheet .corner { font-size: 11px; }
+.sheet .corner .hx { color: var(--ax-x); } .sheet .corner .hy { color: var(--ax-y); } .sheet .corner .hz { color: var(--ax-z); }
+.sheet td input.num { text-align: right; font-family: var(--font-mono); }
+.sheet-tabs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 6px; font-size: 12px; }
+.sheet-tabs > span { font-weight: 700; margin-right: 4px; } .sheet-tabs .x { color: var(--ax-x); } .sheet-tabs .y { color: var(--ax-y); } .sheet-tabs .z { color: var(--ax-z); }
+.sheet-tabs button { font-size: 12px; padding: 3px 10px; color: var(--ink); }
+.sheet-tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+details.long { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.views.split .stage { height: 380px; min-height: 0; }
+/* ダッシュボード */
+.dash { display: grid; gap: 16px; }
+.dash-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; }
+.dash-head h1 { font-family: var(--font-display); font-size: 22px; margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.kpi .k { font-size: 12px; color: var(--muted); }
+.kpi .v { font-family: var(--font-mono); font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+@media (max-width: 420px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h3 { font-family: var(--font-display); font-size: 16px; margin: 0; }
+.card .crumb { font-size: 11px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--sunk); }
+.chip.x { color: var(--ax-x); background: var(--ax-x-soft); } .chip.y { color: var(--ax-y); background: var(--ax-y-soft); } .chip.z { color: var(--ax-z); background: var(--ax-z-soft); }
+.meter { height: 6px; border-radius: 99px; background: var(--sunk); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.bars { display: grid; gap: 4px; }
+.bar { display: grid; grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 12px; }
+.bar .lb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.bar .tr { height: 10px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.bar .tr i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.bar .nv { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.lowers { font-size: 12px; color: var(--muted); }
+.lowers button { border: 0; background: none; padding: 0 2px; color: var(--accent); text-decoration: underline; font-size: 12px; }
+.dash-empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.notes-bar { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+@media (prefers-reduced-motion: no-preference) { .tree button, .tabs button { transition: background .12s; } }
+</style>
+
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand"><i class="ico"></i>Cube Explorer<span class="tag">試作</span>
+      <button type="button" class="ghost menu-btn" id="menu-btn" aria-expanded="false" aria-controls="side-body">メニュー</button></div>
+    <div class="side-body" id="side-body">
+      <nav class="nav" id="nav" aria-label="画面">
+        <button type="button" data-view="dash">ダッシュボード</button>
+        <button type="button" data-view="cube">キューブを見る</button>
+        <p class="nav-sub">組み立てと入力</p>
+        <button type="button" data-view="axes"><span class="n">1</span>軸を決める</button>
+        <button type="button" data-view="members"><span class="n">2</span>目盛りを登録</button>
+        <button type="button" data-view="data"><span class="n">3</span>値を入れる</button>
+      </nav>
+      <p class="nav-sub">キューブ(上位 › 下位)</p>
+      <ul class="tree" id="tree"></ul>
+      <div class="tree-actions">
+        <button type="button" class="primary" id="new-cube">＋ 新しいキューブ</button>
+        <button type="button" id="add-lower">＋ 下位のキューブを作る</button>
+        <button type="button" id="add-upper">＋ 上位のキューブを作る</button>
+      </div>
+      <p class="hint" id="tree-hint"></p>
+      <div class="side-foot">
+        <button id="tpl-btn" type="button">テンプレートから始める</button>
+        <button id="blank-btn" type="button" class="ghost">白紙にする</button>
+        <p class="hint">変更はこのブラウザにだけ残ります。</p>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="blank-confirm" class="confirm" hidden>
+      <span>作ったキューブと入力したデータをすべて消して、白紙に戻します。</span>
+      <button id="blank-yes" type="button" class="danger">白紙にする</button>
+      <button id="blank-no" type="button">やめる</button>
+    </div>
+    <div id="tpl-panel" class="panel" hidden>
+      <p class="panel-title">テンプレート(選ぶと今の内容は置き換わります)</p>
+      <div class="tpls" id="tpls"></div>
+      <div style="margin-top:8px"><button id="tpl-close" type="button">閉じる</button></div>
+    </div>
+
+    <div class="views" id="views">
+      <section id="dash" class="dash" hidden></section>
+      <section class="panel" id="editor" hidden></section>
+      <section class="panel viewer" id="viewer">
+        <div class="viewer-head"><h2 id="viewer-title">プレビュー</h2><span class="hint" id="viewer-sub" style="margin:0"></span></div>
+        <div class="viewer-body">
+          <div class="viewer-3d">
+            <div class="stage" id="stage"><div class="labels" id="labels"></div></div>
+            <div class="snap" id="snap">
+              <button type="button" data-face="front" aria-pressed="false">正面</button>
+              <button type="button" data-face="top" aria-pressed="false">上面</button>
+              <button type="button" data-face="side" aria-pressed="false">側面</button>
+              <button type="button" data-face="iso" aria-pressed="true">斜め</button>
+              <span class="sp">ドラッグで回転</span>
+            </div>
+            <div class="notes-bar" id="notes-bar" hidden></div>
+          </div>
+          <div class="viewer-side">
+            <div class="cellinfo" id="cellinfo"><span class="k">コマをクリックすると中身が出ます。</span></div>
+            <p class="face-title" id="face-title"></p>
+            <div class="scroll" id="face"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const nid = (p) => p + Math.random().toString(36).slice(2, 9);
+  const AX = ["x", "y", "z"];
+  const AXNAME = { x: "X軸", y: "Y軸", z: "Z軸" };
+  const AXDIR = { x: "横に並ぶ", y: "縦に並ぶ", z: "奥に並ぶ" };
+  const VTYPE = { money: "金額", number: "数値", text: "文字" };
+  const AGG = { sum: "合計", avg: "平均", count: "件数", max: "最大", min: "最小" };
+  const SEP = "\u0001";
+  const fmt = (n) => (Number.isFinite(n) ? (Math.round(n * 100) / 100).toLocaleString("ja-JP") : "");
+
+  // ---- キューブの形 ----
+  // cube = { id, name, parent, via: "x"|"y"|"z"(上位のどの軸の目盛りから入るか), axes: {x,y,z}, value: {name,type,agg}, cells: { "上位の目盛り\u0001x\u0001y\u0001z": 値 } }
+  // axis = { name, kind: "list"|"month", members: [...], from, to }
+  const newAxis = (name, members = []) => ({ name, kind: "list", members, from: "", to: "" });
+  const newCube = (name, parent = null, via = null) => ({ id: nid("c"), name, parent, via, axes: { x: newAxis("X軸"), y: newAxis("Y軸"), z: newAxis("Z軸") }, value: { name: "値", type: "number", agg: "sum" }, cells: {} });
+  const monthsBetween = (a, b) => {
+    if (!/^\d{4}-\d{2}$/.test(a) || !/^\d{4}-\d{2}$/.test(b) || a > b) return [];
+    const out = []; let [y, m] = a.split("-").map(Number);
+    while (out.length < 60) { const s = `${y}-${String(m).padStart(2, "0")}`; out.push(s); if (s === b) break; m++; if (m > 12) { m = 1; y++; } }
+    return out;
+  };
+  const members = (ax) => (ax.kind === "month" ? monthsBetween(ax.from, ax.to) : ax.members);
+  // 表記:目盛りごとに複数の書き方(法人名・PartyID・顧客番号など)を持てる。
+  // labels[0](id "base")が基本の表記で、目盛りそのもの。ほかの表記の値は alt[目盛り][表記の id] に持つ。
+  // show は表示の並び。1つの部品は表記の id の配列で、2つ以上なら「または」(値の入っている最初の表記を使う)。
+  //   例 [["base"], ["n2", "n3"], ["n4"]] … 顧客番号 / 法人名または屋号 / 代表者名
+  // pack が true(既定)なら、値の入っていない部品は飛ばして詰める。false なら「—」を出す
+  const ensureLabels = (ax) => { if (!ax.labels?.length) ax.labels = [{ id: "base", name: "名前" }]; ax.alt ??= {}; ax.show = partsOf(ax); return ax; };
+  const partsOf = (ax) => { const ids = new Set((ax.labels || []).map((l) => l.id)); const ps = (ax.show || ["base"]).map((p) => (Array.isArray(p) ? p : [p]).filter((id) => ids.has(id))).filter((p) => p.length); return ps.length ? ps : [["base"]]; };
+  const labelName = (ax, id) => ax.labels?.find((l) => l.id === id)?.name ?? "";
+  const hasNotes = (ax) => ax.kind === "list" && (ax.labels?.length ?? 0) > 1;
+  const noteVal = (ax, m, id) => (id === "base" ? m : ax.alt?.[m]?.[id] ?? "");
+  const disp = (ax, m) => {
+    if (!hasNotes(ax)) return m;
+    const out = [];
+    for (const part of partsOf(ax)) {
+      const v = part.map((id) => noteVal(ax, m, id)).find((x) => x);
+      if (v) out.push(v); else if (ax.pack === false) out.push("—");
+    }
+    return out.length ? out.join(" / ") : m;
+  };
+  const withNotes = (ax, labels, alt) => Object.assign(ax, { labels: [{ id: "base", name: labels[0] }, ...labels.slice(1).map((name, i) => ({ id: "n" + (i + 1), name }))], alt, show: [["base"]], pack: true });
+
+  // ---- テンプレート ----
+  function depositTemplate() {
+    const corp = newCube("取引先別の入金");
+    // 法人と個人が混ざる取引先。基本の表記は顧客番号(個人は法人名を持たないため)
+    const code = { みどり堂: "C-0001", しおかぜ: "C-0002", もみじ屋: "C-0003", くらしき工房: "C-0004", やまだ雑貨: "C-0005", 小林咲: "C-0006" };
+    corp.axes = { x: newAxis("取引先", Object.values(code)), y: { name: "年月", kind: "month", members: [], from: "2026-04", to: "2026-09" }, z: newAxis("内訳", ["売上", "システム利用料"]) };
+    corp.value = { name: "金額", type: "money", agg: "sum" };
+    withNotes(corp.axes.x, ["顧客番号", "PartyID", "法人名", "屋号", "代表者名", "区分"], {
+      "C-0001": { n1: "P-10021", n2: "株式会社みどり堂", n4: "佐藤 健", n5: "法人" },
+      "C-0002": { n1: "P-10048", n2: "有限会社しおかぜ", n4: "中村 葵", n5: "法人" },
+      "C-0003": { n1: "P-10077", n2: "株式会社もみじ屋", n4: "高橋 誠", n5: "法人" },
+      "C-0004": { n1: "P-10103", n2: "合同会社くらしき工房", n4: "山本 光", n5: "法人" },
+      "C-0005": { n1: "P-10140", n3: "やまだ雑貨", n4: "山田 太郎", n5: "個人" },
+      "C-0006": { n1: "P-10152", n4: "小林 咲", n5: "個人" },
+    });
+    corp.axes.x.show = [["base"], ["n2", "n3"], ["n4"]]; // 顧客番号 / 法人名または屋号 / 代表者名(空欄は詰める)
+    const shop = newCube("ショップ別の入金", corp.id, "x");
+    shop.axes = { x: newAxis("ショップ", ["楽天市場店", "Yahoo!店", "自社サイト"]), y: { name: "年月", kind: "month", members: [], from: "2026-04", to: "2026-09" }, z: newAxis("内訳", ["売上", "システム利用料"]) };
+    shop.value = { name: "金額", type: "money", agg: "sum" };
+    const info = newCube("取引先の基本情報", corp.id, "x");
+    info.axes = { x: newAxis("項目", ["課税区分", "住所", "代表者"]), y: newAxis("版", ["現在"]), z: newAxis("確認", ["登録内容"]) };
+    info.value = { name: "内容", type: "text", agg: "count" };
+    const base = { みどり堂: [2800000, 1200000, 300000], しおかぜ: [640000, 0, 0], もみじ屋: [1900000, 910000, 150000], くらしき工房: [0, 450000, 80000], やまだ雑貨: [380000, 0, 60000], 小林咲: [0, 120000, 0] };
+    const months = monthsBetween("2026-04", "2026-09");
+    for (const [name, arr] of Object.entries(base)) arr.forEach((b, si) => {
+      const c = code[name];
+      if (!b) return;
+      months.forEach((m, i) => {
+        const sales = Math.round((b * (0.9 + 0.04 * i + ((name.length * 7 + si * 5 + i * 3) % 7) / 100)) / 100) * 100;
+        const fee = -Math.round((sales * 0.035) / 10) * 10;
+        const sname = shop.axes.x.members[si];
+        shop.cells[[c, sname, m, "売上"].join(SEP)] = sales;
+        shop.cells[[c, sname, m, "システム利用料"].join(SEP)] = fee;
+        corp.cells[["", c, m, "売上"].join(SEP)] = (corp.cells[["", c, m, "売上"].join(SEP)] || 0) + sales;
+        corp.cells[["", c, m, "システム利用料"].join(SEP)] = (corp.cells[["", c, m, "システム利用料"].join(SEP)] || 0) + fee;
+      });
+    });
+    const infos = { みどり堂: ["課税", "広島市中区1丁目", "佐藤 健"], しおかぜ: ["免税", "呉市2丁目", "中村 葵"], もみじ屋: ["課税", "廿日市市3丁目", "高橋 誠"], くらしき工房: ["免税", "倉敷市4丁目", "山本 光"], やまだ雑貨: ["免税", "尾道市5丁目", "山田 太郎"], 小林咲: ["免税", "三原市6丁目", "小林 咲"] };
+    for (const [name, vals] of Object.entries(infos)) vals.forEach((v, i) => { info.cells[[code[name], info.axes.x.members[i], "現在", "登録内容"].join(SEP)] = v; });
+    return { cubes: [corp, shop, info], selected: corp.id, tab: "axes", at: {} };
+  }
+  function storeTemplate() {
+    const st = newCube("店舗別の売上");
+    st.axes = { x: newAxis("店舗", ["本通店", "呉駅前店", "福山店"]), y: { name: "年月", kind: "month", members: [], from: "2026-07", to: "2026-09" }, z: newAxis("商品カテゴリ", ["飲料", "食品", "日用品"]) };
+    st.value = { name: "売上金額", type: "money", agg: "sum" };
+    withNotes(st.axes.x, ["店舗名", "店舗コード"], { 本通店: { n1: "S01" }, 呉駅前店: { n1: "S02" }, 福山店: { n1: "S03" } });
+    const inner = newCube("担当者別の売上", st.id, "x");
+    inner.axes = { x: newAxis("担当者", ["田中", "鈴木", "伊藤"]), y: { name: "年月", kind: "month", members: [], from: "2026-07", to: "2026-09" }, z: newAxis("商品カテゴリ", ["飲料", "食品", "日用品"]) };
+    inner.value = { name: "売上金額", type: "money", agg: "sum" };
+    return { cubes: [st, inner], selected: st.id, tab: "axes", at: {} };
+  }
+  const TEMPLATES = [
+    { name: "入金管理(架空データ入り)", note: "取引先(法人と個人)× 年月 × 内訳の入金。取引先は顧客番号・法人名・屋号・代表者名の表記つき。下位に「ショップ別の入金」と「取引先の基本情報」。", make: depositTemplate },
+    { name: "店舗の売上", note: "店舗 × 年月 × 商品カテゴリ。下位に「担当者別の売上」。データは空。", make: storeTemplate },
+    { name: "軸だけのひな形", note: "X・Y・Z に名前だけ入った空のキューブを1つ。", make: () => { const c = newCube("新しいキューブ"); return { cubes: [c], selected: c.id, tab: "axes", at: {} }; } },
+  ];
+
+  // ---- 状態 ----
+  const KEY = "cube-builder-proto-v2";
+  let st;
+  try { st = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { st = null; }
+  const blank = () => ({ cubes: [], selected: null, tab: "axes", view: "dash", at: {} });
+  if (!st || !Array.isArray(st.cubes)) st = blank();
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* 保存できなくても動かす */ } };
+  let face = "front", picked = null, importState = null, pendingDelete = null;
+
+  const cube = (id) => st.cubes.find((c) => c.id === id);
+  const kids = (id) => st.cubes.filter((c) => c.parent === id);
+  const chainOf = (c) => { const out = []; while (c) { out.unshift(c); c = cube(c.parent); } return out; };
+  // 下位のキューブは、上位の目盛り(st.at[下位の id])ごとに中身を持つ
+  const atOf = (c) => (c.parent ? (st.at[c.id] ?? members(cube(c.parent).axes[c.via])[0] ?? "") : "");
+
+  function aggregate(c, at, pick) {
+    // pick(x,y,z) が true のコマを集める
+    const xs = members(c.axes.x), ys = members(c.axes.y), zs = members(c.axes.z);
+    const vals = [];
+    for (const x of xs) for (const y of ys) for (const z of zs) {
+      if (!pick(x, y, z)) continue;
+      const v = c.cells[[at, x, y, z].join(SEP)];
+      if (v !== undefined && v !== "") vals.push(v);
+    }
+    if (c.value.type === "text" || c.value.agg === "count") return vals.length ? (c.value.type === "text" && vals.length === 1 && c.value.agg !== "count" ? vals[0] : vals.length) : null;
+    const nums = vals.map(Number).filter(Number.isFinite);
+    if (!nums.length) return null;
+    return { sum: () => nums.reduce((a, b) => a + b, 0), avg: () => nums.reduce((a, b) => a + b, 0) / nums.length, max: () => Math.max(...nums), min: () => Math.min(...nums) }[c.value.agg]();
+  }
+
+  // ---- 木 ----
+  function renderTree() {
+    const out = [];
+    const walk = (parent, depth) => kids(parent).forEach((c) => {
+      const p = cube(c.parent);
+      out.push(`<li><button type="button" data-id="${c.id}" aria-current="${c.id === st.selected}" style="padding-left:${8 + depth * 16}px"><i class="ico"></i>${esc(c.name)}${p ? `<span class="via">${esc(p.axes[c.via].name)}ごと</span>` : ""}</button></li>`);
+      walk(c.id, depth + 1);
+    });
+    walk(null, 0);
+    $("tree").innerHTML = out.join("") || `<li class="empty" style="padding:8px 0">まだキューブがありません</li>`;
+    const has = !!cube(st.selected);
+    $("add-lower").disabled = !has; $("add-upper").disabled = !has;
+    $("tree-hint").textContent = has ? "下位は、選んだキューブの1つの軸の目盛りごとに中身を持つキューブです(例:法人ごとのショップ別)。" : "";
+  }
+
+  // ---- 中央:設定 ----
+  // 表示の並びの編集(軸の設定とプレビューの両方で使う)。部品ごとに「または」を足せ、上下に並び替えられる
+  const partText = (ax, part) => part.map((id) => esc(labelName(ax, id))).join("<span class=\"or\">または</span>");
+  const sampleOf = (ax) => { const ms = ax.members; const pick = ms.length > 3 ? [ms[0], ms[1], ms[ms.length - 1]] : ms; return pick.map((m) => esc(disp(ax, m))).join("、"); };
+  function composeEditor(ax, k) {
+    const ps = partsOf(ax);
+    return `<div class="compose" data-compose="${k}">
+      <ol class="parts">${ps.map((part, i) => `<li class="part">
+        <span class="pnum">${i + 1}</span>
+        <span class="palts">${part.map((id, j) => `${j ? `<span class="or">または</span>` : ""}<span class="pill">${esc(labelName(ax, id))}${part.length > 1 ? `<button type="button" class="ghost" data-orx="${i}:${id}" aria-label="${esc(labelName(ax, id))}を外す">×</button>` : ""}</span>`).join("")}
+          <select data-or="${i}" aria-label="${i + 1}番目に「または」を足す"><option value="">＋ または</option>${ax.labels.filter((l) => !part.includes(l.id)).map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select></span>
+        <span class="pmove"><button type="button" class="ghost" data-pmove="${i}:-1" ${i ? "" : "disabled"} aria-label="上へ">↑</button><button type="button" class="ghost" data-pmove="${i}:1" ${i < ps.length - 1 ? "" : "disabled"} aria-label="下へ">↓</button><button type="button" class="ghost" data-prm="${i}" ${ps.length > 1 ? "" : "disabled"} aria-label="この部品を外す">×</button></span>
+      </li>`).join("")}</ol>
+      <div class="compose-foot">
+        <select data-addpart aria-label="表示に表記を足す"><option value="">＋ 表示に足す</option>${ax.labels.map((l) => `<option value="${l.id}">${esc(l.name)}</option>`).join("")}</select>
+        <label class="chk"><input type="checkbox" data-pack ${ax.pack === false ? "" : "checked"}>空欄は詰める</label>
+      </div>
+      ${ax.members.length ? `<p class="hint" style="margin:4px 0 0">見え方:${sampleOf(ax)}</p>` : ""}
+    </div>`;
+  }
+  // 表示の並びの操作(クリックと選択)。どちらの場所からでも同じ処理
+  function composeAction(e) {
+    const box = e.target.closest("[data-compose]"); if (!box) return false;
+    const ax = ensureLabels(cube(st.selected).axes[box.dataset.compose]); const ps = ax.show; const t = e.target;
+    if (e.type === "click") {
+      const mv = t.closest("[data-pmove]"), rm = t.closest("[data-prm]"), ox = t.closest("[data-orx]");
+      if (mv) { const [i, d] = mv.dataset.pmove.split(":").map(Number); [ps[i], ps[i + d]] = [ps[i + d], ps[i]]; }
+      else if (rm) ps.splice(+rm.dataset.prm, 1);
+      else if (ox) { const [i, id] = ox.dataset.orx.split(":"); ps[+i] = ps[+i].filter((x) => x !== id); }
+      else return true;
+    } else {
+      if (t.dataset.or !== undefined && t.value) ps[+t.dataset.or].push(t.value);
+      else if (t.dataset.addpart !== undefined && t.value) ps.push([t.value]);
+      else if (t.dataset.pack !== undefined) ax.pack = t.checked;
+      else return true;
+    }
+    ax.show = partsOf(ax); render(); return true;
+  }
+  function notesSection(ax, k) {
+    const ls = ax.labels?.length ? ax.labels : [{ id: "base", name: "名前" }];
+    const many = ls.length > 1;
+    return `<details class="notes" ${many ? "open" : ""}>
+      <summary>表記 <span class="hint" style="margin:0">${many ? ls.map((l) => esc(l.name)).join("・") : "1つ(名前)"}</span></summary>
+      <p class="hint" style="margin:0 0 6px">同じ目盛りを、顧客番号・法人名・代表者名のように別の書き方でも持てます。「基本」の表記が目盛りそのもので、空にはできません。‹ › で並び替えます。</p>
+      <div class="note-names">${ls.map((l, i) => `<span class="note-name">${i ? `<button type="button" class="ghost" data-lmove="${l.id}:-1" aria-label="${esc(l.name)}を前へ">‹</button>` : ""}<input data-note="${l.id}" value="${esc(l.name)}" aria-label="表記の名前" size="8">${i < ls.length - 1 ? `<button type="button" class="ghost" data-lmove="${l.id}:1" aria-label="${esc(l.name)}を後ろへ">›</button>` : ""}${l.id === "base" ? `<span class="hint" style="margin:0">基本</span>` : `<button type="button" class="ghost" data-delnote="${l.id}" aria-label="${esc(l.name)}を外す">×</button>`}</span>`).join("")}
+        <button type="button" data-addnote>＋ 表記を足す</button></div>
+      ${many ? `<p class="sub">表示の並び <span class="hint" style="margin:0">(上から順に「 / 」でつなぐ。「または」は値の入っている最初の表記を使う)</span></p>${composeEditor(ax, k)}
+        ${ax.members.length ? `<div class="scroll" style="margin-top:8px"><table class="note-table"><thead><tr>${ls.map((l) => `<th>${esc(l.name)}</th>`).join("")}</tr></thead>
+        <tbody>${ax.members.map((m) => `<tr>${ls.map((l) => l.id === "base" ? `<td>${esc(m)}</td>` : `<td><input data-alt-m="${esc(m)}" data-alt-id="${l.id}" value="${esc(noteVal(ax, m, l.id))}" aria-label="${esc(m)}の${esc(l.name)}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>` : ""}` : ""}
+    </details>`;
+  }
+
+  // 目盛りの一括登録:Excel の範囲をコピーして貼る(タブ区切り)。CSV(カンマ区切り)も可
+  const bulk = { ax: null, text: "", msg: "" };
+  function bulkPanel(ax) {
+    const ls = ax.labels?.length ? ax.labels : [{ id: "base", name: "名前" }];
+    return `<div class="bulk">
+      <p class="hint" style="margin:0 0 6px">Excel で範囲を選んでコピーし、下に貼り付けます。1行が1つの目盛りです。1行目に見出し(${ls.map((l) => esc(l.name)).join("・")})があれば、その名前で列をつなぎます。見出しがないときは、左から表記の並び順(${ls.map((l) => esc(l.name)).join(" → ")})として読みます。知らない見出しの列は、新しい表記として足します。同じ${esc(ls.find((l) => l.id === "base").name)}の行は上書きします。</p>
+      <textarea data-bulktext placeholder="${esc(ls.map((l) => l.name).join("\t"))}">${esc(bulk.text)}</textarea>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px"><button type="button" class="primary" data-bulkgo>登録する</button><button type="button" data-bulkclose>閉じる</button></div>
+      ${bulk.msg}
+    </div>`;
+  }
+  function bulkApply(ax) {
+    ensureLabels(ax);
+    const lines = bulk.text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (!lines.length) { bulk.msg = `<p class="notice warn">貼り付けた内容がありません。</p>`; return; }
+    const tab = lines.some((l) => l.includes("\t"));
+    const rows = tab ? lines.map((l) => l.split("\t").map((x) => x.trim())) : parseCsv(lines.join("\n")).map((r) => r.map((x) => x.trim()));
+    const n = (s) => s.replace(/\s/g, "");
+    // 1行目のどれかが表記の名前と同じなら見出しとみなす
+    const isHead = rows[0].some((h) => n(h) === n(ax.name) || ax.labels.some((l) => n(l.name) === n(h)));
+    let cols;
+    if (isHead) {
+      cols = rows[0].map((h) => {
+        if (!h) return null;
+        const hit = ax.labels.find((l) => n(l.name) === n(h)); if (hit) return hit.id;
+        if (n(h) === n(ax.name) && !rows[0].some((x) => n(x) === n(ax.labels.find((l) => l.id === "base").name))) return "base"; // 軸の名前の列は基本の表記として読む
+        const id = nid("n"); ax.labels.push({ id, name: h }); return id;
+      });
+    } else cols = ax.labels.map((l) => l.id).slice(0, rows[0].length);
+    const bi = cols.indexOf("base");
+    if (bi < 0) { bulk.msg = `<p class="notice warn">基本の表記「${esc(ax.labels.find((l) => l.id === "base").name)}」の列が見つかりません。見出しに入れてください。</p>`; return; }
+    let added = 0, updated = 0, skipped = 0;
+    for (const r of rows.slice(isHead ? 1 : 0)) {
+      const m = r[bi]; if (!m) { skipped++; continue; }
+      if (ax.members.includes(m)) updated++; else { ax.members.push(m); added++; }
+      cols.forEach((id, i) => { if (id && id !== "base" && r[i]) (ax.alt[m] ??= {})[id] = r[i]; });
+    }
+    bulk.text = ""; bulk.msg = `<p class="notice">${added}件を足し、${updated}件を更新しました${skipped ? `(${esc(ax.labels.find((l) => l.id === "base").name)}が空の${skipped}行は飛ばしました)` : ""}。</p>`;
+  }
+
+  function renderAxes(c) {
+    const p = cube(c.parent);
+    const axisCard = (k) => {
+      const ax = c.axes[k];
+      const lowers = kids(c.id).filter((d) => d.via === k);
+      return `<div class="axis-card ${k}" data-ax="${k}">
+        <div class="axis-head"><span class="badge">${k.toUpperCase()}</span><input aria-label="${AXNAME[k]}の名前" data-f="name" value="${esc(ax.name)}"><span class="dir">${AXDIR[k]}</span></div>
+        <div class="row"><label>目盛り</label>
+          <select data-f="kind" aria-label="目盛りの作り方"><option value="list" ${ax.kind === "list" ? "selected" : ""}>自分で並べる</option><option value="month" ${ax.kind === "month" ? "selected" : ""}>年月の範囲</option></select></div>
+        ${ax.kind === "month" ? `<div class="month-row"><input type="month" data-f="from" value="${esc(ax.from)}" aria-label="開始の年月"> 〜 <input type="month" data-f="to" value="${esc(ax.to)}" aria-label="終わりの年月"><span class="hint" style="margin:0">${members(ax).length}か月</span></div>`
+        : `<div class="members">${ax.members.map((m, i) => `<span class="member">${esc(m)}<button type="button" data-del="${i}" aria-label="${esc(m)}を外す">×</button></span>`).join("") || `<span class="hint" style="margin:0">まだ目盛りがありません</span>`}</div>
+           <div class="add-member"><input data-f="newmember" placeholder="目盛りを足す(、区切りで複数)" aria-label="${AXNAME[k]}の目盛りを足す"><button type="button" data-add>足す</button><button type="button" data-bulk>まとめて貼り付け</button></div>
+           ${bulk.ax === k ? bulkPanel(ax) : ""}
+           ${notesSection(ax, k)}`}
+        ${lowers.length ? `<p class="link-note">この軸の目盛りごとに下位:${lowers.map((d) => esc(d.name)).join("、")}</p>` : ""}
+      </div>`;
+    };
+    $("pane").innerHTML = `${guide(["軸を決める", "目盛りを登録する", "値を入れる"], 0)}
+      <div class="guide-box"><b>キューブの形を決めます。</b>名前を付け、X(横)・Y(縦)・Z(奥)の軸にそれぞれ名前を付けます(例:X 法人情報、Y お客様、Z 年月)。年月の軸は「年月の範囲」を選ぶと月が自動で並びます。最後にコマに入れる値(例:入金額)を決めたら、② に進みます。</div>
+      <div class="row"><label for="cube-name">名前</label><input id="cube-name" value="${esc(c.name)}"></div>
+      ${p ? `<div class="row"><label for="cube-via">上位から</label><select id="cube-via">${AX.map((k) => `<option value="${k}" ${k === c.via ? "selected" : ""}>「${esc(p.name)}」の${esc(p.axes[k].name)}ごと</option>`).join("")}</select></div>` : ""}
+      ${AX.map(axisCard).join("")}
+      <div class="axis-card v">
+        <div class="axis-head"><span class="badge">値</span><input id="v-name" aria-label="コマに入れる値の名前" value="${esc(c.value.name)}"><span class="dir">コマの中身</span></div>
+        <div class="row"><label for="v-type">型</label><select id="v-type">${Object.entries(VTYPE).map(([k, v]) => `<option value="${k}" ${k === c.value.type ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="row"><label for="v-agg">まとめ方</label><select id="v-agg">${Object.entries(AGG).filter(([k]) => c.value.type !== "text" || k === "count").map(([k, v]) => `<option value="${k}" ${k === c.value.agg ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <p class="hint">面で見るとき、見えていない軸の方向にまとめる方法です。</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+        <button type="button" class="danger" id="del-cube">このキューブを削除</button>
+        <button type="button" class="primary" data-tab="members" style="margin-left:auto">② 目盛りを登録するへ</button>
+      </div>
+      <div id="del-confirm"></div>`;
+    $("cube-name").oninput = (e) => { c.name = e.target.value; renderTree(); save(); renderLabelsOnly(); };
+    if ($("cube-via")) $("cube-via").onchange = (e) => { c.via = e.target.value; render(); };
+    $("v-name").oninput = (e) => { c.value.name = e.target.value; save(); renderFace(); };
+    $("v-type").onchange = (e) => { c.value.type = e.target.value; if (c.value.type === "text") c.value.agg = "count"; render(); };
+    $("v-agg").onchange = (e) => { c.value.agg = e.target.value; render(); };
+    const pane = $("pane");
+    pane.oninput = (e) => {
+      const card = e.target.closest(".axis-card[data-ax]"); if (!card) return; const ax = c.axes[card.dataset.ax];
+      const f = e.target.dataset.f;
+      if (e.target.dataset.bulktext !== undefined) { bulk.text = e.target.value; return; }
+      if (f === "name") { ax.name = e.target.value; save(); renderLabelsOnly(); renderTree(); renderFace(); }
+      if (e.target.dataset.note) { ensureLabels(ax).labels.find((l) => l.id === e.target.dataset.note).name = e.target.value; save(); renderFace(); renderNotesBar(); }
+      if (e.target.dataset.altM !== undefined) {
+        const m = e.target.dataset.altM; ensureLabels(ax); (ax.alt[m] ??= {})[e.target.dataset.altId] = e.target.value.trim();
+        save(); renderLabelsOnly(); renderFace(); renderPicked();
+      }
+    };
+    pane.onchange = (e) => {
+      const card = e.target.closest(".axis-card[data-ax]"); if (!card) return; const ax = c.axes[card.dataset.ax];
+      if (composeAction(e)) return;
+      const f = e.target.dataset.f;
+      if (f === "kind") { ax.kind = e.target.value; if (ax.kind === "month" && !ax.from) { ax.from = "2026-04"; ax.to = "2026-09"; } render(); }
+      if (f === "from" || f === "to") { ax[f] = e.target.value; render(); }
+    };
+    const addFrom = (card) => {
+      const ax = c.axes[card.dataset.ax]; const inp = card.querySelector("[data-f=newmember]");
+      const vals = inp.value.split(/[、,\n]/).map((s) => s.trim()).filter((s) => s && !ax.members.includes(s));
+      if (!vals.length) return; ax.members.push(...vals); render();
+      document.querySelector(`.axis-card[data-ax="${card.dataset.ax}"] [data-f=newmember]`)?.focus();
+    };
+    pane.onclick = (e) => {
+      if (composeAction(e)) return;
+      const card = e.target.closest(".axis-card[data-ax]");
+      if (card && e.target.closest("[data-bulk]")) { bulk.ax = bulk.ax === card.dataset.ax ? null : card.dataset.ax; bulk.msg = ""; render(); document.querySelector("[data-bulktext]")?.focus(); return; }
+      if (card && e.target.closest("[data-bulkclose]")) { bulk.ax = null; bulk.text = ""; bulk.msg = ""; render(); return; }
+      if (card && e.target.closest("[data-bulkgo]")) { bulkApply(c.axes[card.dataset.ax]); render(); return; }
+      const lm = e.target.closest("[data-lmove]");
+      if (card && lm) {
+        const ax = c.axes[card.dataset.ax]; const [id, d] = lm.dataset.lmove.split(":"); const i = ax.labels.findIndex((l) => l.id === id); const j = i + Number(d);
+        if (j >= 0 && j < ax.labels.length) { [ax.labels[i], ax.labels[j]] = [ax.labels[j], ax.labels[i]]; render(); }
+        return;
+      }
+      if (card && e.target.closest("[data-add]")) addFrom(card);
+      const del = e.target.closest("[data-del]");
+      if (card && del) { const ax = c.axes[card.dataset.ax]; const [m] = ax.members.splice(+del.dataset.del, 1); if (ax.alt) delete ax.alt[m]; render(); }
+      if (card && e.target.closest("[data-addnote]")) {
+        const ax = ensureLabels(c.axes[card.dataset.ax]);
+        const id = nid("n"); ax.labels.push({ id, name: `表記${ax.labels.length + 1}` }); render();
+        document.querySelector(`.axis-card[data-ax="${card.dataset.ax}"] [data-note="${id}"]`)?.select();
+      }
+      const dn = e.target.closest("[data-delnote]");
+      if (card && dn) {
+        const ax = c.axes[card.dataset.ax]; const id = dn.dataset.delnote;
+        ax.labels = ax.labels.filter((l) => l.id !== id); ax.show = partsOf(ax);
+        for (const m of Object.keys(ax.alt)) delete ax.alt[m][id];
+        render();
+      }
+    };
+    pane.onkeydown = (e) => { if (e.key === "Enter" && e.target.dataset.f === "newmember") { e.preventDefault(); addFrom(e.target.closest(".axis-card")); } };
+    $("del-cube").onclick = () => {
+      const all = []; const walk = (id) => { all.push(cube(id)); kids(id).forEach((k) => walk(k.id)); }; walk(c.id);
+      $("del-confirm").innerHTML = `<div class="confirm" style="margin-top:8px">「${esc(c.name)}」${all.length > 1 ? `と下位(${all.slice(1).map((x) => esc(x.name)).join("、")})` : ""}を削除します。入力したデータも消えます。<button type="button" class="danger" id="dc-yes">削除する</button><button type="button" id="dc-no">やめる</button></div>`;
+      $("dc-yes").onclick = () => { st.cubes = st.cubes.filter((x) => !all.includes(x)); st.selected = c.parent || st.cubes[0]?.id || null; render(); };
+      $("dc-no").onclick = () => { $("del-confirm").innerHTML = ""; };
+    };
+  }
+
+  function atSelect(c, id) {
+    if (!c.parent) return "";
+    const p = cube(c.parent); const ms = members(p.axes[c.via]); const cur = atOf(c);
+    return `<label>${esc(p.name)}の${esc(p.axes[c.via].name)}<select id="${id}">${ms.map((m) => `<option value="${esc(m)}" ${m === cur ? "selected" : ""}>${esc(disp(p.axes[c.via], m))}</option>`).join("")}</select></label>`;
+  }
+
+  // 貼り付けた文字を目盛りに直す。基本の表記・ほかの表記・表示中の書き方のどれでも探す
+  function findMember(ax, text) {
+    const t = String(text ?? "").trim(); if (!t) return null;
+    const ms = members(ax);
+    if (ms.includes(t)) return t;
+    if (hasNotes(ax)) { const hit = ms.find((m) => ax.labels.some((l) => noteVal(ax, m, l.id) === t) || disp(ax, m) === t); if (hit) return hit; }
+    return null;
+  }
+  const cellText = (v) => (v === undefined || v === "" ? "" : String(v));
+  const toValue = (c, raw) => { const r = String(raw).trim(); if (r === "") return undefined; if (c.value.type === "text") return r; const n = Number(r.replace(/[,円¥\s]/g, "")); return Number.isFinite(n) ? n : null; };
+  const guide = () => ""; // 手順はタブの①②③で示す
+
+  // ---- ② 目盛りの一覧(軸ごとのシート) ----
+  // 1行が1つの目盛り、列が表記。下の空いた行に書くと目盛りが増える。Excel の範囲も貼れる
+  const drafts = {}; // まだ基本の表記が入っていない行 { "cubeId:axis": [{ labelId: 値 }] }
+  let membersMsg = "", pendingFocus = null, ROW_H = 35, mScroll = { key: "", top: 0 };
+  function renameMember(c, k, from, to) {
+    const ax = c.axes[k]; const i = ax.members.indexOf(from); if (i < 0 || !to || ax.members.includes(to)) return false;
+    ax.members[i] = to; if (ax.alt?.[from]) { ax.alt[to] = ax.alt[from]; delete ax.alt[from]; }
+    const pos = { x: 1, y: 2, z: 3 }[k];
+    const move = (cb, idx) => { const out = {}; for (const [key, v] of Object.entries(cb.cells)) { const p = key.split(SEP); if (p[idx] === from) p[idx] = to; out[p.join(SEP)] = v; } cb.cells = out; };
+    move(c, pos); kids(c.id).filter((d) => d.via === k).forEach((d) => { move(d, 0); if (st.at[d.id] === from) st.at[d.id] = to; });
+    return true;
+  }
+  function renderMembers(c) {
+    const listAxes = AX.filter((k) => c.axes[k].kind === "list");
+    if (!listAxes.includes(st.mAx)) st.mAx = listAxes.includes("y") ? "y" : listAxes[0];
+    const k = st.mAx;
+    if (!k) { $("pane").innerHTML = `<p class="notice">どの軸も「年月の範囲」なので、登録する目盛りはありません。③ に進んでください。</p><button type="button" class="primary" data-tab="data">③ 値を入れるへ</button>`; return; }
+    // 縦:1行が1つの目盛り(既定、空き1000行)。横:1列が1つの目盛り(空き100列)
+    const vert = st.mDir !== "h"; const STEP = vert ? 1000 : 100;
+    const ax = ensureLabels(c.axes[k]); const key = `${c.id}:${k}:${vert ? "v" : "h"}`;
+    const dr = (drafts[key] ??= []); while (dr.length < STEP) dr.push({});
+    const ls = ax.labels; const baseName = ls.find((l) => l.id === "base").name;
+    const labelHead = (l) => `<div class="mh"><input data-lname="${l.id}" value="${esc(l.name)}" aria-label="表記の名前">${l.id === "base" ? `<span class="tagb">基本・必須</span>` : `<button type="button" class="ghost" data-mdelcol="${l.id}" aria-label="${esc(l.name)}を消す" title="この表記を消す">×</button>`}</div>`;
+    const mCell = (m, ri, l) => `<td><input data-mr="${ri}" data-lid="${l.id}" value="${esc(noteVal(ax, m, l.id))}"></td>`;
+    const dCell = (d, di, l) => `<td class="draft"><input data-dr="${di}" data-lid="${l.id}" value="${esc(d[l.id] ?? "")}" placeholder="${l.id === "base" && di === 0 ? "ここに書くと増えます" : ""}"></td>`;
+    const table = vert
+      ? `<table class="sheet msheet virt ${k}" id="mtable" style="min-width:${ls.length * 190 + 150}px"><colgroup><col class="c-rn">${ls.map(() => `<col>`).join("")}<col class="c-add"></colgroup>
+        <thead><tr><th class="rn"></th>${ls.map((l) => `<th>${labelHead(l)}</th>`).join("")}<th class="rn add"><button type="button" data-addcol>＋ 表記の列</button></th></tr></thead>
+        <tbody id="mbody"></tbody></table>`
+      : `<table class="sheet msheet hz ${k}" id="mtable" style="width:${220 + (ax.members.length + dr.length) * 150}px"><colgroup><col class="c-lab">${ax.members.map(() => `<col>`).join("")}${dr.map(() => `<col>`).join("")}</colgroup>
+        <thead><tr><th class="rn">表記 ＼ ${esc(ax.name)}</th>${ax.members.map((m, ri) => `<th class="rn">${ri + 1}<button type="button" class="ghost" data-mdel="${ri}" aria-label="${esc(m)}を消す">×</button></th>`).join("")}${dr.map(() => `<th class="rn">＋</th>`).join("")}</tr></thead>
+        <tbody>${ls.map((l) => `<tr><th>${labelHead(l)}</th>${ax.members.map((m, ri) => mCell(m, ri, l)).join("")}${dr.map((d, di) => dCell(d, di, l)).join("")}</tr>`).join("")}
+          <tr><th><button type="button" data-addcol>＋ 表記の行</button></th><td colspan="${ax.members.length + dr.length}"></td></tr></tbody></table>`;
+    $("pane").innerHTML = `
+      <div class="guide-box"><b>目盛りを登録します。</b>軸を選び、表に1つずつ書きます(例:お客様を1人ずつ)。顧客番号・法人名のように書き方が複数あるときは「＋ 表記」で足します。Excel の範囲をコピーしてマスに貼り付けることもでき、1行目(横並びなら1列目)が表記の名前なら、それに合わせて入ります。</div>
+      <div class="mtools">
+        <div class="axis-pick">${AX.map((a) => `<button type="button" class="${a}" data-max="${a}" aria-pressed="${a === k}" ${c.axes[a].kind === "list" ? "" : "disabled title=\"年月の範囲で決まる軸です\""}>${a.toUpperCase()} ${esc(c.axes[a].name)} <span>${members(c.axes[a]).length}</span></button>`).join("")}</div>
+        <div class="seg" role="group" aria-label="並べ方"><span>並べ方</span><button type="button" data-dir="v" aria-pressed="${vert}">目盛りを縦に</button><button type="button" data-dir="h" aria-pressed="${!vert}">目盛りを横に</button></div>
+      </div>
+      <div class="scroll sheet-wrap tall" id="mwrap">${table}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px"><button type="button" id="m-more">＋ 空の${vert ? "行" : "列"}を${STEP}${vert ? "行" : "列"}</button><span class="hint" style="margin:0">登録済み ${ax.members.length}件。${esc(baseName)}が空の${vert ? "行" : "列"}は登録されません。</span><button type="button" class="primary" data-tab="data" style="margin-left:auto">③ 値を入れるへ</button></div>
+      <div>${membersMsg}</div>`;
+    membersMsg = "";
+    const tb = $("mtable");
+    // 縦並びは、見えている行(と前後少し)だけを描く。行が何千行あっても軽く動く
+    const total = ax.members.length + dr.length; const BUF = 20; let cur = [-1, -1];
+    const rowHtml = (idx) => idx < ax.members.length
+      ? `<tr><td class="rn">${idx + 1}</td>${ls.map((l) => mCell(ax.members[idx], idx, l)).join("")}<td class="rn"><button type="button" class="ghost" data-mdel="${idx}" aria-label="${esc(ax.members[idx])}を消す">×</button></td></tr>`
+      : `<tr><td class="rn">＋</td>${ls.map((l) => dCell(dr[idx - ax.members.length], idx - ax.members.length, l)).join("")}<td class="rn"></td></tr>`;
+    const drawBody = (force) => {
+      if (!vert) return;
+      const wrap = $("mwrap"); const body = $("mbody"); if (!wrap || !body) return;
+      const head = tb.tHead?.offsetHeight || 44; const h = wrap.clientHeight || 600;
+      const start = Math.max(0, Math.floor(Math.max(0, wrap.scrollTop - head) / ROW_H) - BUF);
+      const end = Math.min(total, Math.ceil((wrap.scrollTop + h) / ROW_H) + BUF);
+      if (!force && start === cur[0] && end === cur[1]) return;
+      cur = [start, end];
+      const a = document.activeElement; const keep = a && body.contains(a) ? { sel: a.dataset.mr !== undefined ? `[data-mr="${a.dataset.mr}"][data-lid="${a.dataset.lid}"]` : `[data-dr="${a.dataset.dr}"][data-lid="${a.dataset.lid}"]`, v: a.value, pos: a.selectionStart } : null;
+      const span = ls.length + 2;
+      let html = `<tr class="spacer" style="height:${start * ROW_H}px"><td colspan="${span}"></td></tr>`;
+      for (let i = start; i < end; i++) html += rowHtml(i);
+      html += `<tr class="spacer" style="height:${(total - end) * ROW_H}px"><td colspan="${span}"></td></tr>`;
+      body.innerHTML = html;
+      if (keep) { const n = body.querySelector(keep.sel); if (n) { n.value = keep.v; n.focus(); try { n.setSelectionRange(keep.pos, keep.pos); } catch { /* 数字欄など */ } } }
+    };
+    // idx 番目の行(目盛り → 空き行の順)を見える位置に出してから入力欄を返す
+    const cellAt = (idx, lid) => {
+      const wrap = $("mwrap"); const head = tb.tHead?.offsetHeight || 44; const top = head + idx * ROW_H;
+      if (top < wrap.scrollTop + head || top + ROW_H > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = Math.max(0, top - wrap.clientHeight / 2);
+      drawBody(true);
+      const sel = idx < ax.members.length ? `[data-mr="${idx}"]` : `[data-dr="${idx - ax.members.length}"]`;
+      return tb.querySelector(`${sel}[data-lid="${lid}"]`);
+    };
+    if (vert) {
+      const wrap = $("mwrap");
+      if (mScroll.key === key) wrap.scrollTop = mScroll.top; else mScroll = { key, top: 0 };
+      drawBody(true);
+      const first = tb.querySelector("#mbody tr:not(.spacer)"); if (first && Math.abs(first.offsetHeight - ROW_H) > 1) { ROW_H = first.offsetHeight; drawBody(true); }
+      wrap.onscroll = () => { mScroll.top = wrap.scrollTop; requestAnimationFrame(() => drawBody(false)); };
+    }
+    // 登録して描き直したあとは、次の空き行(横並びなら次の空き列)へ
+    if (pendingFocus) { const f = pendingFocus; pendingFocus = null; (vert ? cellAt(f.idx, f.lid) : tb.querySelector(`[data-dr="${f.di}"][data-lid="${f.lid}"]`))?.focus(); }
+    const commitDraft = (di) => {
+      const d = dr[di]; const base = (d.base ?? "").trim(); if (!base) return false;
+      if (ax.members.includes(base)) membersMsg = `<p class="notice warn">「${esc(base)}」はもう登録されています。</p>`;
+      else ax.members.push(base);
+      for (const [id, v] of Object.entries(d)) if (id !== "base" && v) (ax.alt[base] ??= {})[id] = v;
+      dr.splice(di, 1); return true;
+    };
+    tb.onchange = (e) => {
+      const i = e.target; const id = i.dataset.lid; const v = i.value.trim();
+      if (!i.isConnected) return; // 描き直しで外れた入力欄の change(ブラウザが後から出す)は無視する
+      if (i.dataset.lname) { ax.labels.find((l) => l.id === i.dataset.lname).name = v || "表記"; save(); renderFace(); return; }
+      if (i.dataset.mr !== undefined) {
+        const m = ax.members[+i.dataset.mr];
+        if (id === "base") {
+          if (v === m) return;
+          if (!renameMember(c, k, m, v)) { membersMsg = v ? `<p class="notice warn">「${esc(v)}」はもう登録されているので、名前を変えられません。</p>` : `<p class="notice warn">基本の表記は空にできません。消すときは × を押してください。</p>`; render(); return; }
+          save(); renderPreview(); return;
+        }
+        (ax.alt[m] ??= {})[id] = v; save(); renderPreview(); return; // 描き直さないので、そのまま次のマスへ進める
+      }
+      if (i.dataset.dr !== undefined) { if (i.dataset.done) return; const di = +i.dataset.dr; dr[di][id] = v; if (commitDraft(di)) { i.dataset.done = "1"; pendingFocus = { idx: ax.members.length + di, di, lid: id }; render(); } else save(); }
+    };
+    // Enter で次の目盛りへ(縦なら下、横なら右)
+    tb.onkeydown = (e) => {
+      if (e.key !== "Enter" || !e.target.dataset.lid) return; e.preventDefault(); const i = e.target;
+      const idx = i.dataset.mr !== undefined ? +i.dataset.mr : ax.members.length + +i.dataset.dr; const lid = i.dataset.lid;
+      const wasDraft = i.dataset.dr !== undefined && (lid === "base" && i.value.trim());
+      i.dispatchEvent(new Event("change", { bubbles: true }));
+      if (wasDraft) return; // 登録したときは、描き直したあと次の空き行へ移っている
+      if (vert) cellAt(idx + 1, lid)?.focus();
+      else tb.querySelector(`${i.dataset.mr !== undefined ? (+i.dataset.mr + 1 < ax.members.length ? `[data-mr="${+i.dataset.mr + 1}"]` : `[data-dr="0"]`) : `[data-dr="${+i.dataset.dr + 1}"]`}[data-lid="${lid}"]`)?.focus();
+    };
+    tb.addEventListener("paste", (e) => {
+      const i = e.target.closest("input[data-lid]"); const text = e.clipboardData?.getData("text") ?? "";
+      if (!i || !/[\t\n]/.test(text.trim())) return;
+      e.preventDefault();
+      let grid = text.replace(/^﻿/, "").replace(/\r?\n$/, "").split(/\r?\n/).map((l) => l.split("\t").map((x) => x.trim()));
+      if (!vert) { const w = Math.max(...grid.map((r) => r.length)); grid = Array.from({ length: w }, (_, j) => grid.map((r) => r[j] ?? "")); } // 横並びは行と列を入れ替えて同じ処理にする
+      const n = (s) => s.replace(/\s/g, "");
+      let cols; const c0 = ls.findIndex((l) => l.id === i.dataset.lid);
+      // 1行目が表記の名前なら、それに合わせる(知らない名前は新しい表記)。
+      // まだ表記が1つ(名前)だけの軸に複数列を貼ったときも、1行目を表記の名前とみなし、先頭を基本の表記にする
+      const fresh = ls.length === 1 && grid[0].length >= 2 && grid.length >= 2;
+      if (fresh || grid[0].some((h) => ls.some((l) => n(l.name) === n(h)))) {
+        const baseHit = grid[0].some((h) => n(h) === n(baseName));
+        cols = grid[0].map((h, j) => {
+          if (!h) return null;
+          const hit = ls.find((l) => n(l.name) === n(h)); if (hit) return hit.id;
+          if (j === 0 && !baseHit) { const b = ls.find((l) => l.id === "base"); if (b.name === "名前") b.name = h; return "base"; }
+          const id = nid("n"); ax.labels.push({ id, name: h }); return id;
+        });
+        grid = grid.slice(1);
+        if (ax.labels.length > 1 && partsOf(ax).length === 1) ax.show = [["base"], ax.labels.filter((l) => l.id !== "base").map((l) => l.id)]; // 既定は「基本 / ほかの表記のうち入っている最初のもの」
+      } else cols = grid[0].map((_, j) => ls[c0 + j]?.id ?? null);
+      const bi = cols.indexOf("base"); let added = 0, updated = 0;
+      const rowStart = i.dataset.mr !== undefined ? +i.dataset.mr : null;
+      grid.forEach((r, gi) => {
+        const m = bi >= 0 ? r[bi] : (rowStart !== null ? ax.members[rowStart + gi] : null);
+        if (!m) return;
+        if (!ax.members.includes(m)) { ax.members.push(m); added++; } else updated++;
+        cols.forEach((id, j) => { if (id && id !== "base" && r[j]) (ax.alt[m] ??= {})[id] = r[j]; });
+      });
+      membersMsg = bi < 0 && rowStart === null ? `<p class="notice warn">「${esc(baseName)}」が入っていないので登録できませんでした。${vert ? "左端の列" : "一番上の行"}から貼るか、表記の名前を見出しに入れてください。</p>` : `<p class="notice">${added}件を足し、${updated}件を更新しました。</p>`;
+      render();
+    });
+    tb.onclick = (e) => {
+      const d = e.target.closest("[data-mdel]");
+      if (d) { const m = ax.members[+d.dataset.mdel]; ax.members.splice(+d.dataset.mdel, 1); delete ax.alt[m]; membersMsg = `<p class="notice">「${esc(m)}」を消しました(入っていた値は表示されなくなります)。</p>`; render(); return; }
+      const dc = e.target.closest("[data-mdelcol]");
+      if (dc) { const id = dc.dataset.mdelcol; ax.labels = ax.labels.filter((l) => l.id !== id); ax.show = partsOf(ax); for (const m of Object.keys(ax.alt)) delete ax.alt[m][id]; membersMsg = `<p class="notice">表記を消しました。</p>`; render(); return; }
+      if (e.target.closest("[data-addcol]")) { const id = nid("n"); ax.labels.push({ id, name: `表記${ax.labels.length + 1}` }); render(); document.querySelector(`[data-lname="${id}"]`)?.select(); }
+    };
+    $("pane").querySelector(".mtools").onclick = (e) => {
+      const b = e.target.closest("[data-max]"); if (b) { st.mAx = b.dataset.max; render(); return; }
+      const d = e.target.closest("[data-dir]"); if (d) { st.mDir = d.dataset.dir; render(); }
+    };
+    $("m-more").onclick = () => { for (let j = 0; j < STEP; j++) dr.push({}); render(); };
+  }
+
+  // ---- ③ 値を入れる(行と列に軸を1つずつ選ぶ表。残りの軸はシートで切り替える) ----
+  let dataMsg = "", pasteOpen = false, longOpen = false;
+  function dataLayout(c) {
+    let r = st.rowAx in c.axes ? st.rowAx : "y", col = st.colAx in c.axes ? st.colAx : "x";
+    if (r === col) col = AX.find((k) => k !== r);
+    const s = AX.find((k) => k !== r && k !== col);
+    return { r, col, s };
+  }
+  const keyOf = (at, o) => [at, o.x, o.y, o.z].join(SEP);
+  const crossTsv = (c, at, L, sv) => {
+    const R = members(c.axes[L.r]), C = members(c.axes[L.col]);
+    return [[`${c.axes[L.r].name}＼${c.axes[L.col].name}`, ...C].join("\t"), ...R.map((rv) => [rv, ...C.map((cv) => cellText(c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]))].join("\t"))].join("\n");
+  };
+  function pasteCross(c, at, L, sv, text) {
+    const rows = text.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim() !== "").map((l) => l.split("\t"));
+    if (rows.length < 2 || rows[0].length < 2) return `<p class="notice warn">1行目に${esc(c.axes[L.col].name)}、1列目に${esc(c.axes[L.r].name)}が並んだ表を貼ってください。</p>`;
+    let filled = 0, added = 0, bad = 0; const missing = new Set();
+    const resolve = (ax, t) => { const m = findMember(ax, t); if (m) return m; const v = String(t ?? "").trim(); if (!v) return null; if (ax.kind === "list") { ax.members.push(v); added++; return v; } missing.add(v); return null; };
+    const cols = rows[0].map((h, i) => (i === 0 ? null : resolve(c.axes[L.col], h)));
+    for (const r of rows.slice(1)) {
+      const rv = resolve(c.axes[L.r], r[0]); if (!rv) continue;
+      cols.forEach((cv, i) => {
+        if (!cv || r[i] === undefined) return;
+        const v = toValue(c, r[i]); if (v === undefined) return; if (v === null) { bad++; return; }
+        c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })] = v; filled++;
+      });
+    }
+    return `<p class="notice">${filled}マスに入れました${added ? `(新しい目盛り ${added}個を軸に足しました)` : ""}。</p>`
+      + (bad ? `<p class="notice warn">数字として読めない値が${bad}個あり、入れませんでした。</p>` : "")
+      + (missing.size ? `<p class="notice warn">年月の範囲にない目盛りがありました:${[...missing].slice(0, 5).map(esc).join("、")}</p>` : "");
+  }
+  function renderData(c) {
+    const L = dataLayout(c); const R = members(c.axes[L.r]), C = members(c.axes[L.col]), S = members(c.axes[L.s]);
+    const head = guide(["軸を決める", "目盛りを登録する", "値を入れる"], 2);
+    const axSel = (id, cur) => `<select id="${id}">${AX.map((k) => `<option value="${k}" ${k === cur ? "selected" : ""}>${k.toUpperCase()} ${esc(c.axes[k].name)}</option>`).join("")}</select>`;
+    const empty = [L.r, L.col, L.s].filter((k) => !members(c.axes[k]).length);
+    const layout = `<div class="guide-box"><b>値を入れます。</b>表の縦(行)と横(列)にする軸を選ぶと、その2軸の表になります。残りの軸「${esc(c.axes[L.s].name)}」は、表の上のシートで切り替えます。マスに直接書くか、Excel の範囲をマスに貼り付けてください。</div>
+      <div class="tools"><label>縦(行)の軸${axSel("row-ax", L.r)}</label><label>横(列)の軸${axSel("col-ax", L.col)}</label>${atSelect(c, "at-sel")}</div>`;
+    if (empty.length) {
+      $("pane").innerHTML = `${head}${layout}<p class="notice warn">${empty.map((k) => `${k.toUpperCase()}「${esc(c.axes[k].name)}」`).join("・")}にまだ目盛りがありません。② で登録してください。</p>
+        <button type="button" class="primary" data-tab="members">② 目盛りを登録するへ</button>`;
+      bindLayout(c); return;
+    }
+    if (!S.includes(st.dataS)) st.dataS = S[0];
+    const sv = st.dataS; const at = atOf(c); const num = c.value.type !== "text";
+    $("pane").innerHTML = `${head}${layout}
+      <div class="sheet-tabs" role="tablist" aria-label="${esc(c.axes[L.s].name)}のシート"><span class="${L.s}">${L.s.toUpperCase()} ${esc(c.axes[L.s].name)}:</span>${S.map((m) => `<button type="button" class="${L.s}" data-sv="${esc(m)}" aria-selected="${m === sv}">${esc(disp(c.axes[L.s], m))}</button>`).join("")}</div>
+      <div class="scroll sheet-wrap"><table class="sheet"><thead><tr><th class="corner"><span class="h${L.r}">${esc(c.axes[L.r].name)}</span> ＼ <span class="h${L.col}">${esc(c.axes[L.col].name)}</span></th>${C.map((cv) => `<th class="h${L.col}">${esc(disp(c.axes[L.col], cv))}</th>`).join("")}</tr></thead>
+      <tbody id="grid">${R.map((rv) => `<tr><th class="h${L.r}">${esc(disp(c.axes[L.r], rv))}</th>${C.map((cv) => { const v = c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]; return `<td><input ${num ? 'inputmode="decimal" class="num"' : ""} data-rv="${esc(rv)}" data-cv="${esc(cv)}" value="${esc(v ?? "")}" aria-label="${esc(rv)}・${esc(cv)}"></td>`; }).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="tools" style="margin-top:8px">
+        <button type="button" id="face-copy">この表を Excel 用にコピー</button>
+        <button type="button" id="face-paste-open" aria-expanded="${pasteOpen}">見出しつきの表を貼り付ける</button></div>
+      ${pasteOpen ? `<div class="bulk" style="margin-bottom:8px">
+        <p class="hint" style="margin:0 0 6px">「この表を Excel 用にコピー」で出したひな形に既存の数字を埋め、見出しごとコピーしてここに貼ります。1行目が${esc(c.axes[L.col].name)}、1列目が${esc(c.axes[L.r].name)}です。目盛りはどの表記で書いてあっても探し、ないものは足します。</p>
+        <textarea id="face-paste"></textarea>
+        <div style="margin-top:6px"><button type="button" class="primary" id="face-paste-go">このシートに入れる</button></div></div>` : ""}
+      <div id="face-copy-out"></div>${dataMsg}
+      <details class="long" ${longOpen ? "open" : ""}><summary>1行1コマの表で入れる(CSV もここから)</summary><div id="long"></div></details>`;
+    dataMsg = "";
+    bindLayout(c);
+    if (longOpen) renderImport(c, $("long"));
+    $("pane").querySelector("details.long").addEventListener("toggle", (e) => { longOpen = e.target.open; if (longOpen) renderImport(c, $("long")); });
+    $("pane").querySelector(".sheet-tabs").onclick = (e) => { const b = e.target.closest("[data-sv]"); if (b) { st.dataS = b.dataset.sv; render(); } };
+    $("face-copy").onclick = async () => {
+      const t = crossTsv(c, at, L, sv);
+      try { await navigator.clipboard.writeText(t); $("face-copy-out").innerHTML = `<p class="notice">コピーしました。Excel の左上のマスを選んで貼り付けてください。</p>`; }
+      catch { $("face-copy-out").innerHTML = `<p class="notice">下の内容をすべて選んでコピーし、Excel に貼り付けてください。</p><textarea readonly id="face-copy-text">${esc(t)}</textarea>`; $("face-copy-text").select(); }
+    };
+    $("face-paste-open").onclick = () => { pasteOpen = !pasteOpen; render(); $("face-paste")?.focus(); };
+    if ($("face-paste-go")) $("face-paste-go").onclick = () => { dataMsg = pasteCross(c, at, L, sv, $("face-paste").value); pasteOpen = false; render(); };
+    const grid = $("grid");
+    grid.onchange = (e) => {
+      const i = e.target; const k = keyOf(at, { [L.r]: i.dataset.rv, [L.col]: i.dataset.cv, [L.s]: sv }); const v = toValue(c, i.value);
+      if (v === undefined) delete c.cells[k]; else if (v === null) { i.value = ""; delete c.cells[k]; } else c.cells[k] = v;
+      save(); renderPreview();
+    };
+    grid.onkeydown = (e) => {
+      if (e.key !== "Enter") return; e.preventDefault(); const i = e.target; const td = i.closest("td"); const idx = [...td.parentNode.children].indexOf(td);
+      td.parentNode.nextElementSibling?.children[idx]?.querySelector("input")?.focus();
+    };
+    grid.addEventListener("paste", (e) => {
+      const inp = e.target.closest("input[data-rv]"); const t = e.clipboardData?.getData("text") ?? "";
+      if (!inp || !/[\t\n]/.test(t.trim())) return;
+      e.preventDefault();
+      const rows = t.replace(/\r?\n$/, "").split(/\r?\n/).map((l) => l.split("\t"));
+      const r0 = R.indexOf(inp.dataset.rv), c0 = C.indexOf(inp.dataset.cv); let filled = 0, bad = 0;
+      rows.forEach((r, i) => r.forEach((raw, j) => {
+        const rv = R[r0 + i], cv = C[c0 + j]; if (!rv || !cv) return;
+        const v = toValue(c, raw); const k = keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv });
+        if (v === undefined) delete c.cells[k]; else if (v === null) bad++; else { c.cells[k] = v; filled++; }
+      }));
+      dataMsg = `<p class="notice">${filled}マスに貼り付けました${bad ? `(数字として読めない値 ${bad}個は飛ばしました)` : ""}。</p>`; render();
+    });
+  }
+  function bindLayout(c) {
+    $("row-ax").onchange = (e) => { const L = dataLayout(c); st.rowAx = e.target.value; if (st.rowAx === L.col) st.colAx = L.r; render(); };
+    $("col-ax").onchange = (e) => { const L = dataLayout(c); st.colAx = e.target.value; if (st.colAx === L.r) st.rowAx = L.col; render(); };
+    if ($("at-sel")) $("at-sel").onchange = (e) => { st.at[c.id] = e.target.value; render(); };
+  }
+
+  // ---- 表で入れる ----
+  // Excel のような表。1行が1コマ。列ごとに、どの軸(どの表記で書くか)か・値かを見出しで選ぶ。
+  // Excel の範囲をマスに貼ると右・下へ広がり、1行目が見出しなら列の割り当てもそれに合わせる
+  let sheet = null;
+  const sheetTargets = (c) => {
+    const p = cube(c.parent);
+    const axT = (key, ax, label) => (hasNotes(ax) ? ax.labels.map((l) => [l.id === "base" ? key : `${key}:${l.id}`, `${label}(${l.name})`]) : [[key, label]]);
+    return [["", "使わない"], ...(p ? axT("at", p.axes[c.via], `上位:${p.axes[c.via].name}`) : []),
+      ...AX.flatMap((k) => axT(k, c.axes[k], `${k.toUpperCase()}:${c.axes[k].name}`)), ["v", `値:${c.value.name}`]];
+  };
+  // 見出しの文字から列の割り当てを推し量る(軸の名前・表記の名前・値の名前)
+  const guessCol = (c, h) => {
+    const p = cube(c.parent); const n = (s) => String(s ?? "").replace(/\s/g, ""); if (!n(h)) return "";
+    for (const key of [...(p ? ["at"] : []), ...AX]) {
+      const ax = key === "at" ? p.axes[c.via] : c.axes[key];
+      if (n(h) === n(ax.name)) return key;
+      if (hasNotes(ax)) { const l = ax.labels.find((l) => n(l.name) === n(h)); if (l) return l.id === "base" ? key : `${key}:${l.id}`; }
+    }
+    return n(h) === n(c.value.name) ? "v" : "";
+  };
+  const blankRows = (n, w) => Array.from({ length: n }, () => Array(w).fill(""));
+  function newSheet(c, all) {
+    const p = cube(c.parent);
+    const cols = [...(p ? ["at"] : []), "x", "y", "z", "v"];
+    const rows = [];
+    for (const at of p ? members(p.axes[c.via]) : [""]) for (const z of members(c.axes.z)) for (const y of members(c.axes.y)) for (const x of members(c.axes.x)) {
+      const v = c.cells[[at, x, y, z].join(SEP)];
+      if (!all && (v === undefined || v === "")) continue;
+      if (rows.length >= 2000) break;
+      rows.push([...(p ? [at] : []), x, y, z, cellText(v)]);
+    }
+    return { cube: c.id, cols, rows: [...rows, ...blankRows(rows.length ? 5 : 10, cols.length)], msg: "", capped: rows.length >= 2000 };
+  }
+  // 貼り付けた範囲を、行 r0・列 c0 から入れる。1行目が見出しなら割り当てに使う
+  function sheetPaste(c, r0, c0, text) {
+    let grid = text.replace(/\r?\n$/, "").split(/\r?\n/).map((l) => l.split("\t"));
+    const heads = grid[0].map((h) => guessCol(c, h));
+    if (heads.filter(Boolean).length >= Math.min(2, grid[0].length)) {
+      heads.forEach((k, j) => { while (sheet.cols.length <= c0 + j) { sheet.cols.push(""); sheet.rows.forEach((r) => r.push("")); } sheet.cols[c0 + j] = k; });
+      grid = grid.slice(1);
+    }
+    grid.forEach((line, i) => line.forEach((v, j) => {
+      while (sheet.cols.length <= c0 + j) { sheet.cols.push(""); sheet.rows.forEach((r) => r.push("")); }
+      while (sheet.rows.length <= r0 + i) sheet.rows.push(Array(sheet.cols.length).fill(""));
+      sheet.rows[r0 + i][c0 + j] = v.trim();
+    }));
+    if (sheet.rows.length < r0 + grid.length + 3) sheet.rows.push(...blankRows(3, sheet.cols.length));
+  }
+  function sheetApply(c) {
+    const p = cube(c.parent);
+    const need = ["x", "y", "z", "v", ...(p ? ["at"] : [])].filter((k) => !sheet.cols.some((m) => m === k || m.startsWith(k + ":")));
+    if (need.length) { const t = sheetTargets(c); return `<p class="notice warn">見出しで選ばれていないものがあります:${need.map((k) => esc(t.find((x) => x[0] === k)[1])).join("、")}</p>`; }
+    let n = 0, added = 0, bad = 0; const missed = new Set();
+    const resolve = (r, key, ax) => {
+      const i = sheet.cols.findIndex((m) => m === key || m.startsWith(key + ":"));
+      const val = (r[i] ?? "").trim(); if (!val) return null;
+      const id = sheet.cols[i].split(":")[1];
+      if (!id) { const hit = findMember(ax, val); if (hit) return hit; if (ax.kind === "list") { ax.members.push(val); added++; return val; } missed.add(val); return null; }
+      const hit = members(ax).find((m) => noteVal(ax, m, id) === val); if (!hit) missed.add(val); return hit || null;
+    };
+    for (const r of sheet.rows) {
+      if (r.every((x) => !String(x).trim())) continue;
+      const at = p ? resolve(r, "at", p.axes[c.via]) : "";
+      const xyz = { x: resolve(r, "x", c.axes.x), y: resolve(r, "y", c.axes.y), z: resolve(r, "z", c.axes.z) };
+      if (at === null || !xyz.x || !xyz.y || !xyz.z) continue;
+      const v = toValue(c, r[sheet.cols.indexOf("v")] ?? "");
+      const k = [at, xyz.x, xyz.y, xyz.z].join(SEP);
+      if (v === undefined) continue; if (v === null) { bad++; continue; }
+      c.cells[k] = v; n++;
+    }
+    return `<p class="notice">${n}コマを入れました${added ? `(新しい目盛り ${added}個を軸に足しました)` : ""}。</p>`
+      + (bad ? `<p class="notice warn">数字として読めない値が${bad}個あり、入れませんでした。</p>` : "")
+      + (missed.size ? `<p class="notice warn">見つからない目盛りの行は入れませんでした:${[...missed].slice(0, 5).map(esc).join("、")}${missed.size > 5 ? ` ほか${missed.size - 5}件` : ""}(年月の範囲外か、表記の値が未登録です)</p>` : "");
+  }
+  const colClass = (k) => (k.startsWith("x") ? "hx" : k.startsWith("y") ? "hy" : k.startsWith("z") ? "hz" : k === "v" ? "hv" : "");
+  function renderImport(c, host) {
+    if (!sheet || sheet.cube !== c.id) sheet = newSheet(c, false);
+    const t = sheetTargets(c);
+    host.innerHTML = `
+      <p class="hint" style="margin:0 0 8px">1行が1コマです。列の見出しで、その列を<b>どの軸に当てはめるか</b>を選びます。Excel でコピーした範囲を、どのマスにでも貼り付けられます(1行目が軸の名前なら、見出しもそれに合わせます)。軸にまだない目盛りは、入れるときに足します。</p>
+      <div class="tools">
+        <button type="button" id="sh-all">全部の組み合わせを並べる</button>
+        <button type="button" id="sh-add">＋ 10行</button>
+        <button type="button" id="sh-col">＋ 列</button>
+        <button type="button" id="sh-reset">表を空にする</button>
+        <label>CSV を読む<input type="file" id="imp-file" accept=".csv,text/csv"></label>
+      </div>
+      ${sheet.capped ? `<p class="hint">2000行までを表示しています。</p>` : ""}
+      <div class="scroll sheet-wrap"><table class="sheet"><thead><tr><th class="rn"></th>${sheet.cols.map((k, i) => `<th class="${colClass(k)}"><select data-col="${i}" aria-label="${i + 1}列目の当てはめ先">${t.map(([v, name]) => `<option value="${v}" ${v === k ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></th>`).join("")}<th class="rn"></th></tr></thead>
+      <tbody id="sheet">${sheet.rows.map((r, ri) => `<tr><td class="rn">${ri + 1}</td>${sheet.cols.map((k, ci) => `<td><input data-r="${ri}" data-c="${ci}" value="${esc(r[ci] ?? "")}" aria-label="${ri + 1}行${ci + 1}列"></td>`).join("")}<td class="rn"><button type="button" class="ghost" data-delrow="${ri}" aria-label="${ri + 1}行目を消す">×</button></td></tr>`).join("")}</tbody></table></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px"><button type="button" class="primary" id="sh-go">キューブに入れる</button><span class="hint" style="margin:0">同じコマは上書きします。表から消した行のコマは、キューブからは消えません。</span></div>
+      <div id="imp-result">${sheet.msg}</div>`;
+    sheet.msg = "";
+    const tb = $("sheet");
+    tb.oninput = (e) => { const i = e.target; if (i.dataset.r !== undefined) sheet.rows[+i.dataset.r][+i.dataset.c] = i.value; };
+    tb.addEventListener("paste", (e) => {
+      const i = e.target.closest("input[data-r]"); const text = e.clipboardData?.getData("text") ?? "";
+      if (!i || !/[\t\n]/.test(text.trim())) return;
+      e.preventDefault(); sheetPaste(c, +i.dataset.r, +i.dataset.c, text); render();
+    });
+    tb.onclick = (e) => { const d = e.target.closest("[data-delrow]"); if (d) { sheet.rows.splice(+d.dataset.delrow, 1); render(); } };
+    // Enter で下のマスへ(Excel と同じ動き)
+    tb.onkeydown = (e) => { if (e.key !== "Enter") return; const i = e.target; e.preventDefault(); tb.querySelector(`input[data-r="${+i.dataset.r + 1}"][data-c="${i.dataset.c}"]`)?.focus(); };
+    host.querySelector("thead").onchange = (e) => { const s = e.target.closest("[data-col]"); if (s) { sheet.cols[+s.dataset.col] = s.value; render(); } };
+    $("sh-all").onclick = () => { sheet = newSheet(c, true); if (!sheet.rows.some((r) => r.some((x) => x))) sheet.msg = `<p class="notice warn">軸に目盛りがまだないので、組み合わせを並べられません。表に直接書くか貼り付ければ、入れるときに目盛りも足します。</p>`; render(); };
+    $("sh-add").onclick = () => { sheet.rows.push(...blankRows(10, sheet.cols.length)); render(); };
+    $("sh-col").onclick = () => { sheet.cols.push(""); sheet.rows.forEach((r) => r.push("")); render(); };
+    $("sh-reset").onclick = () => { const cols = sheet.cols; sheet = { cube: c.id, cols, rows: blankRows(10, cols.length), msg: "" }; render(); };
+    $("sh-go").onclick = () => { sheet.msg = sheetApply(c); render(); };
+    $("imp-file").onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return; const buf = await f.arrayBuffer();
+      let txt = new TextDecoder("utf-8").decode(buf);
+      if (txt.includes("\uFFFD")) { try { txt = new TextDecoder("shift_jis").decode(buf); } catch { /* utf-8 のまま */ } }
+      const rows = parseCsv(txt.replace(/^﻿/, "")); if (!rows.length) return;
+      const cols = rows[0].map((h) => guessCol(c, h));
+      sheet = { cube: c.id, cols, rows: [...rows.slice(1).map((r) => cols.map((_, i) => (r[i] ?? "").trim())), ...blankRows(3, cols.length)], msg: `<p class="notice">${f.name} の ${rows.length - 1}行を表に読みました。見出しの当てはめ先を確かめてから「キューブに入れる」を押してください。</p>` };
+      render();
+    };
+  }
+
+
+  // ---- プレビュー(three.js) ----
+  const stage = $("stage"), labelsEl = $("labels");
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  stage.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.55); sun.position.set(5, 8, 10); scene.add(sun);
+  const group = new THREE.Group(); scene.add(group);
+  let rotX = -0.42, rotY = 0.62, targetX = rotX, targetY = rotY, dist = 14, meshes = [], dims = { nx: 1, ny: 1, nz: 1 };
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const colorOf = (t) => { const a = new THREE.Color(css("--accent-soft") || "#d9eeef"), b = new THREE.Color(css("--accent") || "#0e6a70"); return a.lerp(b, t); };
+
+  function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  new ResizeObserver(resize).observe(stage);
+
+  function renderPreview() {
+    meshes.forEach((m) => { group.remove(m); m.geometry.dispose(); m.material.dispose(); });
+    meshes = [];
+    const c = cube(st.selected);
+    if (!c) { dims = { nx: 0, ny: 0, nz: 0 }; renderFace(); return; }
+    const xs = members(c.axes.x).slice(0, 14), ys = members(c.axes.y).slice(0, 14), zs = members(c.axes.z).slice(0, 14);
+    const nx = Math.max(xs.length, 1), ny = Math.max(ys.length, 1), nz = Math.max(zs.length, 1);
+    dims = { nx, ny, nz, xs, ys, zs };
+    const at = atOf(c);
+    const vals = [];
+    xs.forEach((x, i) => ys.forEach((y, j) => zs.forEach((z, k) => { const v = c.cells[[at, x, y, z].join(SEP)]; vals.push([i, j, k, v]); })));
+    const nums = vals.map((v) => (c.value.type === "text" ? (v[3] ? 1 : 0) : Math.abs(Number(v[3]) || 0)));
+    const max = Math.max(...nums, 1);
+    const unit = 1, gap = 0.12;
+    const geo = new THREE.BoxGeometry(unit - gap, unit - gap, unit - gap);
+    vals.forEach(([i, j, k, v], n) => {
+      const has = v !== undefined && v !== "";
+      const mat = new THREE.MeshLambertMaterial({ color: has ? colorOf(0.25 + 0.75 * (nums[n] / max)) : new THREE.Color(css("--line") || "#d5dde0"), transparent: true, opacity: has ? 0.92 : 0.28 });
+      const m = new THREE.Mesh(geo.clone(), mat);
+      m.position.set(i - (nx - 1) / 2, (ny - 1) / 2 - j, (nz - 1) / 2 - k);
+      m.userData = { x: xs[i], y: ys[j], z: zs[k], v };
+      group.add(m); meshes.push(m);
+    });
+    // 外枠
+    const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(nx, ny, nz)), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--muted") || "#5d6b71") }));
+    group.add(box); meshes.push(box);
+    dist = Math.max(nx, ny, nz) * 2.1 + 4;
+    picked = null; renderPicked(); renderFace(); renderNotesBar();
+  }
+
+  // 軸ラベル:各軸の平行な4本の辺のうち、画面上でいちばん外側の辺に沿って置く
+  function project(v) { const p = v.clone().applyMatrix4(group.matrixWorld).project(camera); return { x: (p.x + 1) / 2 * stage.clientWidth, y: (1 - p.y) / 2 * stage.clientHeight }; }
+  function renderLabelsOnly() {
+    labelsEl.innerHTML = "";
+    const c = cube(st.selected); if (!c || !dims.xs) return;
+    const { nx, ny, nz } = dims; const hx = nx / 2, hy = ny / 2, hz = nz / 2;
+    const center = project(new THREE.Vector3(0, 0, 0));
+    const specs = {
+      x: { list: dims.xs, along: (t) => new THREE.Vector3(t - (nx - 1) / 2, 0, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(0, a * hy, b * hz)) },
+      y: { list: dims.ys, along: (t) => new THREE.Vector3(0, (ny - 1) / 2 - t, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, 0, b * hz)) },
+      z: { list: dims.zs, along: (t) => new THREE.Vector3(0, 0, (nz - 1) / 2 - t), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, b * hy, 0)) },
+    };
+    const placed = [];
+    const overlaps = (r) => placed.some((q) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t);
+    for (const k of AX) {
+      const sp = specs[k];
+      let best = null, bestD = -1;
+      for (const e of sp.edges) { const p = project(e); const d = Math.hypot(p.x - center.x, p.y - center.y); if (d > bestD) { bestD = d; best = e; } }
+      const mid = project(best); const dx = mid.x - center.x, dy = mid.y - center.y, len = Math.hypot(dx, dy) || 1;
+      const off = { x: (dx / len) * 16, y: (dy / len) * 16 };
+      const items = sp.list.map((m, t) => { const p = project(sp.along(t).add(best)); return { m: disp(c.axes[k], m), x: p.x + off.x, y: p.y + off.y }; });
+      // 名前
+      const ends = [project(sp.along(-0.9).add(best)), project(sp.along(sp.list.length - 0.1).add(best))];
+      const tp = ends.sort((a, b) => Math.hypot(b.x - center.x, b.y - center.y) - Math.hypot(a.x - center.x, a.y - center.y))[0];
+      const title = { m: `${k.toUpperCase()} ${c.axes[k].name}`, x: tp.x + off.x * 1.8, y: tp.y + off.y * 1.8, title: true };
+      for (const it of [title, ...items]) {
+        const w = [...it.m].reduce((n, ch) => n + (ch.charCodeAt(0) < 256 ? 6.6 : 11), 0) * (it.title ? 1.1 : 1) + 10, h = 18;
+        // 重なるときは、もう1段外側にずらして置く(ずらしても重なれば省く)
+        let r = null;
+        for (const step of it.title ? [0, 1] : [0, 1, 2]) {
+          const ix = it.x + off.x * 1.15 * step, iy = it.y + off.y * 1.15 * step;
+          const q = { l: ix - w / 2, r: ix + w / 2, t: iy - h / 2, b: iy + h / 2 };
+          if (q.l < 2 || q.t < 2 || q.r > stage.clientWidth - 2 || q.b > stage.clientHeight - 2 || overlaps(q)) continue;
+          r = q; it.x = ix; it.y = iy; break;
+        }
+        if (!r) continue;
+        placed.push(r);
+        const el = document.createElement("span"); el.className = `lbl ${k}${it.title ? " title" : ""}`; el.textContent = it.m;
+        el.style.left = it.x + "px"; el.style.top = it.y + "px"; labelsEl.appendChild(el);
+      }
+    }
+  }
+
+  // 回転(ドラッグ)と面への切り替え
+  const FACES = { front: [0, 0], top: [-Math.PI / 2 + 0.001, 0], side: [0, -Math.PI / 2], iso: [-0.42, 0.62] };
+  let drag = null;
+  stage.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: false }; stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener("pointermove", (e) => {
+    if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    targetY += dx * 0.01; targetX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetX + dy * 0.01)); rotX = targetX; rotY = targetY;
+    drag.x = e.clientX; drag.y = e.clientY; setFaceButtons(null);
+  });
+  stage.addEventListener("pointerup", (e) => {
+    const was = drag; drag = null; if (!was || was.moved) return;
+    const rect = stage.getBoundingClientRect();
+    const mouse = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(mouse, camera);
+    const hit = ray.intersectObjects(meshes.filter((m) => m.isMesh))[0];
+    picked = hit ? hit.object : null; renderPicked();
+  });
+  function setFaceButtons(f) { document.querySelectorAll("#snap button[data-face]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.face === f)); }
+  $("snap").onclick = (e) => { const b = e.target.closest("button[data-face]"); if (!b) return; [targetX, targetY] = FACES[b.dataset.face]; face = b.dataset.face === "iso" ? "front" : b.dataset.face; setFaceButtons(b.dataset.face); renderFace(); };
+
+  const openBars = new Set(); // プレビュー上で開いている表記の編集(描き直しても開いたままにする)
+  // プレビューの上で、軸ごとに表示する表記を切り替える
+  function renderNotesBar() {
+    const c = cube(st.selected); const bar = $("notes-bar");
+    const ks = c ? AX.filter((k) => hasNotes(c.axes[k])) : [];
+    bar.hidden = !ks.length;
+    bar.innerHTML = ks.map((k) => { const ax = c.axes[k]; return `<details data-bar="${k}" ${openBars.has(k) ? "open" : ""}><summary><span class="${k}">${k.toUpperCase()} ${esc(ax.name)}の表記</span> ${partsOf(ax).map((p) => partText(ax, p)).join(" / ")}${ax.pack === false ? "" : `<span class="hint" style="margin:0">(空欄は詰める)</span>`}</summary>${composeEditor(ax, k)}</details>`; }).join("");
+  }
+  $("notes-bar").onclick = (e) => { composeAction(e); };
+  $("notes-bar").onchange = (e) => { composeAction(e); };
+  $("notes-bar").addEventListener("toggle", (e) => { const k = e.target.dataset?.bar; if (k) (e.target.open ? openBars.add(k) : openBars.delete(k)); }, true);
+
+  function renderPicked() {
+    const c = cube(st.selected);
+    meshes.forEach((m) => { if (m.isMesh) m.material.emissive?.setHex(0x000000); });
+    if (!c || !picked) { $("cellinfo").innerHTML = `<span class="k">コマをクリックすると中身が出ます。</span>`; return; }
+    picked.material.emissive.setHex(0x333333);
+    const d = picked.userData;
+    const lowers = kids(c.id);
+    $("cellinfo").innerHTML = `${AX.map((k) => `<span class="${k}">${esc(c.axes[k].name)}:${esc(disp(c.axes[k], d[k]))}</span>`).join("")}
+      <span>${esc(c.value.name)} <b>${d.v === undefined || d.v === "" ? "(空)" : esc(c.value.type === "text" ? d.v : fmt(Number(d.v)))}</b></span>
+      ${lowers.map((l) => `<button type="button" data-down="${l.id}" data-m="${esc(d[l.via])}">${esc(disp(c.axes[l.via], d[l.via]))}の「${esc(l.name)}」へ</button>`).join("")}`;
+  }
+  $("cellinfo").onclick = (e) => { const b = e.target.closest("[data-down]"); if (!b) return; st.at[b.dataset.down] = b.dataset.m; st.selected = b.dataset.down; render(); };
+
+  function renderFace() {
+    const c = cube(st.selected);
+    if (!c || !dims.xs || !dims.xs.length || !dims.ys.length || !dims.zs.length) { $("face").innerHTML = `<p class="empty">${c ? "3つの軸に目盛りを入れると、ここに面の表が出ます。" : "キューブを作ると、ここに立体と表が出ます。"}</p>`; $("face-title").textContent = ""; labelsEl.innerHTML = ""; return; }
+    const at = atOf(c);
+    const pair = { front: ["y", "x", "z"], top: ["z", "x", "y"], side: ["y", "z", "x"] }[face];
+    const [rk, ck, dk] = pair; const R = members(c.axes[rk]), C = members(c.axes[ck]);
+    const pickFor = (r, col) => (x, y, z) => ({ x, y, z })[rk] === r && ({ x, y, z })[ck] === col;
+    const show = (v) => (v === null ? "" : typeof v === "number" ? fmt(v) : esc(v));
+    $("face-title").innerHTML = `${c.parent ? `${esc(cube(c.parent).axes[c.via].name)}「${esc(disp(cube(c.parent).axes[c.via], at))}」の中 / ` : ""}行 <span class="${rk}">${esc(c.axes[rk].name)}</span> × 列 <span class="${ck}">${esc(c.axes[ck].name)}</span>(<span class="${dk}">${esc(c.axes[dk].name)}</span>は${AGG[c.value.agg]})`;
+    const rowsHtml = R.map((r) => `<tr><th class="h${rk === "x" ? "x" : rk === "y" ? "y" : ""}" style="${rk === "z" ? "color:var(--ax-z)" : ""}">${esc(disp(c.axes[rk], r))}</th>${C.map((col) => { const v = aggregate(c, at, pickFor(r, col)); return `<td class="v ${v === null ? "zero" : ""}">${v === null ? "–" : show(v)}</td>`; }).join("")}</tr>`).join("");
+    $("face").innerHTML = `<table><thead><tr><th></th>${C.map((col) => `<th style="color:var(--ax-${ck});text-align:right">${esc(disp(c.axes[ck], col))}</th>`).join("")}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+  }
+
+  function tick() {
+    rotX += (targetX - rotX) * 0.15; rotY += (targetY - rotY) * 0.15;
+    group.rotation.set(rotX, rotY, 0);
+    camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0);
+    group.updateMatrixWorld(); renderer.render(scene, camera); renderLabelsOnly();
+    requestAnimationFrame(tick);
+  }
+
+  // ---- 全体の操作 ----
+  // ---- 画面の切り替え ----
+  const EDIT = { axes: 1, members: 1, data: 1 };
+  const VIEW_NAME = { dash: "ダッシュボード", cube: "キューブを見る", axes: "軸を決める", members: "目盛りを登録", data: "値を入れる" };
+  function render() {
+    renderTree();
+    const v = VIEW_NAME[st.view] ? st.view : "dash"; st.view = v;
+    if (v !== "dash" && !cube(st.selected) && st.cubes.length) st.selected = st.cubes[0].id;
+    const c = cube(st.selected);
+    document.querySelectorAll("#nav [data-view]").forEach((b) => b.setAttribute("aria-current", b.dataset.view === v));
+    $("dash").hidden = v !== "dash";
+    $("editor").hidden = !(v in EDIT);
+    $("viewer").hidden = !(v === "cube" || v === "axes");
+    $("views").classList.toggle("split", v === "axes");
+    if (v === "dash") renderDash();
+    if (v in EDIT) renderEditor(c, v);
+    $("viewer-title").textContent = v === "axes" ? "プレビュー" : c ? c.name : "キューブがまだありません";
+    $("viewer-sub").textContent = c && v === "cube" ? [chainOf(c).slice(0, -1).map((k) => k.name).join(" › "), kids(c.id).length ? `下位:${kids(c.id).map((k) => k.name).join("、")}` : ""].filter(Boolean).join(" / ") : "";
+    renderPreview(); save();
+  }
+  function renderEditor(c, tab) {
+    if (!c) {
+      $("editor").innerHTML = `<h2>キューブを作りましょう</h2>
+        <p style="margin:0 0 10px">左の「＋ 新しいキューブ」で作り始め、X軸(横)・Y軸(縦)・Z軸(奥行き)と、コマに入れる値を順に決めます。</p>
+        <p class="hint">よくある形から始めるときは、左下の「テンプレートから始める」を使ってください。</p>`;
+      return;
+    }
+    const chain = chainOf(c);
+    $("editor").innerHTML = `
+      <div class="crumbs">${chain.map((k, i) => i === chain.length - 1 ? `<span>${esc(k.name)}</span>` : `<button type="button" data-go="${k.id}">${esc(k.name)}</button><span>›</span>`).join("")}</div>
+      <h2>${{ axes: "① 軸を決める", members: "② 目盛りを登録", data: "③ 値を入れる" }[tab]}</h2>
+      <div id="pane"></div>`;
+    ({ axes: renderAxes, members: renderMembers, data: renderData })[tab](c);
+  }
+
+  // ---- ダッシュボード ----
+  function cubeStats(c) {
+    const p = cube(c.parent);
+    const xs = members(c.axes.x), ys = members(c.axes.y), zs = members(c.axes.z), ats = p ? members(p.axes[c.via]) : [""];
+    const ok = { 0: new Set(ats), 1: new Set(xs), 2: new Set(ys), 3: new Set(zs) };
+    const gk = AX.find((k) => c.axes[k].kind === "month") || "y"; const gi = { x: 1, y: 2, z: 3 }[gk];
+    const by = new Map(members(c.axes[gk]).map((m) => [m, 0]));
+    let filled = 0, sum = 0;
+    for (const [key, v] of Object.entries(c.cells)) {
+      const q = key.split(SEP); if (![0, 1, 2, 3].every((i) => ok[i].has(q[i]))) continue;
+      filled++; const n = c.value.type === "text" ? 1 : Number(v) || 0; sum += n; by.set(q[gi], (by.get(q[gi]) || 0) + n);
+    }
+    return { total: xs.length * ys.length * zs.length * ats.length, filled, sum, gk, by };
+  }
+  function renderDash() {
+    const all = st.cubes; const stats = new Map(all.map((c) => [c.id, cubeStats(c)]));
+    const memberCount = all.reduce((n, c) => n + AX.reduce((m, k) => m + members(c.axes[k]).length, 0), 0);
+    const filled = [...stats.values()].reduce((n, s) => n + s.filled, 0);
+    const head = `<div class="dash-head"><div><h1>ダッシュボード</h1><p class="hint" style="margin:0">作ったキューブの入り具合と合計を一覧で見ます。カードから立体表示や入力に進めます。</p></div>
+      <div class="card-actions"><button type="button" class="primary" data-act="new">＋ 新しいキューブ</button><button type="button" data-act="tpl">テンプレートから始める</button></div></div>`;
+    if (!all.length) {
+      $("dash").innerHTML = `${head}<div class="dash-empty"><b>まだキューブがありません</b><p class="hint" style="margin:0">「＋ 新しいキューブ」で白紙から作るか、「テンプレートから始める」で入金管理などの例を読み込みます。</p></div>`;
+      return;
+    }
+    const fmtV = (c, n) => (c.value.type === "text" ? `${fmt(n)}件` : c.value.type === "money" ? `¥${fmt(n)}` : fmt(n));
+    const card = (c) => {
+      const s = stats.get(c.id); const pct = s.total ? Math.round((s.filled / s.total) * 100) : 0;
+      const entries = [...s.by.entries()]; const shown = entries.slice(0, 8); const max = Math.max(...shown.map(([, n]) => Math.abs(n)), 1);
+      const chain = chainOf(c).slice(0, -1);
+      return `<article class="card">
+        ${chain.length ? `<span class="crumb">${chain.map((k) => esc(k.name)).join(" › ")} ›</span>` : ""}
+        <h3>${esc(c.name)}</h3>
+        <div class="chips">${AX.map((k) => `<span class="chip ${k}">${k.toUpperCase()} ${esc(c.axes[k].name)} ${members(c.axes[k]).length}</span>`).join("")}<span class="chip">値 ${esc(c.value.name)}(${VTYPE[c.value.type]})</span></div>
+        <div><div class="meter" role="img" aria-label="入力済み ${pct}%"><i style="width:${pct}%"></i></div>
+          <p class="hint" style="margin:4px 0 0">入力済み ${fmt(s.filled)} / ${fmt(s.total)} コマ(${pct}%)${s.filled && c.value.type !== "text" ? ` ・ ${esc(c.value.name)}の合計 <b style="color:var(--ink)">${fmtV(c, s.sum)}</b>` : ""}</p></div>
+        ${s.filled && shown.length ? `<div class="bars" aria-label="${esc(c.axes[s.gk].name)}ごとの${c.value.type === "text" ? "件数" : "合計"}">${shown.map(([m, n]) => `<div class="bar"><span class="lb" title="${esc(disp(c.axes[s.gk], m))}">${esc(disp(c.axes[s.gk], m))}</span><span class="tr"><i style="width:${Math.round((Math.abs(n) / max) * 100)}%"></i></span><span class="nv">${fmtV(c, n)}</span></div>`).join("")}${entries.length > 8 ? `<p class="hint" style="margin:0">ほか ${entries.length - 8} 件</p>` : ""}</div>` : `<p class="hint" style="margin:0">まだ値が入っていません。</p>`}
+        ${kids(c.id).length ? `<p class="lowers" style="margin:0">下位:${kids(c.id).map((k) => `<button type="button" data-open="${k.id}" data-v="cube">${esc(k.name)}</button>`).join("、")}</p>` : ""}
+        <div class="card-actions"><button type="button" class="primary" data-open="${c.id}" data-v="cube">立体で見る</button><button type="button" data-open="${c.id}" data-v="data">値を入れる</button><button type="button" data-open="${c.id}" data-v="axes">軸を直す</button></div>
+      </article>`;
+    };
+    const order = []; const walk = (pid) => kids(pid).forEach((c) => { order.push(c); walk(c.id); }); walk(null);
+    $("dash").innerHTML = `${head}
+      <div class="kpis"><div class="kpi"><div class="k">キューブ</div><div class="v">${all.length}</div></div><div class="kpi"><div class="k">目盛り(全部の軸)</div><div class="v">${fmt(memberCount)}</div></div><div class="kpi"><div class="k">入力済みのコマ</div><div class="v">${fmt(filled)}</div></div></div>
+      <div class="cards">${order.map(card).join("")}</div>`;
+  }
+  $("dash").onclick = (e) => {
+    const o = e.target.closest("[data-open]"); if (o) { st.selected = o.dataset.open; st.view = o.dataset.v; render(); scrollTo(0, 0); return; }
+    const a = e.target.closest("[data-act]"); if (!a) return;
+    if (a.dataset.act === "new") $("new-cube").click(); else $("tpl-btn").click();
+  };
+  $("nav").onclick = (e) => { const b = e.target.closest("[data-view]"); if (!b) return; st.view = b.dataset.view; $("side").classList.remove("open"); $("menu-btn").setAttribute("aria-expanded", "false"); render(); scrollTo(0, 0); };
+  $("menu-btn").onclick = () => { const open = $("side").classList.toggle("open"); $("menu-btn").setAttribute("aria-expanded", open); };
+  $("tree").onclick = (e) => { const b = e.target.closest("button[data-id]"); if (b) { st.selected = b.dataset.id; if (st.view === "dash") st.view = "cube"; $("side").classList.remove("open"); sheet = null; bulk.ax = null; bulk.msg = ""; render(); } };
+  $("editor").addEventListener("click", (e) => {
+    const t = e.target.closest("[data-tab]"); if (t) { st.tab = st.view = t.dataset.tab; render(); scrollTo(0, 0); return; }
+    const g = e.target.closest("[data-go]"); if (g) { st.selected = g.dataset.go; render(); }
+  });
+  $("new-cube").onclick = () => { const c = newCube("新しいキューブ"); st.cubes.push(c); st.selected = c.id; st.tab = st.view = "axes"; render(); $("cube-name")?.select(); };
+  $("add-lower").onclick = () => {
+    const p = cube(st.selected); if (!p) return;
+    const c = newCube(`${p.axes.x.name}ごとの中身`, p.id, "x"); st.cubes.push(c); st.selected = c.id; st.tab = st.view = "axes"; render(); $("cube-name")?.select();
+  };
+  $("add-upper").onclick = () => {
+    const c = cube(st.selected); if (!c) return;
+    const up = newCube("上位のキューブ", c.parent, c.parent ? c.via : null);
+    up.axes.x = newAxis(c.name + "の区分", ["(区分1)"]);
+    // 今のキューブを、上位の X 軸の目盛りごとの下位にする(今のデータは最初の目盛りの中に入れる)
+    const moved = {}; for (const [k, v] of Object.entries(c.cells)) { const parts = k.split(SEP); parts[0] = "(区分1)"; moved[parts.join(SEP)] = v; }
+    c.cells = moved; c.parent = up.id; c.via = "x";
+    st.cubes.push(up); st.selected = up.id; st.tab = st.view = "axes"; render(); $("cube-name")?.select();
+  };
+  $("blank-btn").onclick = () => { $("tpl-panel").hidden = true; $("blank-confirm").hidden = false; };
+  $("blank-no").onclick = () => { $("blank-confirm").hidden = true; };
+  $("blank-yes").onclick = () => { st = blank(); sheet = null; $("blank-confirm").hidden = true; render(); };
+  $("tpl-btn").onclick = () => { $("blank-confirm").hidden = true; $("tpl-panel").hidden = false; };
+  $("tpl-close").onclick = () => { $("tpl-panel").hidden = true; };
+  $("tpls").innerHTML = TEMPLATES.map((t, i) => `<button type="button" class="tpl" data-i="${i}"><b>${esc(t.name)}</b><span>${esc(t.note)}</span></button>`).join("");
+  $("tpls").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; st = TEMPLATES[+b.dataset.i].make(); sheet = null; $("tpl-panel").hidden = true; render(); };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => renderPreview());
+
+  resize(); render(); tick();
+})();
+</script>
+
+</body>
+</html>
