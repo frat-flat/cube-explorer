@@ -39,3 +39,19 @@ http://localhost:3000 を開くと面ビュー(Cube Explorer)が表示されま�
 - `e2e/` 画面テスト
 
 ローカルの Supabase は DB だけを使うため、`supabase/config.toml` で認証・ストレージ・Studio などは無効にしています。
+
+## 公開版(Vercel + Supabase)
+
+実データを入れて触るための公開版の設定です。詳しくは DESIGN.md の「公開版 v0」。
+
+| 環境変数 | 内容 |
+|---|---|
+| `DATABASE_URL` | Supabase の接続文字列(トランザクションプーラー・6543番) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase プロジェクトの URL(ログインに使う) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase の公開キー |
+| `ALLOWED_EMAILS` | 見てよいメールアドレス(カンマ区切り) |
+
+- ローカルでは上の3つ(ログイン関係)を設定しなければ、ログインなしで動きます
+- データは `/import` から、申込者 → 契約者 → 法人 → ショップ → 入金明細の順に取り込みます
+- Supabase の Authentication の URL 設定で、公開先の URL と `/auth/callback` をリダイレクト先に許可してください
+
