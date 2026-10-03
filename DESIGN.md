@@ -460,85 +460,84 @@ type CellValue =
 
 1章では「データは既存のRDBのまま、本システムは閲覧の層」としていた。組み立てたキューブについては、**データそのものを本システムのデータベース(Neon)に持つ**。既存のRDBにつなぐ方式(スプリント5)はそのまま残し、両方を使えるようにする。
 
+#### 組み立ての考え方(2026-10-03 改訂:キューブから作る)
+
+最初の案は「段と項目を作り、軸は型から自動で決める」だったが、ユーザーから「表示方法がわかりづらい。キューブを作ってから X軸・Y軸・Z軸を設定しながら作り込む仕様にしたい」「作ったキューブの上位や下位のキューブも作れるようにしたい」「設定したところからプレビューで見たい」との判断があり、**キューブを単位に組み立てる**形に改める。試作:https://claude.ai/artifact/PSSQLtzpGdKrWSMySXSNtz
+
 #### 用語(2章に追加)
 
 | 用語 | コード上の名前 | 意味 |
 |---|---|---|
-| 段 | `Level` | 「もの」の種類。例:申込者、法人、ショップ、月別入金。親の段を1つ持てる(法人の親は契約者) |
-| 項目 | `Field` | 段が持つ列。例:法人の「課税区分」「住所」、入金の「年月」「内訳」「金額」 |
-| 行 | `Record` | 段の1件。例:株式会社みどり堂。コードで特定し、親の行のコードを持つ |
-| 組み立て | `Builder` | 段と項目を作り、並べ、キューブの見え方を決める画面 |
+| キューブ | `BuiltCube` | 利用者が作る立体の表。名前、X・Y・Z の3軸、値、コマを持つ |
+| 軸 | `BuiltAxis` | 名前と目盛り。目盛りは「自分で並べる」(法人名など)か「年月の範囲」(2026-04〜2026-09)で決める |
+| 値 | `BuiltValue` | コマの中身。名前、型(金額・数値・文字)、面で見るときのまとめ方(合計・平均・件数・最大・最小) |
+| 上位・下位 | `parent` / `via` | 下位のキューブは、上位のキューブの1つの軸(`via`)の目盛りごとに1つずつ中身を持つ。例:法人別の入金(上位)の「法人」軸の目盛りごとに、ショップ別の入金(下位) |
+| 組み立て | `Builder` | キューブを作り、軸と値を決め、データを入れる画面 |
 
 #### 組み立てでできること
 
-1. **段を作る**:名前、親の段(なしも可)、行を特定するコードの付け方(手入力 / 自動採番)
-2. **項目を足す**:名前と型を選ぶ。型は 文字・数値・金額・日付・年月・選択肢。選択肢は候補を登録する(例:課税 / 免税)
-3. **並べ替え・名前変更・削除**:段と項目の順番を変える。削除は、データが入っている項目なら確認を出す
-4. **入れ子の種類を作って選ぶ**:種類も利用者が名前から作る(2026-10-03 ユーザー判断「どちらもまっさらでいい」)。種類ごとに見せ方を「1件をカードで見せる / 中の段を並べる / 軸で集計して立体にする」から選び、段ごとにどの種類かを選ぶ。以前決めた3種類(情報カード・入れ物・データのキューブ)は、この見せ方の3つに当たる
-5. **軸と値は型から自動で決まる**:段そのもの → `entity` 軸、選択肢 → `attribute` 軸、日付・年月 → `time` 軸、項目一覧 → `columns` 軸、数値・金額 → 値(集約できる)。組み立て画面では、どれを最初の3軸にするかだけを選ぶ
-
-#### 白紙とテンプレート
-
-- 最初は段も種類も**まっさら**で始まる
-- 「テンプレートから始める」で、よくある形を読み込んでから直せる(ユーザー判断「テンプレートのようなものはあってもいい」)。最初は「種類だけ(基本の3つ)」「入金管理(架空データ入り)」「店舗の売上」「顧客と案件」を用意する。テンプレートは段・種類・項目の定義(と任意のサンプル行)を JSON で持つ
+1. **キューブを作る**:名前を付け、X(横)・Y(縦)・Z(奥)の軸ごとに名前と目盛りを決める。値の名前・型・まとめ方を決める。軸の色は X 紫・Y 緑・Z ピンク(3Dラベルの規則と同じ)
+2. **下位のキューブを作る**:選んだキューブのどの軸の目盛りごとに中身を持つかを選んで作る。1つのキューブに下位をいくつでも付けられる(法人ごとに「ショップ別の入金」と「基本情報」など)
+3. **上位のキューブを作る**:今のキューブを包む上位を作る。今のキューブは上位の X 軸の目盛りごとの下位になり、今のデータは最初の目盛り「(区分1)」の中に入る(後で目盛り名を直す)
+4. **プレビュー**:設定を変えるたびに立体が描き直される。正面・上面・側面・斜めに切り替えられ、ドラッグで回せる。コマを選ぶと中身と「〇〇の『下位キューブ』へ」の移動ボタンが出る。立体の下に、見えている面の表(見えない軸の方向にまとめ方で集計)を出す
+5. **白紙とテンプレート**:最初はキューブが1つもない状態で始まる。「テンプレートから始める」で、入金管理(法人別の入金 › ショップ別の入金・法人の基本情報、架空データ入り)、店舗の売上(› 担当者別の売上)、軸だけのひな形を読み込んでから直せる
 
 #### データの入れ方
 
-- **画面で入力**:段ごとのシート(表)で、行の追加・編集・削除ができる。親の段は候補から選ぶ
-- **CSV・Excel の取り込み**:段を選んでファイルを読み込み、ファイルの列と項目の対応を画面でつなぐ(見出しが同じなら自動でつなぐ)。組み立てた段と項目からひな形 CSV を出せる。コードが同じ行は上書き、親のコードがない行はエラー(v0 と同じ規則)
+- **画面で入力**:キューブの X×Y の表に入力する。Z は1枚ずつ切り替える。下位のキューブは、どの上位の目盛りの中かを先に選ぶ
+- **CSV・Excel の取り込み**:列は「上位の軸(下位のときだけ)・X・Y・Z・値」。見出しが軸の名前と同じなら自動でつなぐ。ファイルにあってまだない目盛りは自動で足す。ひな形 CSV を出せる
 
 #### データの持ち方
 
-段や項目を足すたびにテーブルを作る(DDL を流す)のではなく、**決まった3つのテーブルに定義と行を入れる**。画面から安全に作り変えられ、マイグレーションも要らないため。
+キューブを足すたびにテーブルを作る(DDL を流す)のではなく、**決まったテーブルに定義とコマを入れる**。画面から安全に作り変えられ、マイグレーションも要らないため。
 
 ```sql
-create table cube_meta.nest_kinds (    -- 入れ子の種類(利用者が作る)
+create table cube_meta.built_cubes (   -- 利用者が作るキューブ
   id          uuid primary key default gen_random_uuid(),
-  name        text not null,           -- '情報カード' '店舗のまとまり' など
-  show        text not null,           -- 見せ方 'card' | 'box' | 'cube'
+  name        text not null,
+  parent_id   uuid references cube_meta.built_cubes(id) on delete cascade,  -- 上位(なしも可)
+  via_axis    text check (via_axis in ('x','y','z')),   -- 上位のどの軸の目盛りごとか
+  value_name  text not null,
+  value_type  text not null,           -- 'money' | 'number' | 'text'
+  value_agg   text not null,           -- 'sum' | 'avg' | 'count' | 'max' | 'min'
   position    int not null
 );
 
-create table cube_meta.levels (        -- 段
-  id          uuid primary key default gen_random_uuid(),
+create table cube_meta.built_axes (    -- キューブの3軸
+  cube_id     uuid not null references cube_meta.built_cubes(id) on delete cascade,
+  axis        text not null check (axis in ('x','y','z')),
   name        text not null,
-  parent_id   uuid references cube_meta.levels(id),
-  nest_kind_id uuid references cube_meta.nest_kinds(id),   -- 未設定も可
-  code_mode   text not null default 'manual',   -- 'manual' | 'auto'
-  position    int not null
+  kind        text not null,           -- 'list' | 'month'
+  members     jsonb,                   -- kind = 'list' の目盛り(並び順どおり)
+  month_from  text,                    -- kind = 'month' の範囲 'YYYY-MM'
+  month_to    text,
+  primary key (cube_id, axis)
 );
 
-create table cube_meta.fields (        -- 項目
-  id          uuid primary key default gen_random_uuid(),
-  level_id    uuid not null references cube_meta.levels(id) on delete cascade,
-  key         text not null,           -- 行データの中のキー(英数字。名前から自動で付ける)
-  name        text not null,
-  type        text not null,           -- 'text' | 'number' | 'money' | 'date' | 'month' | 'choice'
-  choices     jsonb,                   -- type = 'choice' の候補
-  position    int not null,
-  unique (level_id, key)
-);
-
-create table cube_data.records (       -- 行
-  level_id     uuid not null references cube_meta.levels(id) on delete cascade,
-  code         text not null,
-  parent_code  text,                   -- 親の段の行のコード
-  values       jsonb not null,         -- {"tax_category": "課税", "address": "..."}
-  updated_at   timestamptz not null default now(),
-  primary key (level_id, code)
+create table cube_data.built_cells (   -- コマ
+  cube_id     uuid not null references cube_meta.built_cubes(id) on delete cascade,
+  parent_path text not null default '', -- 上位の目盛りのたどり(最上位は空)
+  x           text not null,
+  y           text not null,
+  z           text not null,
+  value       jsonb not null,          -- 数値か文字
+  updated_at  timestamptz not null default now(),
+  primary key (cube_id, parent_path, x, y, z)
 );
 ```
 
-- クエリエンジン(7章)は、段と項目の定義から軸・事実の定義を作り、列式を `values->>'項目のキー'` に置き換えて使う。テーブル名・キーは定義の値からのみ組み立てる(7.2 のホワイトリストの考え方を守る)
-- 想定する量は段ごとに数十万行まで。遅くなったら、よく使う項目に式インデックスを足す。それでも足りなければ、段ごとに実テーブルへ書き出す(後で決める)
-- 公開版 v0 の5表と入金キューブは、この仕組みで作った定義に移し、サンプルとして同梱する
+- 面の表と立体は、キューブの定義から軸・事実の定義を作り、クエリエンジン(7章)で集計する。テーブル名・列名は定義の値からのみ組み立てる(7.2 のホワイトリストの考え方を守る)
+- 想定する量はキューブごとに数十万コマまで。遅くなったら `(cube_id, parent_path)` などにインデックスを足す
+- 公開版 v0 の入金キューブは、この仕組みで作ったテンプレート「入金管理」として同梱する
+- 以前の案の「入れ子の種類」(情報カード・入れ物・データのキューブ)は、値の型が文字のキューブ(情報カード)と、下位を持つキューブ(入れ物)で表せるので、別の定義は持たない
 
 #### 未決(13章に追加)
 
 | 項目 | 内容 |
 |---|---|
-| 型を変えたとき | データが入っている項目の型を変えるとき、変換できない値をどう扱うか |
-| 削除と履歴 | 行の削除を論理削除にするか、変更履歴を残すか(スプリント6の履歴と合わせる) |
+| 型を変えたとき | データが入っているキューブの値の型を変えるとき、変換できない値をどう扱うか |
+| 目盛りの削除 | データが入っている目盛りを消すとき、コマも消すか、確認を出して止めるか |
+| 削除と履歴 | コマの削除を論理削除にするか、変更履歴を残すか(スプリント6の履歴と合わせる) |
 | 編集の権限 | 当面はログインできる人全員が組み立て・編集できる。分けるかは権限の検討時に決める |
 
 ### スプリント5：実DBへの接続
