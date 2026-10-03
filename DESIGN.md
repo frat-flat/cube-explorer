@@ -470,6 +470,7 @@ type CellValue =
 |---|---|---|
 | キューブ | `BuiltCube` | 利用者が作る立体の表。名前、X・Y・Z の3軸、値、コマを持つ |
 | 軸 | `BuiltAxis` | 名前と目盛り。目盛りは「自分で並べる」(法人名など)か「年月の範囲」(2026-04〜2026-09)で決める |
+| 表記 | `AxisLabel` | 1つの目盛りの別の書き方。例:申込者を「法人名」「PartyID」「顧客番号」で表す。1つめが基本の表記(目盛りそのもの) |
 | 値 | `BuiltValue` | コマの中身。名前、型(金額・数値・文字)、面で見るときのまとめ方(合計・平均・件数・最大・最小) |
 | 上位・下位 | `parent` / `via` | 下位のキューブは、上位のキューブの1つの軸(`via`)の目盛りごとに1つずつ中身を持つ。例:法人別の入金(上位)の「法人」軸の目盛りごとに、ショップ別の入金(下位) |
 | 組み立て | `Builder` | キューブを作り、軸と値を決め、データを入れる画面 |
@@ -480,7 +481,8 @@ type CellValue =
 2. **下位のキューブを作る**:選んだキューブのどの軸の目盛りごとに中身を持つかを選んで作る。1つのキューブに下位をいくつでも付けられる(法人ごとに「ショップ別の入金」と「基本情報」など)
 3. **上位のキューブを作る**:今のキューブを包む上位を作る。今のキューブは上位の X 軸の目盛りごとの下位になり、今のデータは最初の目盛り「(区分1)」の中に入る(後で目盛り名を直す)
 4. **プレビュー**:設定を変えるたびに立体が描き直される。正面・上面・側面・斜めに切り替えられ、ドラッグで回せる。コマを選ぶと中身と「〇〇の『下位キューブ』へ」の移動ボタンが出る。立体の下に、見えている面の表(見えない軸の方向にまとめ方で集計)を出す
-5. **白紙とテンプレート**:最初はキューブが1つもない状態で始まる。「テンプレートから始める」で、入金管理(法人別の入金 › ショップ別の入金・法人の基本情報、架空データ入り)、店舗の売上(› 担当者別の売上)、軸だけのひな形を読み込んでから直せる
+5. **表記を持たせる**(2026-10-03 ユーザー要望「表記方法が複数ある場合の設定」「複数表記もできるように」):軸ごとに表記の種類(法人名・PartyID・顧客番号など)を足し、目盛りごとに各表記の値を入れる。どの表記で見せるかは軸の設定とプレビューの上で切り替えられ、複数選ぶと「みどり堂 / C-0001」のように並べて出す。表記を変えてもコマのデータは変わらない(コマは基本の表記で持つ)。取り込みでは、どの表記の列でも目盛りに結び付けられる(顧客番号の列から法人を特定する、など)。見つからない値の行は取り込まず、件数と例を出す
+6. **白紙とテンプレート**:最初はキューブが1つもない状態で始まる。「テンプレートから始める」で、入金管理(法人別の入金 › ショップ別の入金・法人の基本情報、架空データ入り)、店舗の売上(› 担当者別の売上)、軸だけのひな形を読み込んでから直せる
 
 #### データの入れ方
 
@@ -511,7 +513,28 @@ create table cube_meta.built_axes (    -- キューブの3軸
   members     jsonb,                   -- kind = 'list' の目盛り(並び順どおり)
   month_from  text,                    -- kind = 'month' の範囲 'YYYY-MM'
   month_to    text,
+  show_labels jsonb not null default '["base"]',  -- 表示する表記の id(複数可、並び順どおり)
   primary key (cube_id, axis)
+);
+
+create table cube_meta.built_axis_labels (   -- 軸の表記の種類
+  cube_id     uuid not null,
+  axis        text not null,
+  id          text not null,           -- 'base' が基本の表記
+  name        text not null,           -- '法人名' 'PartyID' '顧客番号'
+  position    int not null,
+  primary key (cube_id, axis, id),
+  foreign key (cube_id, axis) references cube_meta.built_axes(cube_id, axis) on delete cascade
+);
+
+create table cube_meta.built_member_labels ( -- 目盛りごとの、基本以外の表記の値
+  cube_id     uuid not null,
+  axis        text not null,
+  member      text not null,           -- 基本の表記(目盛りそのもの)
+  label_id    text not null,
+  value       text not null,
+  primary key (cube_id, axis, member, label_id),
+  foreign key (cube_id, axis, label_id) references cube_meta.built_axis_labels(cube_id, axis, id) on delete cascade
 );
 
 create table cube_data.built_cells (   -- コマ
