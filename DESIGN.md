@@ -474,8 +474,13 @@ type CellValue =
 1. **段を作る**:名前、親の段(なしも可)、行を特定するコードの付け方(手入力 / 自動採番)
 2. **項目を足す**:名前と型を選ぶ。型は 文字・数値・金額・日付・年月・選択肢。選択肢は候補を登録する(例:課税 / 免税)
 3. **並べ替え・名前変更・削除**:段と項目の順番を変える。削除は、データが入っている項目なら確認を出す
-4. **入れ子の種類を選ぶ**:段ごとに、決定済みの3種類(情報カード・入れ物・データのキューブ)から選ぶ
+4. **入れ子の種類を作って選ぶ**:種類も利用者が名前から作る(2026-10-03 ユーザー判断「どちらもまっさらでいい」)。種類ごとに見せ方を「1件をカードで見せる / 中の段を並べる / 軸で集計して立体にする」から選び、段ごとにどの種類かを選ぶ。以前決めた3種類(情報カード・入れ物・データのキューブ)は、この見せ方の3つに当たる
 5. **軸と値は型から自動で決まる**:段そのもの → `entity` 軸、選択肢 → `attribute` 軸、日付・年月 → `time` 軸、項目一覧 → `columns` 軸、数値・金額 → 値(集約できる)。組み立て画面では、どれを最初の3軸にするかだけを選ぶ
+
+#### 白紙とテンプレート
+
+- 最初は段も種類も**まっさら**で始まる
+- 「テンプレートから始める」で、よくある形を読み込んでから直せる(ユーザー判断「テンプレートのようなものはあってもいい」)。最初は「種類だけ(基本の3つ)」「入金管理(架空データ入り)」「店舗の売上」「顧客と案件」を用意する。テンプレートは段・種類・項目の定義(と任意のサンプル行)を JSON で持つ
 
 #### データの入れ方
 
@@ -487,11 +492,18 @@ type CellValue =
 段や項目を足すたびにテーブルを作る(DDL を流す)のではなく、**決まった3つのテーブルに定義と行を入れる**。画面から安全に作り変えられ、マイグレーションも要らないため。
 
 ```sql
+create table cube_meta.nest_kinds (    -- 入れ子の種類(利用者が作る)
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,           -- '情報カード' '店舗のまとまり' など
+  show        text not null,           -- 見せ方 'card' | 'box' | 'cube'
+  position    int not null
+);
+
 create table cube_meta.levels (        -- 段
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   parent_id   uuid references cube_meta.levels(id),
-  nest_kind   text not null,           -- 'card' | 'box' | 'cube'
+  nest_kind_id uuid references cube_meta.nest_kinds(id),   -- 未設定も可
   code_mode   text not null default 'manual',   -- 'manual' | 'auto'
   position    int not null
 );
