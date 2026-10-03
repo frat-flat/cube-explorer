@@ -450,6 +450,7 @@ type CellValue =
 - **ログイン**:Supabase Auth のメールリンク。`ALLOWED_EMAILS` に入れたメールアドレスの人だけが見られる。全ページと API で確認する(入口は `src/proxy.ts`)。表は RLS を有効にし、Supabase の API から直接は読めないようにする
 - **置き場所**:データベースは Supabase(Pro・東京リージョン)、画面は Vercel(fratflat チーム)
 - スプリント1の面ビューは `/face` に移す
+- **手元での本番相当環境**(2026-10-03 追加):Supabase の空きができるまでは、`npm run local` で手元に同じ構成(ローカル Supabase の DB と認証、本番ビルド、ログインのメールはローカルの受信箱 Mailpit に届く)を立ち上げて触る。架空のサンプルデータ(`supabase/seed_deposit.sql`)が最初から入っている
 
 ### スプリント5：実DBへの接続
 

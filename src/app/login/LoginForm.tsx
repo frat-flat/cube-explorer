@@ -4,6 +4,9 @@ import { useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import styles from "./login.module.css";
 
+// ローカルで動かすときのメール受信箱(scripts/local.mjs が設定する)
+const LOCAL_MAIL_URL = process.env.NEXT_PUBLIC_LOCAL_MAIL_URL;
+
 const ERRORS: Record<string, string> = {
   link: "ログインリンクが無効か、期限が切れています。もう一度メールを送ってください。",
   denied: "このメールアドレスには閲覧の許可がありません。管理者に追加を依頼してください。",
@@ -40,6 +43,12 @@ export function LoginForm({ error }: { error?: string }) {
       {state === "sent" ? (
         <p className={styles.note}>
           {email} にログイン用のリンクを送りました。メールのリンクを開くと、この画面に戻ってログインできます。
+          {LOCAL_MAIL_URL && (
+            <>
+              <br />
+              ローカルではメールは <a href={LOCAL_MAIL_URL} target="_blank" rel="noreferrer">メール受信箱</a> に届きます。
+            </>
+          )}
         </p>
       ) : (
         <form onSubmit={submit} className={styles.form}>

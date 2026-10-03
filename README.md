@@ -38,7 +38,26 @@ http://localhost:3000 を開くと面ビュー(Cube Explorer)が表示されま�
 - `src/components/` 面ビューと軸設定パネル
 - `e2e/` 画面テスト
 
-ローカルの Supabase は DB だけを使うため、`supabase/config.toml` で認証・ストレージ・Studio などは無効にしています。
+ローカルの Supabase は DB と認証(ログイン)を使います。ストレージ・Studio などは `supabase/config.toml` で無効にしています。
+
+## 手元で本番と同じ構成で触る
+
+ログインあり・データベースあり・本番ビルドで、サンプルデータ(架空の申込者4・契約者9・法人17・ショップ25・入金明細1,356件)入りの状態を立ち上げます。Docker と Node.js が必要です。
+
+```bash
+npm install
+npm run local              # 起動(初回はサンプルデータが自動で入る)
+npm run local -- --reset   # 取り込んだデータを消して、サンプルデータの状態に戻してから起動
+```
+
+1. http://localhost:3000 を開くとログイン画面になります
+2. `demo@example.com` を入れて「ログイン用のリンクを送る」
+3. メールは実際には送られず、http://127.0.0.1:54324 の受信箱に届きます。そのリンクを開くとログインできます
+
+- ログインできるメールアドレスを変えるときは `ALLOWED_EMAILS=a@example.com npm run local`
+- 許可していないアドレスでリンクを開くと「閲覧の許可がありません」になります(本番と同じ動き)
+- `/import` から CSV・Excel を取り込んで、自分のデータに差し替えて試せます
+- サンプルデータは `supabase/seed_deposit.sql`
 
 ## 公開版(Vercel + Supabase)
 
