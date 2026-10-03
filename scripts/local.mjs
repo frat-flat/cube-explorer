@@ -23,7 +23,7 @@ if (process.argv.includes("--reset")) run("npx supabase db reset");
 
 const status = Object.fromEntries(
   execSync("npx supabase status -o env", { encoding: "utf8" })
-    .split("\n")
+    .split(/\r?\n/)
     .map((line) => line.match(/^([A-Z_]+)="?(.*?)"?$/))
     .filter(Boolean)
     .map((m) => [m[1], m[2]]),
