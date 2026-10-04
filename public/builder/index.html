@@ -184,6 +184,11 @@ textarea { width: 100%; min-height: 110px; font-family: var(--font-mono); font-s
 .win-bar .w span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .win-bar .w .x { color: var(--ax-x); } .win-bar .w .y { color: var(--ax-y); } .win-bar .w .z { color: var(--ax-z); }
 .win-bar input[type=range] { width: 100%; min-width: 0; }
+#face { max-height: min(70vh, 640px); overflow: auto; }
+#face thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+#face tr.spacer td { padding: 0; border: 0; }
+.win-bar .wl { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.win-bar .wl .x { color: var(--ax-x); } .win-bar .wl .y { color: var(--ax-y); } .win-bar .wl .z { color: var(--ax-z); }
 .win-bar button { padding: 2px 8px; }
 .cellinfo { min-height: 46px; font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--sunk); margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
 .cellinfo .k { color: var(--muted); font-size: 12px; }
@@ -365,7 +370,10 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
               <button type="button" data-face="top" aria-pressed="false">上面</button>
               <button type="button" data-face="side" aria-pressed="false">側面</button>
               <button type="button" data-face="iso" aria-pressed="true">斜め</button>
-              <span class="sp">ドラッグで回転</span>
+              <button type="button" data-zoom="in" aria-label="拡大">＋</button>
+              <button type="button" data-zoom="out" aria-label="縮小">−</button>
+              <button type="button" data-zoom="reset">全体</button>
+              <span class="sp">ドラッグで回転 ・ ホイールで拡大 ・ Shift+ドラッグで移動</span>
             </div>
             <div class="win-bar" id="win-bar" hidden></div>
             <div class="notes-bar" id="notes-bar" hidden></div>
@@ -935,6 +943,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       + (bad ? `<p class="notice warn">数字として読めない値が${bad}個あり、入れませんでした。</p>` : "")
       + (missing.size ? `<p class="notice warn">年月の範囲にない目盛りがありました:${[...missing].slice(0, 5).map(esc).join("、")}</p>` : "");
   }
+  let GRID_H = 33;
   function renderData(c) {
     const L = dataLayout(c); const R = members(c.axes[L.r]), C = members(c.axes[L.col]), S = members(c.axes[L.s]);
     const head = guide(["軸を決める", "目盛りを登録する", "値を入れる"], 2);
@@ -951,8 +960,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const sv = st.dataS; const at = atOf(c); const num = c.value.type !== "text";
     $("pane").innerHTML = `${head}${layout}
       <div class="sheet-tabs" role="tablist" aria-label="${esc(c.axes[L.s].name)}のシート"><span class="${L.s}">${L.s.toUpperCase()} ${esc(c.axes[L.s].name)}:</span>${S.map((m) => `<button type="button" class="${L.s}" data-sv="${esc(m)}" aria-selected="${m === sv}">${esc(disp(c.axes[L.s], m))}</button>`).join("")}</div>
-      <div class="scroll sheet-wrap"><table class="sheet"><thead><tr><th class="corner"><span class="h${L.r}">${esc(c.axes[L.r].name)}</span> ＼ <span class="h${L.col}">${esc(c.axes[L.col].name)}</span></th>${C.map((cv) => `<th class="h${L.col}">${esc(disp(c.axes[L.col], cv))}</th>`).join("")}</tr></thead>
-      <tbody id="grid">${R.map((rv) => `<tr><th class="h${L.r}">${esc(disp(c.axes[L.r], rv))}</th>${C.map((cv) => { const v = c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]; return `<td><input ${num ? 'inputmode="decimal" class="num"' : ""} data-rv="${esc(rv)}" data-cv="${esc(cv)}" value="${esc(v ?? "")}" aria-label="${esc(rv)}・${esc(cv)}"></td>`; }).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="scroll sheet-wrap tall" id="gwrap"><table class="sheet"><thead><tr><th class="corner"><span class="h${L.r}">${esc(c.axes[L.r].name)}</span> ＼ <span class="h${L.col}">${esc(c.axes[L.col].name)}</span></th>${C.map((cv) => `<th class="h${L.col}">${esc(disp(c.axes[L.col], cv))}</th>`).join("")}</tr></thead>
+      <tbody id="grid"></tbody></table></div>
       <div class="tools" style="margin-top:8px">
         <button type="button" id="face-copy">この表を Excel 用にコピー</button>
         <button type="button" id="face-paste-open" aria-expanded="${pasteOpen}">見出しつきの表を貼り付ける</button></div>
@@ -974,15 +983,40 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     };
     $("face-paste-open").onclick = () => { pasteOpen = !pasteOpen; render(); $("face-paste")?.focus(); };
     if ($("face-paste-go")) $("face-paste-go").onclick = () => { dataMsg = pasteCross(c, at, L, sv, $("face-paste").value); pasteOpen = false; render(); };
-    const grid = $("grid");
+    const grid = $("grid"), gwrap = $("gwrap");
+    // 見えている行だけ描く(1万行でも軽く)。描き直しても、入力中のマスは選んだままにする
+    const rowHtml = (rv) => `<tr><th class="h${L.r}">${esc(disp(c.axes[L.r], rv))}</th>${C.map((cv) => { const v = c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]; return `<td><input ${num ? 'inputmode="decimal" class="num"' : ""} data-rv="${esc(rv)}" data-cv="${esc(cv)}" value="${esc(v ?? "")}" aria-label="${esc(rv)}・${esc(cv)}"></td>`; }).join("")}</tr>`;
+    const gv = { from: -1, to: -1 };
+    const cellSel = (rv, cv) => `input[data-rv="${CSS.escape(rv)}"][data-cv="${CSS.escape(cv)}"]`;
+    const drawGrid = (force) => {
+      const top = Math.max(0, gwrap.scrollTop - grid.offsetTop), h = gwrap.clientHeight || 600;
+      const from = Math.max(0, Math.floor(top / GRID_H) - 20), to = Math.min(R.length, Math.ceil((top + h) / GRID_H) + 20);
+      if (!force && from === gv.from && to === gv.to) return;
+      gv.from = from; gv.to = to;
+      const a = document.activeElement, keep = a && grid.contains(a) && a.dataset.rv !== undefined ? { rv: a.dataset.rv, cv: a.dataset.cv, val: a.value } : null;
+      if (keep) { a.dataset.gone = "1"; grid.onchange({ target: a }); }
+      const pad = (n) => (n > 0 ? `<tr class="spacer" style="height:${n * GRID_H}px"><td colspan="${C.length + 1}"></td></tr>` : "");
+      grid.innerHTML = pad(from) + R.slice(from, to).map(rowHtml).join("") + pad(R.length - to);
+      const first = grid.querySelector("tr:not(.spacer)");
+      if (first && first.offsetHeight > 0 && Math.abs(first.offsetHeight - GRID_H) > 1) { GRID_H = first.offsetHeight; drawGrid(true); return; }
+      if (keep) grid.querySelector(cellSel(keep.rv, keep.cv))?.focus({ preventScroll: true });
+    };
+    gwrap.addEventListener("scroll", () => requestAnimationFrame(() => drawGrid(false)));
+    drawGrid(true);
     grid.onchange = (e) => {
-      const i = e.target; const k = keyOf(at, { [L.r]: i.dataset.rv, [L.col]: i.dataset.cv, [L.s]: sv }); const v = toValue(c, i.value);
+      const i = e.target; if (!i.isConnected && i.dataset.gone) return; // 描き直しで外したマスの遅れて来る change は済んでいる
+      const k = keyOf(at, { [L.r]: i.dataset.rv, [L.col]: i.dataset.cv, [L.s]: sv }); const v = toValue(c, i.value);
+      if (v !== null && (c.cells[k] ?? "") === (v ?? "")) return;
       if (v === undefined) delete c.cells[k]; else if (v === null) { i.value = ""; delete c.cells[k]; } else c.cells[k] = v;
       save(); renderPreview();
     };
     grid.onkeydown = (e) => {
-      if (e.key !== "Enter") return; e.preventDefault(); const i = e.target; const td = i.closest("td"); const idx = [...td.parentNode.children].indexOf(td);
-      td.parentNode.nextElementSibling?.children[idx]?.querySelector("input")?.focus();
+      if (e.key !== "Enter") return; e.preventDefault(); const i = e.target;
+      const next = R[R.indexOf(i.dataset.rv) + 1]; if (next === undefined) return;
+      grid.onchange({ target: i });
+      let n = grid.querySelector(cellSel(next, i.dataset.cv));
+      if (!n) { gwrap.scrollTop += GRID_H * 10; drawGrid(true); n = grid.querySelector(cellSel(next, i.dataset.cv)); }
+      n?.focus();
     };
     grid.addEventListener("paste", (e) => {
       const inp = e.target.closest("input[data-rv]"); const t = e.clipboardData?.getData("text") ?? "";
@@ -1142,58 +1176,86 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   new ResizeObserver(resize).observe(stage);
 
+  // 立体:コマは InstancedMesh でまとめて描く(1万件×数十でも描画は2回で済む)。
+  // 目盛りが多い軸はコマを薄くして、立体全体がだいたい同じ大きさに収まるようにする
+  const FIT = 16, CELL_BUDGET = 300000;
+  const unitBox = new THREE.BoxGeometry(1, 1, 1);
+  let inst = { full: null, empty: null, fIdx: null, eIdx: null, val: null }, hl = null, panX = 0, panY = 0, baseDist = 14, lastCube = null;
+  const cellPos = (i, j, k) => { const d = dims; return new THREE.Vector3((i - (d.nx - 1) / 2) * d.sx, ((d.ny - 1) / 2 - j) * d.sy, ((d.nz - 1) / 2 - k) * d.sz); };
   function renderPreview() {
-    meshes.forEach((m) => { group.remove(m); m.geometry.dispose(); m.material.dispose(); });
-    meshes = [];
+    if ($("viewer").hidden) return; // 立体を出していない画面では描かない(出すときに render() から描く)
+    meshes.forEach((m) => { group.remove(m); if (m.geometry !== unitBox) m.geometry.dispose(); m.material.dispose(); m.dispose?.(); });
+    meshes = []; inst = { full: null, empty: null, fIdx: null, eIdx: null, val: null }; hl = null; picked = null;
     const c = cube(st.selected);
-    if (!c) { dims = { nx: 0, ny: 0, nz: 0 }; renderFace(); return; }
+    if (!c) { dims = { nx: 0, ny: 0, nz: 0 }; renderFace(); $("win-bar").hidden = true; return; }
     const win = winOf(c);
     const [xs, ys, zs] = AX.map((k) => members(c.axes[k]).slice(win[k].off, win[k].off + win[k].size));
     const nx = Math.max(xs.length, 1), ny = Math.max(ys.length, 1), nz = Math.max(zs.length, 1);
-    dims = { nx, ny, nz, xs, ys, zs };
-    const at = atOf(c);
-    const vals = [];
-    xs.forEach((x, i) => ys.forEach((y, j) => zs.forEach((z, k) => { const v = c.cells[[at, x, y, z].join(SEP)]; vals.push([i, j, k, v]); })));
-    const nums = vals.map((v) => (c.value.type === "text" ? (v[3] ? 1 : 0) : Math.abs(Number(v[3]) || 0)));
-    const max = Math.max(...nums, 1);
-    const unit = 1, gap = 0.12;
-    const geo = new THREE.BoxGeometry(unit - gap, unit - gap, unit - gap);
-    vals.forEach(([i, j, k, v], n) => {
-      const has = v !== undefined && v !== "";
-      const mat = new THREE.MeshLambertMaterial({ color: has ? colorOf(0.25 + 0.75 * (nums[n] / max)) : new THREE.Color(css("--line") || "#d5dde0"), transparent: true, opacity: has ? 0.92 : 0.28 });
-      const m = new THREE.Mesh(geo.clone(), mat);
-      m.position.set(i - (nx - 1) / 2, (ny - 1) / 2 - j, (nz - 1) / 2 - k);
-      m.userData = { x: xs[i], y: ys[j], z: zs[k], v };
-      group.add(m); meshes.push(m);
-    });
+    dims = { nx, ny, nz, xs, ys, zs, sx: Math.min(1, FIT / nx), sy: Math.min(1, FIT / ny), sz: Math.min(1, FIT / nz) };
+    const N = xs.length * ys.length * zs.length;
+    if (N) {
+      // 値を1回なめて、映す範囲のコマに割り当てる
+      const at = atOf(c), ix = [xs, ys, zs].map((l) => new Map(l.map((m, i) => [m, i])));
+      const val = new Array(N), Y = ys.length, Z = zs.length;
+      for (const [key, v] of Object.entries(c.cells)) {
+        if (v === undefined || v === "") continue;
+        const q = key.split(SEP); if (q[0] !== at) continue;
+        const i = ix[0].get(q[1]), j = ix[1].get(q[2]), k = ix[2].get(q[3]);
+        if (i !== undefined && j !== undefined && k !== undefined) val[(i * Y + j) * Z + k] = v;
+      }
+      const num = (v) => (c.value.type === "text" ? 1 : Math.abs(Number(v) || 0));
+      let nFill = 0, max = 1;
+      for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; max = Math.max(max, num(val[n])); }
+      const lo = new THREE.Color(css("--accent-soft") || "#d9eeef"), hi = new THREE.Color(css("--accent") || "#0e6a70"), col = new THREE.Color();
+      const full = new THREE.InstancedMesh(unitBox, new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.92 }), Math.max(nFill, 1));
+      const empty = new THREE.InstancedMesh(unitBox, new THREE.MeshLambertMaterial({ color: new THREE.Color(css("--line") || "#d5dde0"), transparent: true, opacity: 0.28, depthWrite: false }), Math.max(N - nFill, 1));
+      full.count = nFill; empty.count = N - nFill;
+      const gap = (s) => (s >= 0.4 ? 0.12 * s : 0); // 薄いコマはすき間をなくす
+      const m4 = new THREE.Matrix4(), rot = new THREE.Quaternion(), scl = new THREE.Vector3(dims.sx - gap(dims.sx), dims.sy - gap(dims.sy), dims.sz - gap(dims.sz));
+      const fIdx = new Int32Array(nFill), eIdx = new Int32Array(N - nFill); let a = 0, b = 0;
+      for (let n = 0; n < N; n++) {
+        const k = n % Z, j = ((n - k) / Z) % Y, i = Math.floor(n / (Y * Z));
+        m4.compose(cellPos(i, j, k), rot, scl);
+        if (val[n] !== undefined) { full.setMatrixAt(a, m4); full.setColorAt(a, col.copy(lo).lerp(hi, 0.25 + 0.75 * (num(val[n]) / max))); fIdx[a++] = n; }
+        else { empty.setMatrixAt(b, m4); eIdx[b++] = n; }
+      }
+      full.instanceMatrix.needsUpdate = true; if (full.instanceColor) full.instanceColor.needsUpdate = true; empty.instanceMatrix.needsUpdate = true;
+      group.add(empty, full); meshes.push(empty, full);
+      inst = { full, empty, fIdx, eIdx, val };
+      hl = new THREE.LineSegments(new THREE.EdgesGeometry(unitBox), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--ink") || "#1b2428") }));
+      hl.visible = false; group.add(hl); meshes.push(hl);
+    }
     // 外枠
-    const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(nx, ny, nz)), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--muted") || "#5d6b71") }));
+    const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(nx * dims.sx, ny * dims.sy, nz * dims.sz)), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--muted") || "#5d6b71") }));
     group.add(box); meshes.push(box);
-    dist = Math.max(nx, ny, nz) * 2.1 + 4;
-    picked = null; renderPicked(); renderFace(); renderNotesBar(); renderWinBar(c, win);
+    baseDist = Math.max(nx * dims.sx, ny * dims.sy, nz * dims.sz) * 2.1 + 4;
+    if (lastCube !== c.id) { lastCube = c.id; dist = baseDist; panX = panY = 0; }
+    renderPicked(); renderFace(); renderNotesBar(); renderWinBar(c, win);
   }
 
-  // 立体に映すのは各軸の一部(コマ数に上限を設ける)。目盛りが多い軸は「映す範囲」を送って見る
-  const CELL_BUDGET = 2400, WIN_MIN = 14, WIN_MAX = 40;
+  // 一度に映す数は選べる(全部=コマ30万個まで)。目盛りが多くて収まらない軸は「映す範囲」を送って見る
+  const LIMITS = [["all", "全部"], ["2000", "2,000件"], ["500", "500件"], ["100", "100件"], ["30", "30件"]];
   function winOf(c) {
-    const tot = Object.fromEntries(AX.map((k) => [k, members(c.axes[k]).length]));
-    const size = Object.fromEntries(AX.map((k) => [k, Math.max(1, Math.min(tot[k], WIN_MIN))]));
-    // 余裕があれば、目盛りの多い軸から順に映す数を増やす
-    for (let grown = true; grown; ) {
-      grown = false;
-      for (const k of [...AX].sort((a, b) => tot[b] - tot[a])) {
-        if (size[k] >= Math.min(tot[k], WIN_MAX)) continue;
-        const prod = AX.reduce((n, q) => n * (q === k ? size[q] + 1 : size[q]), 1);
-        if (prod <= CELL_BUDGET) { size[k]++; grown = true; }
-      }
-    }
     const saved = ((st.win ??= {})[c.id] ??= {});
+    const lim = saved.lim && saved.lim !== "all" ? +saved.lim : Infinity;
+    const tot = Object.fromEntries(AX.map((k) => [k, members(c.axes[k]).length]));
+    const size = Object.fromEntries(AX.map((k) => [k, Math.max(1, Math.min(tot[k], lim))]));
+    for (let guard = 0; guard < 20; guard++) {
+      const prod = AX.reduce((n, k) => n * size[k], 1); if (prod <= CELL_BUDGET) break;
+      const k = [...AX].sort((p, q) => size[q] - size[p])[0];
+      const next = Math.max(30, Math.floor(size[k] * CELL_BUDGET / prod)); if (next >= size[k]) break; size[k] = next;
+    }
     return Object.fromEntries(AX.map((k) => { const off = Math.max(0, Math.min(saved[k] || 0, tot[k] - size[k])); saved[k] = off; return [k, { off, size: size[k], tot: tot[k] }]; }));
   }
   function renderWinBar(c, win) {
     const bar = $("win-bar"); const ks = AX.filter((k) => win[k].tot > win[k].size);
-    bar.hidden = !ks.length;
-    bar.innerHTML = ks.map((k) => { const w = win[k]; return `<div class="w"><span><span class="${k}">${k.toUpperCase()} ${esc(c.axes[k].name)}</span> ${w.off + 1}–${w.off + w.size} 件目 / 全${w.tot}件</span>`
+    const big = AX.some((k) => win[k].tot > 30);
+    bar.hidden = !big;
+    if (!big) { bar.innerHTML = ""; return; }
+    const lim = st.win[c.id].lim || "all";
+    bar.innerHTML = `<div class="wl"><span>一度に映す数</span><select id="win-lim">${LIMITS.map(([v, t]) => `<option value="${v}" ${v === lim ? "selected" : ""}>${t}</option>`).join("")}</select>`
+      + `<span class="hint" style="margin:0">${AX.map((k) => `<span class="${k}">${k.toUpperCase()}</span> ${win[k].tot.toLocaleString()}件`).join(" ・ ")}</span></div>`
+      + ks.map((k) => { const w = win[k]; return `<div class="w"><span><span class="${k}">${k.toUpperCase()} ${esc(c.axes[k].name)}</span> ${(w.off + 1).toLocaleString()}–${(w.off + w.size).toLocaleString()} 件目 / 全${w.tot.toLocaleString()}件</span>`
       + `<button type="button" data-win="${k}" data-d="-1" aria-label="前へ" ${w.off ? "" : "disabled"}>◀</button>`
       + `<input type="range" data-win="${k}" min="0" max="${w.tot - w.size}" value="${w.off}" aria-label="${esc(c.axes[k].name)}の映す範囲">`
       + `<button type="button" data-win="${k}" data-d="1" aria-label="次へ" ${w.off + w.size < w.tot ? "" : "disabled"}>▶</button></div>`; }).join("");
@@ -1205,24 +1267,28 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     cancelAnimationFrame(winRaf); winRaf = requestAnimationFrame(() => { renderPreview(); const r = $("win-bar").querySelector(`input[data-win="${k}"]`); if (r && document.activeElement !== r) r.focus(); });
   }
   $("win-bar").addEventListener("input", (e) => { const r = e.target.closest("input[data-win]"); if (r) moveWin(r.dataset.win, +r.value); });
+  $("win-bar").addEventListener("change", (e) => { if (e.target.id !== "win-lim") return; const c = cube(st.selected); st.win[c.id].lim = e.target.value; lastCube = null; renderPreview(); save(); });
   $("win-bar").onclick = (e) => {
     const b = e.target.closest("button[data-win]"); if (!b) return;
     const c = cube(st.selected); const w = winOf(c)[b.dataset.win];
     moveWin(b.dataset.win, Math.max(0, Math.min(w.tot - w.size, w.off + Number(b.dataset.d) * w.size)));
   };
 
-  // 軸ラベル:各軸の平行な4本の辺のうち、画面上でいちばん外側の辺に沿って置く
-  function project(v) { const p = v.clone().applyMatrix4(group.matrixWorld).project(camera); return { x: (p.x + 1) / 2 * stage.clientWidth, y: (1 - p.y) / 2 * stage.clientHeight }; }
+  // 軸ラベル:各軸の平行な4本の辺のうち、画面上でいちばん外側の辺に沿って置く。
+  // 目盛りが詰まって見えるときは、1・2・5・10…件おきに間引く(拡大すると細かく出る)
+  const niceStep = (s) => { if (s <= 1) return 1; const p = 10 ** Math.floor(Math.log10(s)); return [1, 2, 5, 10].map((m) => m * p).find((v) => v >= s); };
+  function project(v) { const p = v.clone().applyMatrix4(group.matrixWorld).project(camera); return { x: (p.x + 1) / 2 * stage.clientWidth, y: (1 - p.y) / 2 * stage.clientHeight, z: p.z }; }
   function renderLabelsOnly() {
     labelsEl.innerHTML = "";
     const c = cube(st.selected); if (!c || !dims.xs) return;
-    const { nx, ny, nz } = dims; const hx = nx / 2, hy = ny / 2, hz = nz / 2;
+    const { nx, ny, nz, sx, sy, sz } = dims; const hx = nx * sx / 2, hy = ny * sy / 2, hz = nz * sz / 2;
     const center = project(new THREE.Vector3(0, 0, 0));
     const specs = {
-      x: { list: dims.xs, along: (t) => new THREE.Vector3(t - (nx - 1) / 2, 0, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(0, a * hy, b * hz)) },
-      y: { list: dims.ys, along: (t) => new THREE.Vector3(0, (ny - 1) / 2 - t, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, 0, b * hz)) },
-      z: { list: dims.zs, along: (t) => new THREE.Vector3(0, 0, (nz - 1) / 2 - t), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, b * hy, 0)) },
+      x: { list: dims.xs, gap: 44, along: (t) => new THREE.Vector3((t - (nx - 1) / 2) * sx, 0, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(0, a * hy, b * hz)) },
+      y: { list: dims.ys, gap: 20, along: (t) => new THREE.Vector3(0, ((ny - 1) / 2 - t) * sy, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, 0, b * hz)) },
+      z: { list: dims.zs, gap: 30, along: (t) => new THREE.Vector3(0, 0, ((nz - 1) / 2 - t) * sz), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, b * hy, 0)) },
     };
+    const W = stage.clientWidth, H = stage.clientHeight;
     const placed = [];
     const overlaps = (r) => placed.some((q) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t);
     for (const k of AX) {
@@ -1231,19 +1297,36 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       for (const e of sp.edges) { const p = project(e); const d = Math.hypot(p.x - center.x, p.y - center.y); if (d > bestD) { bestD = d; best = e; } }
       const mid = project(best); const dx = mid.x - center.x, dy = mid.y - center.y, len = Math.hypot(dx, dy) || 1;
       const off = { x: (dx / len) * 16, y: (dy / len) * 16 };
-      const items = sp.list.map((m, t) => { const p = project(sp.along(t).add(best)); return { m: disp(c.axes[k], m), x: p.x + off.x, y: p.y + off.y }; });
+      const p0 = project(sp.along(0).add(best)), p1 = project(sp.along(1).add(best));
+      const seg = Math.max(Math.hypot(p1.x - p0.x, p1.y - p0.y), 1e-6), u = { x: (p1.x - p0.x) / seg, y: (p1.y - p0.y) / seg };
+      const step = niceStep(sp.gap / seg);
+      // 拡大して辺が画面の外に出たときは、ラベルを画面の端に寄せて出す(軸に沿った向きに外れたものは出さない)
+      const pin = (p) => { const x = Math.min(W - 24, Math.max(24, p.x)), y = Math.min(H - 12, Math.max(12, p.y)); return Math.abs((x - p.x) * u.x + (y - p.y) * u.y) < 8 ? { x, y } : null; };
+      const items = [];
+      // 画面に入る範囲だけを、間引きの刻みで見る
+      let lo = 0, hi = sp.list.length - 1;
+      { const a = project(sp.along(0).add(best)), b = project(sp.along(sp.list.length - 1).add(best)); const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const tAt = (x, y) => ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / (L * L) * (sp.list.length - 1);
+        const ts = [[0, 0], [W, 0], [0, H], [W, H]].map(([x, y]) => tAt(x, y));
+        lo = Math.max(0, Math.floor(Math.min(...ts)) - 1); hi = Math.min(sp.list.length - 1, Math.ceil(Math.max(...ts)) + 1); }
+      for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) {
+        const p = project(sp.along(t).add(best)); if (p.z > 1) continue;
+        const q = pin({ x: p.x + off.x, y: p.y + off.y }); if (!q) continue;
+        items.push({ m: disp(c.axes[k], sp.list[t]), x: q.x, y: q.y });
+        if (items.length > 200) break;
+      }
       // 名前
       const ends = [project(sp.along(-0.9).add(best)), project(sp.along(sp.list.length - 0.1).add(best))];
       const tp = ends.sort((a, b) => Math.hypot(b.x - center.x, b.y - center.y) - Math.hypot(a.x - center.x, a.y - center.y))[0];
-      const title = { m: `${k.toUpperCase()} ${c.axes[k].name}`, x: tp.x + off.x * 1.8, y: tp.y + off.y * 1.8, title: true };
+      const title = { m: `${k.toUpperCase()} ${c.axes[k].name}${step > 1 ? `(${step}件おき)` : ""}`, x: tp.x + off.x * 1.8, y: tp.y + off.y * 1.8, title: true };
       for (const it of [title, ...items]) {
         const w = [...it.m].reduce((n, ch) => n + (ch.charCodeAt(0) < 256 ? 6.6 : 11), 0) * (it.title ? 1.1 : 1) + 10, h = 18;
         // 重なるときは、もう1段外側にずらして置く(ずらしても重なれば省く)
         let r = null;
-        for (const step of it.title ? [0, 1] : [0, 1, 2]) {
-          const ix = it.x + off.x * 1.15 * step, iy = it.y + off.y * 1.15 * step;
+        for (const s of it.title ? [0, 1] : [0, 1, 2]) {
+          const ix = it.x + off.x * 1.15 * s, iy = it.y + off.y * 1.15 * s;
           const q = { l: ix - w / 2, r: ix + w / 2, t: iy - h / 2, b: iy + h / 2 };
-          if (q.l < 2 || q.t < 2 || q.r > stage.clientWidth - 2 || q.b > stage.clientHeight - 2 || overlaps(q)) continue;
+          if (q.l < 2 || q.t < 2 || q.r > W - 2 || q.b > H - 2 || overlaps(q)) continue;
           r = q; it.x = ix; it.y = iy; break;
         }
         if (!r) continue;
@@ -1257,23 +1340,34 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   // 回転(ドラッグ)と面への切り替え
   const FACES = { front: [0, 0], top: [-Math.PI / 2 + 0.001, 0], side: [0, -Math.PI / 2], iso: [-0.42, 0.62] };
   let drag = null;
-  stage.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: false }; stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, moved: false, pan: e.shiftKey || e.button === 1 || e.button === 2 }; stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener("contextmenu", (e) => e.preventDefault());
+  // ホイールで拡大・縮小(カーソルの位置は変えずに寄る)
+  const zoomTo = (nd) => { dist = Math.max(baseDist * 0.25, Math.min(baseDist * 3, nd)); };
+  stage.addEventListener("wheel", (e) => { e.preventDefault(); zoomTo(dist * (e.deltaY > 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
   stage.addEventListener("pointermove", (e) => {
     if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-    targetY += dx * 0.01; targetX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetX + dy * 0.01)); rotX = targetX; rotY = targetY;
-    drag.x = e.clientX; drag.y = e.clientY; setFaceButtons(null);
+    if (drag.pan) { const k = (2 * dist * Math.tan((camera.fov * Math.PI) / 360)) / (stage.clientHeight || 1); panX -= dx * k; panY += dy * k; }
+    else { targetY += dx * 0.01; targetX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetX + dy * 0.01)); rotX = targetX; rotY = targetY; setFaceButtons(null); }
+    drag.x = e.clientX; drag.y = e.clientY;
   });
   stage.addEventListener("pointerup", (e) => {
     const was = drag; drag = null; if (!was || was.moved) return;
     const rect = stage.getBoundingClientRect();
     const mouse = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     const ray = new THREE.Raycaster(); ray.setFromCamera(mouse, camera);
-    const hit = ray.intersectObjects(meshes.filter((m) => m.isMesh))[0];
-    picked = hit ? hit.object : null; renderPicked();
+    const hit = ray.intersectObjects([inst.full, inst.empty].filter((m) => m && m.count))[0];
+    if (!hit) { picked = null; renderPicked(); return; }
+    const n = (hit.object === inst.full ? inst.fIdx : inst.eIdx)[hit.instanceId];
+    const Y = dims.ys.length, Z = dims.zs.length, k = n % Z, j = ((n - k) / Z) % Y, i = Math.floor(n / (Y * Z));
+    picked = { i, j, k, n }; renderPicked();
   });
   function setFaceButtons(f) { document.querySelectorAll("#snap button[data-face]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.face === f)); }
-  $("snap").onclick = (e) => { const b = e.target.closest("button[data-face]"); if (!b) return; [targetX, targetY] = FACES[b.dataset.face]; face = b.dataset.face === "iso" ? "front" : b.dataset.face; setFaceButtons(b.dataset.face); renderFace(); };
+  $("snap").onclick = (e) => {
+    const z = e.target.closest("button[data-zoom]");
+    if (z) { if (z.dataset.zoom === "reset") { dist = baseDist; panX = panY = 0; } else zoomTo(dist * (z.dataset.zoom === "in" ? 1 / 1.4 : 1.4)); return; }
+    const b = e.target.closest("button[data-face]"); if (!b) return; [targetX, targetY] = FACES[b.dataset.face]; face = b.dataset.face === "iso" ? "front" : b.dataset.face; setFaceButtons(b.dataset.face); renderFace(); };
 
   const openBars = new Set(); // プレビュー上で開いている表記の編集(描き直しても開いたままにする)
   // プレビューの上で、軸ごとに表示する表記を切り替える
@@ -1289,10 +1383,10 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 
   function renderPicked() {
     const c = cube(st.selected);
-    meshes.forEach((m) => { if (m.isMesh) m.material.emissive?.setHex(0x000000); });
+    if (hl) hl.visible = !!picked;
     if (!c || !picked) { $("cellinfo").innerHTML = `<span class="k">コマをクリックすると中身が出ます。</span>`; return; }
-    picked.material.emissive.setHex(0x333333);
-    const d = picked.userData;
+    hl.position.copy(cellPos(picked.i, picked.j, picked.k)); hl.scale.set(dims.sx, dims.sy, dims.sz);
+    const d = { x: dims.xs[picked.i], y: dims.ys[picked.j], z: dims.zs[picked.k], v: inst.val[picked.n] };
     const lowers = kids(c.id);
     $("cellinfo").innerHTML = `${AX.map((k) => `<span class="${k}">${esc(c.axes[k].name)}:${esc(disp(c.axes[k], d[k]))}</span>`).join("")}
       <span>${esc(c.value.name)} <b>${d.v === undefined || d.v === "" ? "(空)" : esc(c.value.type === "text" ? d.v : fmt(Number(d.v)))}</b></span>
@@ -1302,7 +1396,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 
   function renderFace() {
     const c = cube(st.selected);
-    if (!c || !dims.xs || !dims.xs.length || !dims.ys.length || !dims.zs.length) { $("face").innerHTML = `<p class="empty">${c ? "3つの軸に目盛りを入れると、ここに面の表が出ます。" : "キューブを作ると、ここに立体と表が出ます。"}</p>`; $("face-title").textContent = ""; labelsEl.innerHTML = ""; return; }
+    if (!c || !dims.xs || !dims.xs.length || !dims.ys.length || !dims.zs.length) { faceV = null; $("face").innerHTML = `<p class="empty">${c ? "3つの軸に目盛りを入れると、ここに面の表が出ます。" : "キューブを作ると、ここに立体と表が出ます。"}</p>`; $("face-title").textContent = ""; labelsEl.innerHTML = ""; return; }
     const at = atOf(c);
     const pair = { front: ["y", "x", "z"], top: ["z", "x", "y"], side: ["y", "z", "x"] }[face];
     const [rk, ck, dk] = pair; const R = members(c.axes[rk]), C = members(c.axes[ck]);
@@ -1317,14 +1411,30 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const cellOf = (r, col) => reduceVals(c, bucket.get(r + SEP + col) || []);
     const show = (v) => (v === null ? "" : typeof v === "number" ? fmt(v) : esc(v));
     $("face-title").innerHTML = `${c.parent ? `${esc(cube(c.parent).axes[c.via].name)}「${esc(disp(cube(c.parent).axes[c.via], at))}」の中 / ` : ""}行 <span class="${rk}">${esc(c.axes[rk].name)}</span> × 列 <span class="${ck}">${esc(c.axes[ck].name)}</span>(<span class="${dk}">${esc(c.axes[dk].name)}</span>は${AGG[c.value.agg]})`;
-    const rowsHtml = R.map((r) => `<tr><th class="h${rk === "x" ? "x" : rk === "y" ? "y" : ""}" style="${rk === "z" ? "color:var(--ax-z)" : ""}">${esc(disp(c.axes[rk], r))}</th>${C.map((col) => { const v = cellOf(r, col); return `<td class="v ${v === null ? "zero" : ""}">${v === null ? "–" : show(v)}</td>`; }).join("")}</tr>`).join("");
-    $("face").innerHTML = `<table><thead><tr><th></th>${C.map((col) => `<th style="color:var(--ax-${ck});text-align:right">${esc(disp(c.axes[ck], col))}</th>`).join("")}</tr></thead><tbody>${rowsHtml}</tbody></table>`;
+    const rowHtml = (r) => `<tr><th class="h${rk === "x" ? "x" : rk === "y" ? "y" : ""}" style="${rk === "z" ? "color:var(--ax-z)" : ""}">${esc(disp(c.axes[rk], r))}</th>${C.map((col) => { const v = cellOf(r, col); return `<td class="v ${v === null ? "zero" : ""}">${v === null ? "–" : show(v)}</td>`; }).join("")}</tr>`;
+    faceV = { R, rowHtml, cols: C.length + 1, from: -1, to: -1 };
+    $("face").innerHTML = `<table><thead><tr><th></th>${C.map((col) => `<th style="color:var(--ax-${ck});text-align:right">${esc(disp(c.axes[ck], col))}</th>`).join("")}</tr></thead><tbody id="fbody"></tbody></table>`;
+    drawFace(true);
   }
+  // 面の表も、見えている行だけ描く(1万行でも軽く)
+  let faceV = null, FACE_H = 29;
+  function drawFace(force) {
+    const f = faceV, body = $("fbody"); if (!f || !body) return;
+    const wrap = $("face"), top = Math.max(0, wrap.scrollTop - (body.offsetTop || 0)), h = wrap.clientHeight || 600;
+    const from = Math.max(0, Math.floor(top / FACE_H) - 20), to = Math.min(f.R.length, Math.ceil((top + h) / FACE_H) + 20);
+    if (!force && from === f.from && to === f.to) return;
+    f.from = from; f.to = to;
+    const pad = (n) => (n > 0 ? `<tr class="spacer" style="height:${n * FACE_H}px"><td colspan="${f.cols}"></td></tr>` : "");
+    body.innerHTML = pad(from) + f.R.slice(from, to).map(f.rowHtml).join("") + pad(f.R.length - to);
+    const first = body.querySelector("tr:not(.spacer)");
+    if (first && Math.abs(first.offsetHeight - FACE_H) > 1 && first.offsetHeight > 0) { FACE_H = first.offsetHeight; drawFace(true); }
+  }
+  $("face").addEventListener("scroll", () => requestAnimationFrame(() => drawFace(false)));
 
   function tick() {
     rotX += (targetX - rotX) * 0.15; rotY += (targetY - rotY) * 0.15;
     group.rotation.set(rotX, rotY, 0);
-    camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0);
+    camera.position.set(panX, panY, dist); camera.lookAt(panX, panY, 0);
     group.updateMatrixWorld(); renderer.render(scene, camera); renderLabelsOnly();
     requestAnimationFrame(tick);
   }
