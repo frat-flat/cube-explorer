@@ -70,7 +70,7 @@ body { background: var(--bg); color: var(--ink); font-family: var(--font-body); 
 .side-foot { display: grid; gap: 6px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
 .main { min-width: 0; padding-inline: 20px; padding-block: 18px 40px; display: grid; gap: 12px; align-content: start; }
 .views { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-.views.split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.views.split { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr); } /* 軸の設定中も主役はキューブ */
 @media (max-width: 1100px) { .views.split { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -135,6 +135,8 @@ h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 10px; }
 .axis-head input { flex: 1 1 140px; font-weight: 700; }
 .axis-head .dir { font-size: 12px; color: var(--muted); }
 .members { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.more-members { margin: 6px 0; }
+.more-members summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
 .member { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; padding: 1px 2px 1px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); }
 .member button { border: 0; background: none; padding: 0 5px; color: var(--muted); line-height: 1.3; }
 .member .down { color: var(--accent); font-size: 11px; }
@@ -283,7 +285,7 @@ textarea { width: 100%; min-height: 110px; font-family: var(--font-mono); font-s
 .sheet-tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 details.long { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
 details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
-.views.split .stage { height: 380px; min-height: 0; }
+.views.split .stage { height: min(62vh, 560px); min-height: 300px; }
 /* ダッシュボード */
 .dash { display: grid; gap: 16px; }
 .dash-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; }
@@ -617,6 +619,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 
   // 目盛りの一括登録:Excel の範囲をコピーして貼る(タブ区切り)。CSV(カンマ区切り)も可
   const bulk = { ax: null, text: "", msg: "" };
+  const openMembers = new Set(); // 開いている目盛りの一覧(描き直しても開いたままにする)
   function bulkPanel(ax) {
     const ls = ax.labels?.length ? ax.labels : [{ id: "base", name: "名前" }];
     return `<div class="bulk">
@@ -657,6 +660,16 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 
   function renderAxes(c) {
     const p = cube(c.parent);
+    // 目盛りが多い軸は札を全部並べず、先頭だけ見せて残りは開閉式にする(一覧と編集は ② の表で)
+    const chip = (m, i) => `<span class="member">${esc(m)}<button type="button" data-del="${i}" aria-label="${esc(m)}を外す">×</button></span>`;
+    const membersBox = (ax, k) => {
+      const ms = ax.members, HEAD = 12, MAXOPEN = 300;
+      if (!ms.length) return `<div class="members"><span class="hint" style="margin:0">まだ目盛りがありません</span></div>`;
+      if (ms.length <= HEAD) return `<div class="members">${ms.map(chip).join("")}</div>`;
+      const open = openMembers.has(`${c.id}:${k}`);
+      return `<details class="more-members" data-mk="${c.id}:${k}" ${open ? "open" : ""}><summary><b>${ms.length.toLocaleString()}件</b> <span class="hint" style="margin:0">${ms.slice(0, 5).map(esc).join("、")} …</span></summary>
+        <div class="members">${ms.slice(0, MAXOPEN).map(chip).join("")}</div>${ms.length > MAXOPEN ? `<p class="hint" style="margin:0">ここには先頭の${MAXOPEN}件だけ出しています。全部は「② 目盛りを登録」の表で見て直せます。</p>` : ""}</details>`;
+    };
     const axisCard = (k) => {
       const ax = c.axes[k];
       const lowers = kids(c.id).filter((d) => d.via === k);
@@ -665,7 +678,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         <div class="row"><label>目盛り</label>
           <select data-f="kind" aria-label="目盛りの作り方"><option value="list" ${ax.kind === "list" ? "selected" : ""}>自分で並べる</option><option value="month" ${ax.kind === "month" ? "selected" : ""}>年月の範囲</option></select></div>
         ${ax.kind === "month" ? `<div class="month-row"><input type="month" data-f="from" value="${esc(ax.from)}" aria-label="開始の年月"> 〜 <input type="month" data-f="to" value="${esc(ax.to)}" aria-label="終わりの年月"><span class="hint" style="margin:0">${members(ax).length}か月</span></div>`
-        : `<div class="members">${ax.members.map((m, i) => `<span class="member">${esc(m)}<button type="button" data-del="${i}" aria-label="${esc(m)}を外す">×</button></span>`).join("") || `<span class="hint" style="margin:0">まだ目盛りがありません</span>`}</div>
+        : `${membersBox(ax, k)}
            <div class="add-member"><input data-f="newmember" placeholder="目盛りを足す(、区切りで複数)" aria-label="${AXNAME[k]}の目盛りを足す"><button type="button" data-add>足す</button><button type="button" data-bulk>まとめて貼り付け</button></div>
            ${bulk.ax === k ? bulkPanel(ax) : ""}
            ${notesSection(ax, k)}`}
@@ -694,6 +707,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     $("v-type").onchange = (e) => { c.value.type = e.target.value; if (c.value.type === "text") c.value.agg = "count"; render(); };
     $("v-agg").onchange = (e) => { c.value.agg = e.target.value; render(); };
     const pane = $("pane");
+    pane.addEventListener("toggle", (e) => { const mk = e.target.dataset?.mk; if (mk) (e.target.open ? openMembers.add(mk) : openMembers.delete(mk)); }, true);
     pane.oninput = (e) => {
       const card = e.target.closest(".axis-card[data-ax]"); if (!card) return; const ax = c.axes[card.dataset.ax];
       const f = e.target.dataset.f;
