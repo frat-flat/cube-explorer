@@ -135,8 +135,7 @@ h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 10px; }
 .axis-head input { flex: 1 1 140px; font-weight: 700; }
 .axis-head .dir { font-size: 12px; color: var(--muted); }
 .members { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
-.more-members { margin: 6px 0; }
-.more-members summary { cursor: pointer; font-size: 13px; padding: 4px 0; }
+.more-members { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
 .member { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; padding: 1px 2px 1px 8px; border-radius: 99px; background: var(--surface); border: 1px solid var(--line); }
 .member button { border: 0; background: none; padding: 0 5px; color: var(--muted); line-height: 1.3; }
 .member .down { color: var(--accent); font-size: 11px; }
@@ -612,14 +611,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       <div class="note-names">${ls.map((l, i) => `<span class="note-name">${i ? `<button type="button" class="ghost" data-lmove="${l.id}:-1" aria-label="${esc(l.name)}を前へ">‹</button>` : ""}<input data-note="${l.id}" value="${esc(l.name)}" aria-label="表記の名前" size="8">${i < ls.length - 1 ? `<button type="button" class="ghost" data-lmove="${l.id}:1" aria-label="${esc(l.name)}を後ろへ">›</button>` : ""}${l.id === "base" ? `<span class="hint" style="margin:0">基本</span>` : `<button type="button" class="ghost" data-delnote="${l.id}" aria-label="${esc(l.name)}を外す">×</button>`}</span>`).join("")}
         <button type="button" data-addnote>＋ 表記を足す</button></div>
       ${many ? `<p class="sub">表示の並び <span class="hint" style="margin:0">(上から順に「 / 」でつなぐ。「または」は値の入っている最初の表記を使う)</span></p>${composeEditor(ax, k)}
-        ${ax.members.length ? `<div class="scroll" style="margin-top:8px"><table class="note-table"><thead><tr>${ls.map((l) => `<th>${esc(l.name)}</th>`).join("")}</tr></thead>
-        <tbody>${ax.members.map((m) => `<tr>${ls.map((l) => l.id === "base" ? `<td>${esc(m)}</td>` : `<td><input data-alt-m="${esc(m)}" data-alt-id="${l.id}" value="${esc(noteVal(ax, m, l.id))}" aria-label="${esc(m)}の${esc(l.name)}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>` : ""}` : ""}
+        ${ax.members.length ? `<p class="hint" style="margin:8px 0 0">目盛りごとの表記の値は、表で見て直します。<button type="button" data-mview="${k}">表で見る</button></p>` : ""}` : ""}
     </details>`;
   }
 
   // 目盛りの一括登録:Excel の範囲をコピーして貼る(タブ区切り)。CSV(カンマ区切り)も可
   const bulk = { ax: null, text: "", msg: "" };
-  const openMembers = new Set(); // 開いている目盛りの一覧(描き直しても開いたままにする)
   function bulkPanel(ax) {
     const ls = ax.labels?.length ? ax.labels : [{ id: "base", name: "名前" }];
     return `<div class="bulk">
@@ -663,12 +660,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     // 目盛りが多い軸は札を全部並べず、先頭だけ見せて残りは開閉式にする(一覧と編集は ② の表で)
     const chip = (m, i) => `<span class="member">${esc(m)}<button type="button" data-del="${i}" aria-label="${esc(m)}を外す">×</button></span>`;
     const membersBox = (ax, k) => {
-      const ms = ax.members, HEAD = 12, MAXOPEN = 300;
+      const ms = ax.members, HEAD = 12;
       if (!ms.length) return `<div class="members"><span class="hint" style="margin:0">まだ目盛りがありません</span></div>`;
       if (ms.length <= HEAD) return `<div class="members">${ms.map(chip).join("")}</div>`;
-      const open = openMembers.has(`${c.id}:${k}`);
-      return `<details class="more-members" data-mk="${c.id}:${k}" ${open ? "open" : ""}><summary><b>${ms.length.toLocaleString()}件</b> <span class="hint" style="margin:0">${ms.slice(0, 5).map(esc).join("、")} …</span></summary>
-        <div class="members">${ms.slice(0, MAXOPEN).map(chip).join("")}</div>${ms.length > MAXOPEN ? `<p class="hint" style="margin:0">ここには先頭の${MAXOPEN}件だけ出しています。全部は「② 目盛りを登録」の表で見て直せます。</p>` : ""}</details>`;
+      // 多いときは件数と先頭だけ。中身は「表で見る」で ② の表へ移って見る
+      return `<div class="more-members"><b>${ms.length.toLocaleString()}件</b> <span class="hint" style="margin:0">${ms.slice(0, 5).map(esc).join("、")} …</span> <button type="button" data-mview="${k}">表で見る</button></div>`;
     };
     const axisCard = (k) => {
       const ax = c.axes[k];
@@ -707,7 +703,6 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     $("v-type").onchange = (e) => { c.value.type = e.target.value; if (c.value.type === "text") c.value.agg = "count"; render(); };
     $("v-agg").onchange = (e) => { c.value.agg = e.target.value; render(); };
     const pane = $("pane");
-    pane.addEventListener("toggle", (e) => { const mk = e.target.dataset?.mk; if (mk) (e.target.open ? openMembers.add(mk) : openMembers.delete(mk)); }, true);
     pane.oninput = (e) => {
       const card = e.target.closest(".axis-card[data-ax]"); if (!card) return; const ax = c.axes[card.dataset.ax];
       const f = e.target.dataset.f;
@@ -733,6 +728,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       document.querySelector(`.axis-card[data-ax="${card.dataset.ax}"] [data-f=newmember]`)?.focus();
     };
     pane.onclick = (e) => {
+      const mv = e.target.closest("[data-mview]"); if (mv) { st.mAx = mv.dataset.mview; st.mDir = "v"; st.view = "members"; render(); window.scrollTo(0, 0); return; }
       if (composeAction(e)) return;
       const card = e.target.closest(".axis-card[data-ax]");
       if (card && e.target.closest("[data-bulk]")) { bulk.ax = bulk.ax === card.dataset.ax ? null : card.dataset.ax; bulk.msg = ""; render(); document.querySelector("[data-bulktext]")?.focus(); return; }
