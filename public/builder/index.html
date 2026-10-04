@@ -351,34 +351,43 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .toast button { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
 /* 展示:ダッシュボードの「展示」は、業務画面とは別の、暗い展示室の見た目にする(テーマに関係なく同じ) */
 .dash-modes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.hall { --h-ink: #ece6da; --h-muted: #a8a196; --h-paper: #f3eee4; --h-paper-ink: #26231f; --h-paper-muted: #7a7266; --h-line: #d9d0c1;
-  color-scheme: dark; color: var(--h-ink); border-radius: 14px; padding: 30px clamp(16px, 3vw, 40px) 40px; position: relative; overflow: hidden;
-  background: radial-gradient(90% 60% at 50% -10%, #3a3a3e 0%, rgba(58,58,62,0) 70%), linear-gradient(#1c1d20 0%, #17181a 72%, #222326 72.2%, #121314 100%); }
-.hall-head { display: grid; gap: 4px; margin-bottom: 26px; }
-.hall-kicker { margin: 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: .32em; color: var(--h-muted); }
-.hall-head h2 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: .04em; text-wrap: balance; }
-.hall-sub { margin: 0; font-size: 13px; color: var(--h-muted); font-variant-numeric: tabular-nums; }
-.hall-floor { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 34px 26px; align-items: end; }
-.exhibit { margin: 0; display: grid; justify-items: center; min-width: 0; }
-.vitrine { position: relative; width: 100%; height: 240px; }
-.vitrine::before { content: ""; position: absolute; inset: -30px 12% 18px; pointer-events: none;
-  background: linear-gradient(180deg, rgba(255,236,204,.16), rgba(255,236,204,.02) 80%); clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); }
-.vitrine canvas { position: relative; display: block; width: 100%; height: 100%; cursor: pointer; }
-.vitrine canvas:focus-visible { outline: 2px solid #f0c98a; outline-offset: -2px; border-radius: 6px; }
-.plinth { position: relative; width: 62%; height: 46px; margin-top: -14px; background: linear-gradient(90deg, #b9b1a3, #e3ddd2 45%, #cfc7b9); box-shadow: 0 22px 26px -14px rgba(0,0,0,.85); }
-.plinth::before { content: ""; position: absolute; left: 0; right: 0; top: -9px; height: 9px; background: #f2eee7; clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%); }
-.placard { margin-top: 16px; width: min(100%, 290px); background: var(--h-paper); color: var(--h-paper-ink); padding: 10px 12px 10px; border-radius: 2px; display: grid; gap: 3px; font-size: 12px; box-shadow: 0 6px 14px rgba(0,0,0,.4); }
+.museum { --h-paper: #f3eee4; --h-paper-ink: #26231f; --h-paper-muted: #7a7266; --h-line: #d9d0c1; --h-ink: #f2eee6;
+  border-radius: 14px; overflow: hidden; background: #111214; color: var(--h-ink); color-scheme: dark; }
+.mu-stage { position: relative; height: min(76vh, 720px); min-height: 440px; }
+.mu-canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+.mu-canvas:focus-visible { box-shadow: inset 0 0 0 2px #f0c98a; }
+.placard { background: var(--h-paper); color: var(--h-paper-ink); padding: 10px 12px; border-radius: 2px; display: grid; gap: 3px; font-size: 12px; box-shadow: 0 8px 22px rgba(0,0,0,.45); }
 .placard .no { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--h-paper-muted); }
 .placard .ttl { font-family: var(--font-display); font-size: 15px; line-height: 1.35; }
 .placard .axes { color: var(--h-paper-muted); }
 .placard .axes i { font-style: normal; font-weight: 700; } .placard .axes .x { color: #6a3fa0; } .placard .axes .y { color: #23753e; } .placard .axes .z { color: #a9325f; }
 .placard .meta { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--h-paper-ink); }
 .placard .acts { display: flex; gap: 6px; margin-top: 4px; }
-.placard .acts button { background: #fff; color: var(--h-paper-ink); border-color: var(--h-line); font-size: 12px; padding: 3px 9px; }
+.placard .acts button { white-space: nowrap; background: #fff; color: var(--h-paper-ink); border-color: var(--h-line); font-size: 12px; padding: 3px 9px; }
 .placard .acts button:hover { border-color: var(--h-paper-ink); }
-.exhibit.sub .vitrine { height: 190px; } .exhibit.sub .plinth { width: 50%; height: 34px; }
-.exhibit.sub .placard { width: min(100%, 250px); }
-.hall-empty { color: var(--h-muted); }
+.mu-tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.mu-tag { position: absolute; left: 0; top: 0; width: 240px; opacity: 0; filter: blur(4px); pointer-events: none; transition: opacity .4s ease, filter .4s ease; transform-origin: 0 0; }
+.mu-tag.on { opacity: 1; filter: none; pointer-events: auto; }
+.mu-tag::after { content: ""; position: absolute; left: -14px; bottom: 0; width: 14px; height: 1px; background: rgba(243,238,228,.85); }
+.mu-tag.left::after { left: auto; right: -14px; }
+.mu-top { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px 16px; padding: 14px 16px 30px; background: linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0)); pointer-events: none; }
+.mu-top > * { pointer-events: auto; }
+.mu-title { display: grid; gap: 2px; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.mu-kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .32em; color: #c9c3b8; }
+.mu-title b { font-family: var(--font-display); font-size: 22px; letter-spacing: .04em; }
+.mu-title span:last-child { font-size: 12px; color: #d8d2c7; font-variant-numeric: tabular-nums; }
+.mu-theme { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #d8d2c7; }
+.mu-theme select, .mu-nav button, .mu-list button { background: rgba(18,18,20,.72); color: var(--h-ink); border: 1px solid rgba(255,255,255,.28); backdrop-filter: blur(6px); }
+.mu-map { position: absolute; left: 14px; bottom: 14px; width: 190px; height: 150px; border-radius: 8px; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.mu-nav { position: absolute; right: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; max-width: calc(100% - 230px); }
+.mu-nav button { font-size: 12px; padding: 6px 10px; }
+.mu-nav button[aria-pressed="true"] { background: #f2eee6; color: #1b1b1b; }
+.mu-strip { padding: 10px 14px 14px; display: grid; gap: 8px; background: #17181b; }
+.mu-help { margin: 0; font-size: 12px; color: #b9b3a8; }
+.mu-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.mu-list button { flex: none; font-size: 12px; display: inline-flex; gap: 6px; align-items: baseline; }
+.mu-list button span { font-family: var(--font-mono); color: #c9c3b8; }
+@media (max-width: 600px) { .mu-stage { height: 70vh; min-height: 380px; } .mu-map { width: 120px; height: 95px; left: 10px; bottom: 10px; } .mu-nav { right: 10px; bottom: 10px; max-width: calc(100% - 145px); } .mu-tag { width: 200px; } .mu-title b { font-size: 17px; } }
 .savebar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px 12px; margin-bottom: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
 .savebar.dirty { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); box-shadow: inset 4px 0 0 var(--warn); }
 .savebar .sv-name { font-weight: 700; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1957,72 +1966,400 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     group.rotation.set(rotX, rotY, 0);
     camera.position.set(panX, panY, dist); camera.lookAt(panX, panY, 0);
     if (!$("viewer").hidden) { group.updateMatrixWorld(); renderer.render(scene, camera); renderLabelsOnly(); }
-    if (!$("dash").hidden) drawExhibits();
+    if (!$("dash").hidden) muTick(performance.now());
     requestAnimationFrame(tick);
   }
 
-  // ---- 展示(ダッシュボードの立体) ----
-  // 立体ごとに WebGL を作ると重いので、描く係を1つだけ持ち、展示ごとに描いては各展示の絵(canvas)に写す
-  const galR = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  galR.setPixelRatio(1);
-  const galScene = new THREE.Scene(), galCam = new THREE.PerspectiveCamera(30, 1.2, 0.1, 100);
-  galScene.add(new THREE.AmbientLight(0xffffff, 0.5));
-  { const key = new THREE.DirectionalLight(0xfff1dc, 0.95); key.position.set(-2, 10, 6); galScene.add(key);
-    const rim = new THREE.DirectionalLight(0x9fd6ff, 0.35); rim.position.set(6, 1, -6); galScene.add(rim); }
+  // ---- 美術館(ダッシュボードの「展示」) ----
+  // 歩いて回れる3Dの展示室。床をクリックするとそこへ、作品をクリックすると作品の前へ進む(地図アプリの街歩きのように)。
+  // 作品の札は、作品の前まで来るか作品を指したときだけ出す(「札をすべて表示」で全部出せる)。
+  // 展示場は8種類。床・壁の模様は画像を使わず、その場で描く
   const still = matchMedia("(prefers-reduced-motion: reduce)");
-  let exhibits = [];
-  const GAL_N = 8; // 1軸あたり最大8塊にまとめた、粗い模型を飾る
+  const GAL_N = 8; // 1軸あたり最大8塊にまとめた模型を飾る
   const coarseWin = (c) => Object.fromEntries(AX.map((k) => { const tot = members(c.axes[k]).length, bs = Math.max(1, Math.ceil(tot / GAL_N)); return [k, { off: 0, span: tot, tot, bs, cnt: Math.ceil(tot / bs) || 0 }]; }));
-  const disposeTree = (o) => o.traverse((m) => { if (m.geometry && m.geometry !== unitBox) m.geometry.dispose(); if (m.material) m.material.dispose(); });
-  function buildModel(c) {
-    const g = new THREE.Group(), win = coarseWin(c);
-    const glass = (w, h, d) => { const geo = new THREE.BoxGeometry(w, h, d); g.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0xbfd3d6, transparent: true, opacity: 0.08, depthWrite: false })), new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xe8e1d4, transparent: true, opacity: 0.55 }))); };
-    if (!AX.every((k) => win[k].tot > 0)) { glass(3, 3, 3); return g; } // 目盛りがまだない:空のガラスケースだけ
-    const nx = win.x.cnt, ny = win.y.cnt, nz = win.z.cnt, u = 3.6 / Math.max(nx, ny, nz, 2), N = nx * ny * nz;
-    const val = blockValues(c, win), num = (v) => (typeof v === "number" ? Math.abs(v) : 1);
-    const cm = AX.map((k) => (win[k].bs === 1 && calcOf(c.axes[k]).length ? members(c.axes[k]).map((m) => isCalc(c.axes[k], m)) : null));
-    const isCalcN = (n) => { const k = n % nz, j = ((n - k) / nz) % ny, i = Math.floor(n / (ny * nz)); return !!(cm[0]?.[i] || cm[1]?.[j] || cm[2]?.[k]); };
-    let nFill = 0, max = 1; for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; if (!isCalcN(n)) max = Math.max(max, num(val[n])); }
-    if (nFill) {
-      const full = new THREE.InstancedMesh(unitBox, new THREE.MeshPhongMaterial({ shininess: 40, specular: 0x333333 }), nFill);
-      const lo = new THREE.Color("#244f53"), hi = new THREE.Color("#8ee6ea"), warm = new THREE.Color("#f0a868"), col = new THREE.Color();
-      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(u * 0.84, u * 0.84, u * 0.84); let a = 0;
-      for (let n = 0; n < N; n++) {
-        if (val[n] === undefined) continue;
-        const k = n % nz, j = ((n - k) / nz) % ny, i = Math.floor(n / (ny * nz));
-        m4.compose(new THREE.Vector3((i - (nx - 1) / 2) * u, ((ny - 1) / 2 - j) * u, ((nz - 1) / 2 - k) * u), q, sc);
-        full.setMatrixAt(a, m4); full.setColorAt(a++, isCalcN(n) ? warm : col.copy(lo).lerp(hi, 0.2 + 0.8 * Math.min(1, num(val[n]) / max)));
+  const disposeTree = (o) => o.traverse((m) => {
+    if (m.geometry && m.geometry !== unitBox) m.geometry.dispose();
+    for (const mt of [].concat(m.material || [])) { for (const t of ["map", "emissiveMap", "bumpMap"]) mt[t]?.dispose?.(); mt.dispose(); }
+  });
+
+  // -- 模様(canvas に描いて貼る) --
+  const rnd = (s) => () => ((s = Math.imul(s ^ (s >>> 15), 2246822507) ^ Math.imul(s ^ (s >>> 13), 3266489909)) >>> 0) / 4294967296; // 毎回同じ模様になる乱数
+  function tex(size, draw, rep = [1, 1], seed = 7) {
+    const cv = document.createElement("canvas"); cv.width = cv.height = size; const g = cv.getContext("2d"); draw(g, size, rnd(seed));
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+  }
+  const noise = (g, n, r, base, amp, count = 9000, sz = 2) => { g.fillStyle = base; g.fillRect(0, 0, n, n); for (let i = 0; i < count; i++) { const v = (r() - 0.5) * amp; g.fillStyle = v > 0 ? `rgba(255,255,255,${v})` : `rgba(0,0,0,${-v})`; g.fillRect(r() * n, r() * n, sz * (0.5 + r()), sz * (0.5 + r())); } };
+  const TX = {
+    concrete: (base = "#bdbcb8") => (g, n, r) => { noise(g, n, r, base, 0.16, 14000, 2); for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.02})`; g.beginPath(); g.arc(r() * n, r() * n, 8 + r() * 40, 0, 7); g.fill(); } g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 2; g.strokeRect(0, 0, n, n); },
+    plaster: (base) => (g, n, r) => noise(g, n, r, base, 0.05, 6000, 3),
+    herringbone: (g, n, r) => {
+      g.fillStyle = "#6e4a2c"; g.fillRect(0, 0, n, n); const w = n / 8, l = w * 4;
+      for (let y = -l; y < n + l; y += w) for (let x = -l; x < n + l; x += 2 * w) {
+        for (const flip of [0, 1]) {
+          const h = 25 + r() * 12, s = 38 + r() * 14, li = 30 + r() * 14; g.fillStyle = `hsl(${h} ${s}% ${li}%)`;
+          g.save(); g.translate(x + (flip ? w : 0), y + (flip ? w : 0)); g.rotate(flip ? -Math.PI / 4 : Math.PI / 4); g.fillRect(0, 0, l, w * 0.96);
+          g.strokeStyle = "rgba(0,0,0,.25)"; g.strokeRect(0, 0, l, w * 0.96); for (let k = 0; k < 4; k++) { g.strokeStyle = `rgba(0,0,0,${0.05 + r() * 0.06})`; g.beginPath(); g.moveTo(0, r() * w); g.lineTo(l, r() * w); g.stroke(); } g.restore();
+        }
       }
-      full.instanceMatrix.needsUpdate = true; if (full.instanceColor) full.instanceColor.needsUpdate = true; g.add(full);
+    },
+    planks: (hue, light) => (g, n, r) => {
+      const rows = 8, h = n / rows;
+      for (let i = 0; i < rows; i++) { let x = -r() * n; while (x < n) { const len = n * (0.35 + r() * 0.5); g.fillStyle = `hsl(${hue + r() * 8} ${30 + r() * 15}% ${light + r() * 10}%)`; g.fillRect(x, i * h, len, h - 2); g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(x + len - 2, i * h, 2, h); for (let k = 0; k < 5; k++) { g.fillStyle = `rgba(0,0,0,${0.04 + r() * 0.05})`; g.fillRect(x, i * h + r() * h, len, 1); } x += len; } }
+    },
+    marble: (base, vein) => (g, n, r) => {
+      noise(g, n, r, base, 0.05, 5000, 4);
+      for (let i = 0; i < 14; i++) { g.strokeStyle = vein; g.globalAlpha = 0.15 + r() * 0.3; g.lineWidth = 0.6 + r() * 2; g.beginPath(); let x = r() * n, y = 0; g.moveTo(x, y); while (y < n) { x += (r() - 0.5) * 40; y += 10 + r() * 30; g.lineTo(x, y); } g.stroke(); }
+      g.globalAlpha = 1; g.strokeStyle = "rgba(0,0,0,.18)"; g.lineWidth = 2; g.strokeRect(0, 0, n, n);
+    },
+    brick: (g, n, r) => {
+      g.fillStyle = "#cfc6b8"; g.fillRect(0, 0, n, n); const rows = 16, h = n / rows, w = n / 4;
+      for (let i = 0; i < rows; i++) for (let x = (i % 2) * -w / 2; x < n; x += w) { g.fillStyle = `hsl(${10 + r() * 14} ${40 + r() * 18}% ${30 + r() * 14}%)`; g.fillRect(x + 2, i * h + 2, w - 4, h - 4); noiseRect(g, r, x + 2, i * h + 2, w - 4, h - 4); }
+    },
+    grass: (g, n, r) => { noise(g, n, r, "#4d6b33", 0.18, 16000, 2); for (let i = 0; i < 6000; i++) { g.strokeStyle = `hsl(${85 + r() * 30} ${35 + r() * 25}% ${22 + r() * 22}%)`; const x = r() * n, y = r() * n; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (r() - 0.5) * 4, y - 3 - r() * 7); g.stroke(); } },
+    tatami: (g, n, r) => {
+      g.fillStyle = "#b3ad84"; g.fillRect(0, 0, n, n);
+      for (let y = 0; y < n; y += 3) { g.fillStyle = `rgba(${90 + r() * 30},${90 + r() * 20},40,${0.15 + r() * 0.15})`; g.fillRect(0, y, n, 1.5); }
+      g.fillStyle = "#2f3a2a"; g.fillRect(0, 0, n, n * 0.04); g.fillRect(0, n * 0.96, n, n * 0.04); g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(0, 0, 2, n);
+    },
+    shoji: (g, n) => { g.fillStyle = "#f3eee2"; g.fillRect(0, 0, n, n); g.strokeStyle = "#5a3f28"; g.lineWidth = n / 70; for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo((i * n) / 4, 0); g.lineTo((i * n) / 4, n); g.stroke(); } for (let i = 0; i <= 6; i++) { g.beginPath(); g.moveTo(0, (i * n) / 6); g.lineTo(n, (i * n) / 6); g.stroke(); } },
+    sand: (g, n, r) => noise(g, n, r, "#e6d9bd", 0.12, 20000, 1.5),
+    grid: (line, glow) => (g, n) => { g.fillStyle = "#0b1016"; g.fillRect(0, 0, n, n); g.shadowColor = glow; g.shadowBlur = 12; g.strokeStyle = line; g.lineWidth = 3; g.strokeRect(1.5, 1.5, n - 3, n - 3); g.shadowBlur = 0; g.strokeStyle = "rgba(120,200,255,.12)"; g.lineWidth = 1; g.beginPath(); g.moveTo(n / 2, 0); g.lineTo(n / 2, n); g.moveTo(0, n / 2); g.lineTo(n, n / 2); g.stroke(); },
+    painting: (seed) => (g, n, r) => { // 額の中の絵(風景画のような色面)
+      const hues = [[30, 200], [20, 140], [200, 40], [350, 60]][seed % 4];
+      const sky = g.createLinearGradient(0, 0, 0, n); sky.addColorStop(0, `hsl(${hues[1]} 35% 62%)`); sky.addColorStop(1, `hsl(${hues[0]} 45% 70%)`); g.fillStyle = sky; g.fillRect(0, 0, n, n);
+      for (let k = 0; k < 4; k++) { g.fillStyle = `hsl(${hues[k % 2] + r() * 30} ${30 + r() * 20}% ${20 + k * 10}%)`; g.beginPath(); g.moveTo(0, n); let y = n * (0.45 + k * 0.12); g.lineTo(0, y); for (let x = 0; x <= n; x += n / 8) g.lineTo(x, y + (r() - 0.5) * n * 0.12); g.lineTo(n, n); g.fill(); }
+      for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.08})`; g.fillRect(r() * n, r() * n, 2, 2); }
+    },
+  };
+  function noiseRect(g, r, x, y, w, h) { for (let i = 0; i < 30; i++) { g.fillStyle = `rgba(0,0,0,${r() * 0.12})`; g.fillRect(x + r() * w, y + r() * h, 2 + r() * 3, 2); } }
+
+  // -- 展示場の種類 --
+  // 壁・床・天井・光・まわりの景色を決める。extra は柱や木など、その展示場らしい物を足す
+  const HALLS = {
+    modern: { name: "モダン・モノクロの美術館", bg: 0xeeeeec, fog: null, hemi: [0xffffff, 0xd8d8d8, 0.75], sun: [0xffffff, 0.55], spot: [0xffffff, 0.9],
+      floor: () => tex(512, TX.concrete("#c9c8c4"), [6, 6], 3), floorRough: 0.35, wall: () => tex(256, TX.plaster("#f4f4f2"), [4, 1]), ceil: 0xf7f7f5,
+      plinth: { color: 0x1a1a1a, rough: 0.5 }, plateInk: "#f2f2f2", plateBg: "#1a1a1a", skirt: 0x111111, extra: "tracks" },
+    classic: { name: "歴史ある欧米の美術館", bg: 0x2a1c16, fog: null, hemi: [0xfff1dc, 0x3b2a1f, 0.55], sun: [0xffe2b8, 0.5], spot: [0xffd9a0, 1.1],
+      floor: () => tex(512, TX.herringbone, [5, 5], 5), tile: [1.6, 1.6], floorRough: 0.45, wall: () => tex(256, TX.plaster("#6e2026"), [4, 1], 9), ceil: 0xeadfca,
+      plinth: { map: () => tex(256, TX.marble("#ece7de", "#7d7468"), [1, 1], 4), rough: 0.25 }, plateInk: "#3a2a12", plateBg: "#d8b766", skirt: 0x3b2316, extra: "classic" },
+    forest: { name: "森の中の美術館", bg: 0xa9c8d8, fog: [0xb7cdb9, 18, 70], hemi: [0xdcefff, 0x46602c, 0.8], sun: [0xfff0d0, 0.95], spot: [0xfff4e0, 0.5],
+      floor: () => tex(512, TX.planks(30, 48), [4, 4], 6), tile: [2.2, 2.2], floorRough: 0.7, wall: null, glass: true, ceil: null,
+      plinth: { map: () => tex(256, TX.concrete("#a7a49c"), [1, 1], 8), rough: 0.9 }, plateInk: "#2b2b28", plateBg: "#e8e4da", skirt: 0x3c3a33, extra: "forest" },
+    night: { name: "夜のギャラリー", bg: 0x0d0e10, fog: [0x0d0e10, 14, 40], hemi: [0x5a6070, 0x101010, 0.25], sun: [0xffffff, 0.05], spot: [0xffe7c4, 1.8],
+      floor: () => tex(512, TX.concrete("#3a3a3c"), [6, 6], 11), floorRough: 0.25, wall: () => tex(256, TX.plaster("#232427"), [4, 1], 12), ceil: 0x111214,
+      plinth: { color: 0xd9d4ca, rough: 0.6 }, plateInk: "#2a2724", plateBg: "#d9d4ca", skirt: 0x0a0a0a, extra: "cones" },
+    japanese: { name: "和の美術館", bg: 0x1d1a15, fog: null, hemi: [0xfff4e2, 0x4b3c2a, 0.6], sun: [0xffe9c8, 0.45], spot: [0xffe2b0, 0.8],
+      floor: () => tex(512, TX.tatami, [6, 3], 13), tile: [1.8, 0.9], floorRough: 0.85, wall: () => tex(512, TX.shoji, [6, 1], 14), wallEmissive: 0x3a3226, ceil: 0x8a6a48,
+      plinth: { map: () => tex(256, TX.planks(22, 22), [1, 1], 15), rough: 0.6 }, plateInk: "#f4ead8", plateBg: "#3b2a1c", skirt: 0x2e2015, extra: "pillars" },
+    seaside: { name: "海辺の白い美術館", bg: 0x9fd0ea, fog: [0xcfe6f2, 30, 120], hemi: [0xe6f4ff, 0xb9b09a, 0.5], sun: [0xfffaf0, 0.6], spot: [0xffffff, 0.4],
+      floor: () => tex(512, TX.marble("#e9e6de", "#a39a8c"), [5, 5], 16), floorRough: 0.3, wall: () => tex(256, TX.plaster("#f1f0ec"), [4, 1], 17), ceil: 0xfafaf8, backGlass: true,
+      plinth: { color: 0xe4e1da, rough: 0.6 }, plateInk: "#24414d", plateBg: "#eaf3f6", skirt: 0xd9d6cf, extra: "sea" },
+    warehouse: { name: "倉庫を改装したギャラリー", bg: 0x1b1916, fog: null, hemi: [0xf4e6d0, 0x3c3530, 0.55], sun: [0xfff0dc, 0.45], spot: [0xffd7a0, 1.0],
+      floor: () => tex(512, TX.concrete("#8f8c86"), [5, 5], 18), floorRough: 0.6, wall: () => tex(512, TX.brick, [6, 2], 19), ceil: null,
+      plinth: { map: () => tex(256, TX.planks(35, 55), [1, 1], 20), rough: 0.7 }, plateInk: "#1d1d1d", plateBg: "#d9d2c3", skirt: 0x2b2b2b, extra: "beams" },
+    future: { name: "未来の展示室", bg: 0x05070b, fog: [0x05070b, 12, 45], hemi: [0x5aa8ff, 0x0b0f18, 0.35], sun: [0x8fd6ff, 0.15], spot: [0x9fe8ff, 1.2],
+      floor: () => tex(256, TX.grid("#38c8ff", "#38c8ff"), [12, 12], 21), floorEmissive: 0x0f4a66, floorRough: 0.2, wall: () => tex(256, TX.plaster("#0c1118"), [4, 1], 22), ceil: 0x070a10,
+      plinth: { color: 0x0e1218, rough: 0.15, emissive: 0x062030 }, plateInk: "#9fe8ff", plateBg: "#0e1218", skirt: 0x38c8ff, skirtGlow: true, extra: "strips" },
+  };
+  const HALL_ORDER = ["modern", "classic", "forest", "night", "japanese", "seaside", "warehouse", "future"];
+
+  const MU = { r: null, scene: null, cam: null, room: null, roomKey: "", ex: null, items: [], bounds: { w: 10, d: 10 }, pos: new THREE.Vector3(0, 1.6, 4), yaw: 0, pitch: -0.06,
+    tween: null, hover: null, drag: null, keys: new Set(), showAll: false, ring: null, ray: new THREE.Raycaster(), last: 0 };
+  const EYE = 1.6, PLINTH_H = 1.0, MODEL_MAX = 1.45;
+  function muInit() {
+    if (MU.r) return;
+    MU.r = new THREE.WebGLRenderer({ antialias: true });
+    MU.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    MU.r.outputEncoding = THREE.sRGBEncoding; MU.r.toneMapping = THREE.ACESFilmicToneMapping; MU.r.toneMappingExposure = 1.05;
+    MU.r.shadowMap.enabled = true; MU.r.shadowMap.type = THREE.PCFSoftShadowMap;
+    MU.scene = new THREE.Scene(); MU.cam = new THREE.PerspectiveCamera(62, 1.6, 0.05, 300);
+    MU.ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.36, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }));
+    MU.ring.rotation.x = -Math.PI / 2; MU.ring.visible = false; MU.ring.renderOrder = 5; MU.scene.add(MU.ring);
+    const el = MU.r.domElement; el.className = "mu-canvas"; el.tabIndex = 0; el.setAttribute("aria-label", "展示室。床をクリックするとそこへ進み、作品をクリックすると作品の前へ進みます。矢印キーでも歩けます。");
+    el.addEventListener("pointerdown", (e) => { MU.drag = { x: e.clientX, y: e.clientY, moved: false }; el.setPointerCapture(e.pointerId); });
+    el.addEventListener("pointermove", (e) => {
+      if (MU.drag) { const dx = e.clientX - MU.drag.x, dy = e.clientY - MU.drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) MU.drag.moved = true; if (MU.drag.moved) { MU.tween = null; MU.yaw += dx * 0.005; MU.pitch = Math.max(-0.7, Math.min(0.5, MU.pitch + dy * 0.004)); MU.drag.x = e.clientX; MU.drag.y = e.clientY; } }
+      muPointer(e);
+    });
+    el.addEventListener("pointerup", (e) => { const d = MU.drag; MU.drag = null; if (d && !d.moved) muClick(e); });
+    el.addEventListener("pointerleave", () => { MU.hover = null; MU.ring.visible = false; el.style.cursor = ""; });
+    el.addEventListener("wheel", (e) => { e.preventDefault(); muWalk(e.deltaY < 0 ? 0.8 : -0.8, 0); }, { passive: false });
+    el.addEventListener("keydown", (e) => { const k = e.key.toLowerCase(); if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) { e.preventDefault(); MU.keys.add(k); MU.tween = null; } });
+    el.addEventListener("keyup", (e) => MU.keys.delete(e.key.toLowerCase()));
+    el.addEventListener("blur", () => MU.keys.clear());
+  }
+  const muDir = (yaw = MU.yaw, pitch = MU.pitch) => new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+  // 部屋の中・台座の外に収める
+  function muClamp(p) {
+    const { w, d } = MU.bounds; p.x = Math.max(-w / 2 + 0.6, Math.min(w / 2 - 0.6, p.x)); p.z = Math.max(-d / 2 + 0.6, Math.min(d / 2 - 0.6, p.z));
+    for (const it of MU.items) { const dx = p.x - it.x, dz = p.z - it.z, r = Math.hypot(dx, dz), min = 1.05; if (r < min) { const a = r ? 1 : 0; p.x = it.x + (a ? dx / r : 0) * min; p.z = it.z + (a ? dz / r : 1) * min; } }
+    p.y = EYE; return p;
+  }
+  function muWalk(fwd, side) { const f = muDir(MU.yaw, 0), s = new THREE.Vector3(-f.z, 0, f.x); const p = MU.pos.clone().addScaledVector(f, fwd).addScaledVector(s, side); muGo(muClamp(p), MU.yaw, MU.pitch, 0.35); }
+  function muGo(pos, yaw, pitch, dur = 1.1) {
+    let dy = yaw - MU.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); // 近い向きに回る
+    MU.tween = { from: { p: MU.pos.clone(), yaw: MU.yaw, pitch: MU.pitch }, to: { p: pos, yaw: MU.yaw + dy, pitch }, t0: performance.now(), dur: still.matches ? 0.01 : dur * 1000 };
+  }
+  const yawTo = (from, to) => Math.atan2(-(to.x - from.x), -(to.z - from.z));
+  function muGoItem(it) { const p = new THREE.Vector3(it.x, EYE, it.z + 3.6); muClamp(p); muGo(p, yawTo(p, it), -0.12); }
+  const muEntrance = () => { const p = new THREE.Vector3(0, EYE, MU.bounds.d / 2 - 1.4); muGo(p, 0, -0.06); };
+  function muHit(e) {
+    const r = MU.r.domElement.getBoundingClientRect();
+    MU.ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), MU.cam);
+    const targets = [...MU.items.flatMap((it) => it.hitables), MU.room?.userData.floor].filter(Boolean);
+    return MU.ray.intersectObjects(targets, false)[0] || null;
+  }
+  function muPointer(e) {
+    if (!MU.room || MU.drag?.moved) return;
+    const h = muHit(e); const it = h && MU.items.find((x) => x.hitables.includes(h.object));
+    MU.hover = it || null;
+    const el = MU.r.domElement;
+    if (it) { MU.ring.visible = false; el.style.cursor = "pointer"; return; }
+    if (h && h.object === MU.room.userData.floor) { MU.ring.visible = true; MU.ring.position.set(h.point.x, 0.012, h.point.z); el.style.cursor = "pointer"; }
+    else { MU.ring.visible = false; el.style.cursor = "grab"; }
+  }
+  function muClick(e) {
+    const h = muHit(e); if (!h) return; const it = MU.items.find((x) => x.hitables.includes(h.object));
+    if (it) { muGoItem(it); return; }
+    if (h.object === MU.room.userData.floor) { const p = muClamp(new THREE.Vector3(h.point.x, EYE, h.point.z)); muGo(p, MU.yaw, MU.pitch, Math.min(1.6, 0.4 + p.distanceTo(MU.pos) * 0.12)); }
+  }
+
+  // -- 部屋 --
+  function buildRoom(hk, w, d) {
+    const H = HALLS[hk], g = new THREE.Group(), WH = hk === "warehouse" ? 6 : hk === "classic" ? 5.2 : 4.2;
+    MU.scene.background = new THREE.Color(H.bg); MU.scene.fog = H.fog ? new THREE.Fog(H.fog[0], H.fog[1], H.fog[2]) : null;
+    const std = (o) => new THREE.MeshStandardMaterial(o);
+    // 光
+    g.add(new THREE.HemisphereLight(H.hemi[0], H.hemi[1], H.hemi[2]));
+    const sun = new THREE.DirectionalLight(H.sun[0], H.sun[1]); sun.position.set(-w * 0.3, 14, d * 0.25); sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -w / 2 - 2, right: w / 2 + 2, top: d / 2 + 2, bottom: -d / 2 - 2, near: 1, far: 50 }); sun.shadow.bias = -0.0008; sun.shadow.camera.updateProjectionMatrix();
+    g.add(sun, sun.target);
+    // 床
+    const fm = H.floor(); const floorMat = std({ map: fm, roughness: H.floorRough, metalness: 0.0, emissive: H.floorEmissive || 0, emissiveMap: H.floorEmissive ? fm : null });
+    const tile = H.tile || [3, 3]; fm.repeat.set(w / tile[0], d / tile[1]);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), floorMat); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor); g.userData.floor = floor;
+    // 壁
+    const wallMat = H.wall ? (() => { const t = H.wall(); t.repeat.set(w / 4, 1); return std({ map: t, roughness: 0.9, emissive: H.wallEmissive || 0, emissiveIntensity: H.wallEmissive ? 0.35 : 0 }); })() : null;
+    const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xdff2f4, transparent: true, opacity: 0.12, roughness: 0.05, metalness: 0, depthWrite: false });
+    const frameMat = std({ color: hk === "forest" ? 0x2b2b28 : 0xdedad2, roughness: 0.5, metalness: 0.4 });
+    const wall = (len, x, z, ry, glass) => {
+      const geo = new THREE.PlaneGeometry(len, WH); const m = new THREE.Mesh(geo, glass ? glassMat : wallMat.clone()); m.position.set(x, WH / 2, z); m.rotation.y = ry; m.receiveShadow = !glass;
+      if (!glass && m.material.map) { m.material.map = m.material.map.clone(); m.material.map.needsUpdate = true; m.material.map.repeat.set(len / 4, 1); }
+      g.add(m);
+      if (glass) for (let t = -len / 2; t <= len / 2 + 0.01; t += 2.5) { const mul = new THREE.Mesh(new THREE.BoxGeometry(0.06, WH, 0.06), frameMat); mul.position.set(x + Math.cos(ry) * t, WH / 2, z - Math.sin(ry) * t); g.add(mul); }
+      // 幅木
+      if (!glass) { const sk = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.03), H.skirtGlow ? new THREE.MeshBasicMaterial({ color: H.skirt }) : std({ color: H.skirt, roughness: 0.6 })); sk.position.set(x, 0.06, z); sk.rotation.y = ry; sk.translateZ(0.016); g.add(sk); }
+      return m;
+    };
+    const all = !!H.glass;
+    wall(w, 0, -d / 2, 0, all || H.backGlass); wall(d, -w / 2, 0, Math.PI / 2, all); wall(d, w / 2, 0, -Math.PI / 2, all); wall(w, 0, d / 2, Math.PI, all);
+    if (all) for (const [bw, bd, bx, bz] of [[w + 0.2, 0.15, 0, -d / 2], [w + 0.2, 0.15, 0, d / 2], [0.15, d, -w / 2, 0], [0.15, d, w / 2, 0]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.15, bd), frameMat); b.position.set(bx, WH, bz); g.add(b); }
+    // 天井
+    if (H.ceil !== null && H.ceil !== undefined) { const c = new THREE.Mesh(new THREE.PlaneGeometry(w, d), std({ color: H.ceil, roughness: 1, side: THREE.DoubleSide })); c.rotation.x = Math.PI / 2; c.position.y = WH; g.add(c); }
+    // その展示場らしい物
+    const r = rnd(hk.length * 97 + w * 13);
+    if (H.extra === "tracks") for (let x = -w / 2 + 3; x < w / 2 - 2; x += 5) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.03, d - 4), std({ color: 0x2a2a2a, roughness: 0.4 })); b.position.set(x, WH - 0.15, 0); g.add(b); }
+    if (H.extra === "classic") {
+      const marble = std({ map: tex(256, TX.marble("#efe9de", "#8d8172"), [1, 2], 31), roughness: 0.3 });
+      const gold = std({ color: 0xc9a24a, roughness: 0.35, metalness: 0.85 });
+      const wain = std({ color: 0x3e2618, roughness: 0.55 });
+      for (const [len, x, z, ry] of [[w, 0, -d / 2 + 0.02, 0], [d, -w / 2 + 0.02, 0, Math.PI / 2], [d, w / 2 - 0.02, 0, -Math.PI / 2]]) {
+        const p = new THREE.Mesh(new THREE.BoxGeometry(len, 1.0, 0.04), wain); p.position.set(x, 0.5, z); p.rotation.y = ry; g.add(p);
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.05, 0.07), gold); rail.position.set(x, 1.02, z); rail.rotation.y = ry; g.add(rail);
+        const cor = new THREE.Mesh(new THREE.BoxGeometry(len, 0.25, 0.2), std({ color: 0xe8dfcc, roughness: 0.8 })); cor.position.set(x, WH - 0.12, z); cor.rotation.y = ry; g.add(cor);
+        // 柱と額
+        for (let t = -len / 2 + 1.5; t <= len / 2 - 1.5; t += 4) {
+          const col = new THREE.Group();
+          const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, WH - 0.7, 20), marble); shaft.position.y = (WH - 0.7) / 2 + 0.35; shaft.castShadow = true;
+          const base = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.35, 0.66), marble); base.position.y = 0.175;
+          const cap = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.35, 0.66), marble); cap.position.y = WH - 0.35 + 0.175 - 0.17;
+          col.add(shaft, base, cap); col.position.set(x + Math.cos(ry) * t, 0, z - Math.sin(ry) * t); col.rotation.y = ry; col.translateZ(0.3); g.add(col);
+          if (t + 2 < len / 2 - 1) {
+            const fw = 1.3 + r() * 0.5, fh = 0.9 + r() * 0.5;
+            const fr = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.18, fh + 0.18, 0.08), gold);
+            const pic = new THREE.Mesh(new THREE.PlaneGeometry(fw, fh), std({ map: tex(256, TX.painting(Math.floor(r() * 4)), [1, 1], Math.floor(r() * 999)), roughness: 0.8 }));
+            const fg = new THREE.Group(); pic.position.z = 0.045; fg.add(fr, pic); fg.position.set(x + Math.cos(ry) * (t + 2), 2.4, z - Math.sin(ry) * (t + 2)); fg.rotation.y = ry; fg.translateZ(0.06); g.add(fg);
+          }
+        }
+      }
+      // 天窓
+      const sky = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.5, d * 0.6), new THREE.MeshBasicMaterial({ color: 0xfff6e2 })); sky.rotation.x = Math.PI / 2; sky.position.y = WH - 0.01; g.add(sky);
     }
-    glass(nx * u, ny * u, nz * u);
+    if (H.extra === "forest") {
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), std({ map: (() => { const t = tex(512, TX.grass, [40, 40], 33); return t; })(), roughness: 1 }));
+      ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; ground.receiveShadow = true; g.add(ground);
+      const trunkM = std({ color: 0x4a3524, roughness: 0.95 });
+      const leafMs = [0x2f5a2a, 0x3d6b2e, 0x26492a, 0x4f7a34].map((c) => std({ color: c, roughness: 0.9, flatShading: true }));
+      for (let i = 0; i < 70; i++) {
+        const a = r() * Math.PI * 2, rad = Math.max(w, d) / 2 + 3 + r() * 30, x = Math.cos(a) * rad, z = Math.sin(a) * rad, h = 5 + r() * 7, tr = new THREE.Group();
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, h, 7), trunkM); t.position.y = h / 2; t.castShadow = true; tr.add(t);
+        const conifer = r() < 0.5;
+        for (let k = 0; k < 3; k++) { const m = conifer ? new THREE.Mesh(new THREE.ConeGeometry(1.6 - k * 0.4, 2.4, 8), leafMs[(i + k) % 4]) : new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 - k * 0.25, 0), leafMs[(i + k) % 4]); m.position.set((r() - 0.5) * 0.6, h * (conifer ? 0.55 : 0.75) + k * (conifer ? 1.1 : 0.7), (r() - 0.5) * 0.6); m.castShadow = true; tr.add(m); }
+        tr.position.set(x, 0, z); g.add(tr);
+      }
+    }
+    if (H.extra === "cones") for (let x = -w / 2 + 2; x < w / 2 - 1; x += 3) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, d - 2), std({ color: 0x050505 })); b.position.set(x, WH - 0.1, 0); g.add(b); }
+    if (H.extra === "pillars") {
+      const wood = std({ map: tex(256, TX.planks(24, 18), [1, 3], 41), roughness: 0.7 });
+      for (const [len, x, z, ry] of [[w, 0, -d / 2, 0], [d, -w / 2, 0, Math.PI / 2], [d, w / 2, 0, -Math.PI / 2], [w, 0, d / 2, Math.PI]])
+        for (let t = -len / 2; t <= len / 2 + 0.01; t += len / Math.max(2, Math.round(len / 2.7))) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.2, WH, 0.2), wood); p.position.set(x + Math.cos(ry) * t, WH / 2, z - Math.sin(ry) * t); p.castShadow = true; g.add(p); }
+      for (let x = -w / 2; x <= w / 2; x += 1.8) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, d), wood); b.position.set(x, WH - 0.05, 0); g.add(b); }
+    }
+    if (H.extra === "sea") {
+      const sea = new THREE.Mesh(new THREE.PlaneGeometry(400, 200), std({ color: 0x2f7fa6, roughness: 0.15, metalness: 0.2 })); sea.rotation.x = -Math.PI / 2; sea.position.set(0, -1.2, -d / 2 - 100); g.add(sea);
+      const deck = new THREE.Mesh(new THREE.PlaneGeometry(w + 20, 14), std({ map: tex(512, TX.sand, [8, 4], 51), roughness: 1 })); deck.rotation.x = -Math.PI / 2; deck.position.set(0, -0.6, -d / 2 - 7); g.add(deck);
+      const horizon = new THREE.Mesh(new THREE.PlaneGeometry(600, 120), new THREE.MeshBasicMaterial({ color: 0xbfe2f2, fog: true })); horizon.position.set(0, 50, -d / 2 - 180); g.add(horizon);
+    }
+    if (H.extra === "beams") {
+      const steel = std({ color: 0x2a2a2c, roughness: 0.5, metalness: 0.7 });
+      for (let z = -d / 2 + 1.5; z < d / 2; z += 3.5) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, 0.2), steel); b.position.set(0, WH - 0.4, z); g.add(b);
+        for (let x = -w / 2 + 2.5; x < w / 2 - 1; x += 4) { const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1.6, 4), steel); cord.position.set(x, WH - 1.2, z); const shade = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.25, 16, 1, true), std({ color: 0x1f3b33, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide })); shade.position.set(x, WH - 2.05, z); const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffe0a8 })); bulb.position.set(x, WH - 2.15, z); g.add(cord, shade, bulb); } }
+      const roof = new THREE.Mesh(new THREE.PlaneGeometry(w, d), std({ color: 0x1b1a18, side: THREE.DoubleSide })); roof.rotation.x = Math.PI / 2; roof.position.y = WH; g.add(roof);
+    }
+    if (H.extra === "strips") for (const y of [0.9, WH - 0.4]) for (const [len, x, z, ry] of [[w, 0, -d / 2 + 0.02, 0], [d, -w / 2 + 0.02, 0, Math.PI / 2], [d, w / 2 - 0.02, 0, -Math.PI / 2]]) { const s = new THREE.Mesh(new THREE.BoxGeometry(len, 0.03, 0.02), new THREE.MeshBasicMaterial({ color: 0x38c8ff })); s.position.set(x, y, z); s.rotation.y = ry; g.add(s); }
+    g.userData.wallH = WH;
     return g;
   }
-  let exObs = null;
-  function setExhibits(order) {
-    exhibits.forEach((x) => disposeTree(x.model)); exObs?.disconnect();
-    exhibits = order.map((c, i) => ({ id: c.id, model: buildModel(c), angle: 0.7 + i * 0.9, hover: false, seen: true, drawn: false }));
-    exObs = new IntersectionObserver((es) => es.forEach((e) => { const x = exhibits.find((y) => y.id === e.target.dataset.excv); if (x) x.seen = e.isIntersecting; }));
-    document.querySelectorAll("[data-excv]").forEach((cv) => {
-      const x = exhibits.find((y) => y.id === cv.dataset.excv); if (!x) return; exObs.observe(cv); x.cv = cv;
-      cv.onpointerenter = () => { x.hover = true; }; cv.onpointerleave = () => { x.hover = false; };
-      cv.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cv.click(); } };
-    });
-  }
-  function drawExhibits() {
-    for (const x of exhibits) {
-      if (!x.cv || !x.seen) continue;
-      if (still.matches && x.drawn) continue; // 動きを減らす設定なら、1回描いて止める
-      const w = x.cv.clientWidth, h = x.cv.clientHeight; if (!w || !h) continue;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2), W = Math.round(w * dpr), H = Math.round(h * dpr);
-      if (x.cv.width !== W || x.cv.height !== H) { x.cv.width = W; x.cv.height = H; }
-      if (galR.domElement.width !== W || galR.domElement.height !== H) galR.setSize(W, H, false);
-      x.angle += still.matches ? 0 : x.hover ? 0.025 : 0.005;
-      x.model.rotation.set(-0.38, x.angle, 0);
-      galCam.aspect = w / h; galCam.fov = 30; galCam.position.set(0, 1.2, 10.5); galCam.lookAt(0, 0.1, 0); galCam.updateProjectionMatrix();
-      galScene.add(x.model); galR.render(galScene, galCam); galScene.remove(x.model);
-      const ctx = x.cv.getContext("2d"); ctx.clearRect(0, 0, W, H); ctx.drawImage(galR.domElement, 0, 0); x.drawn = true;
+
+  // -- 作品(台座+中まで見える模型) --
+  // コマを小さめに置いてすき間を空け、奥のコマまで見えるようにする。近づくか指すと、すき間がさらに広がる(中を開いて見せる)
+  function buildModel(c) {
+    const g = new THREE.Group(), win = coarseWin(c);
+    const glass = (w, h, dd) => { const geo = new THREE.BoxGeometry(w, h, dd); const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: 0xe8f4f6, transparent: true, opacity: 0.08, roughness: 0.05, depthWrite: false })); const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })); g.add(m, e); return [m, e]; };
+    if (!AX.every((k) => win[k].tot > 0)) { glass(1, 1, 1); g.userData = { h: 1, cells: null }; return g; } // 目盛りがまだない:空のガラスケースだけ
+    const nx = win.x.cnt, ny = win.y.cnt, nz = win.z.cnt, u = MODEL_MAX / Math.max(nx, ny, nz, 2), N = nx * ny * nz;
+    const val = blockValues(c, win), num = (v) => (typeof v === "number" ? Math.abs(v) : 1);
+    const cm = AX.map((k) => (win[k].bs === 1 && calcOf(c.axes[k]).length ? members(c.axes[k]).map((m) => isCalc(c.axes[k], m)) : null));
+    const ijk = (n) => { const k = n % nz, j = ((n - k) / nz) % ny, i = Math.floor(n / (ny * nz)); return [i, j, k]; };
+    const isCalcN = (n) => { const [i, j, k] = ijk(n); return !!(cm[0]?.[i] || cm[1]?.[j] || cm[2]?.[k]); };
+    let nFill = 0, max = 1; for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; if (!isCalcN(n)) max = Math.max(max, num(val[n])); }
+    const base = []; // 中心からの位置(開くときに広げる)
+    const full = new THREE.InstancedMesh(unitBox, new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.1 }), Math.max(nFill, 1)); full.count = nFill; full.castShadow = true;
+    const empty = new THREE.InstancedMesh(unitBox, new THREE.MeshStandardMaterial({ color: 0xcfd8da, transparent: true, opacity: 0.22, roughness: 0.4, depthWrite: false }), Math.max(N - nFill, 1)); empty.count = N - nFill;
+    const lo = new THREE.Color("#1f6b72"), hi = new THREE.Color("#9ef0f2"), warm = new THREE.Color("#f0a050"), col = new THREE.Color();
+    let a = 0, b = 0;
+    for (let n = 0; n < N; n++) {
+      const [i, j, k] = ijk(n); const p = new THREE.Vector3((i - (nx - 1) / 2) * u, ((ny - 1) / 2 - j) * u, ((nz - 1) / 2 - k) * u);
+      if (val[n] !== undefined) { full.setColorAt(a, isCalcN(n) ? warm : col.copy(lo).lerp(hi, 0.15 + 0.85 * Math.min(1, num(val[n]) / max))); base.push({ m: full, i: a++, p, s: u * 0.62 }); }
+      else base.push({ m: empty, i: b++, p, s: u * 0.18 });
     }
+    if (full.instanceColor) full.instanceColor.needsUpdate = true;
+    g.add(full, empty);
+    const [gm, ge] = glass(nx * u * 1.08, ny * u * 1.08, nz * u * 1.08);
+    g.userData = { h: ny * u * 1.08, cells: base, open: -1, glass: [gm, ge], dims: [nx * u, ny * u, nz * u] };
+    setOpen(g, 1);
+    return g;
+  }
+  const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
+  function setOpen(g, f) {
+    const d = g.userData; if (!d.cells || Math.abs(d.open - f) < 0.004) return; d.open = f;
+    for (const c of d.cells) { _v.copy(c.p).multiplyScalar(f); _s.set(c.s, c.s, c.s); _m4.compose(_v, _q, _s); c.m.setMatrixAt(c.i, _m4); }
+    for (const m of new Set(d.cells.map((c) => c.m))) m.instanceMatrix.needsUpdate = true;
+    d.glass.forEach((m) => m.scale.setScalar(f));
+  }
+  function plate(text, H) { // 台座の番号札
+    const cv = document.createElement("canvas"); cv.width = 128; cv.height = 64; const x = cv.getContext("2d");
+    x.fillStyle = H.plateBg; x.fillRect(0, 0, 128, 64); x.fillStyle = H.plateInk; x.font = "600 30px 'IBM Plex Mono', monospace"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(text, 64, 34);
+    const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return new THREE.Mesh(new THREE.PlaneGeometry(0.26, 0.13), new THREE.MeshStandardMaterial({ map: t, roughness: 0.5 }));
+  }
+  function buildExhibits(order, hk) {
+    const H = HALLS[hk], g = new THREE.Group(), items = [];
+    const n = order.length, cols = n <= 3 ? Math.max(n, 1) : Math.min(4, Math.ceil(Math.sqrt(n * 1.4))), rows = Math.ceil(n / cols), SX = 5.2, SZ = 6.2;
+    const w = Math.max(13, cols * SX + 6), d = Math.max(16, rows * SZ + 10);
+    const pm = H.plinth.map ? H.plinth.map() : null;
+    const pMat = new THREE.MeshStandardMaterial({ color: pm ? 0xffffff : H.plinth.color, map: pm, roughness: H.plinth.rough, emissive: H.plinth.emissive || 0 });
+    order.forEach((c, idx) => {
+      const r = Math.floor(idx / cols), k = idx % cols, inRow = Math.min(cols, n - r * cols);
+      const x = (k - (inRow - 1) / 2) * SX + (r % 2 && inRow < cols ? 0 : r % 2 ? SX * 0.25 : 0), z = d / 2 - 7.6 - r * SZ;
+      const sub = !!c.parent, pw = sub ? 0.85 : 1.05;
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(pw, PLINTH_H, pw), pMat); plinth.position.set(x, PLINTH_H / 2, z); plinth.castShadow = plinth.receiveShadow = true;
+      const pl = plate(String(idx + 1).padStart(2, "0"), H); pl.position.set(x, PLINTH_H - 0.16, z + pw / 2 + 0.002);
+      const model = buildModel(c); const sc = sub ? 0.8 : 1; model.scale.setScalar(sc); model.position.set(x, PLINTH_H + (model.userData.h * sc) / 2 + 0.12, z);
+      model.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+      g.add(plinth, pl, model);
+      if (H.spot[1] > 0.2 && idx < 12) { // 作品ごとのスポットライト
+        const sp = new THREE.SpotLight(H.spot[0], H.spot[1], 9, 0.42, 0.55, 1.4); sp.position.set(x, 4.0, z + 1.4); sp.target.position.set(x, PLINTH_H + 0.6, z); g.add(sp, sp.target);
+        if (H.extra === "cones") { const cone = new THREE.Mesh(new THREE.ConeGeometry(1.25, 3.0, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe7c4, transparent: true, opacity: 0.06, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })); cone.position.set(x, 2.6, z + 0.3); g.add(cone); }
+      }
+      items.push({ id: c.id, c, x, z, pw, model, plinth, hitables: [plinth, ...model.children.filter((m) => m.isMesh)], open: 1, top: model.position.y + (model.userData.h * sc) / 2 });
+    });
+    return { g, items, w, d };
+  }
+  function muSet(order, hk, root) {
+    muInit();
+    const stage = root.querySelector("#mu-stage"); stage.prepend(MU.r.domElement);
+    if (MU.ex) { MU.scene.remove(MU.ex); disposeTree(MU.ex); }
+    const { g, items, w, d } = buildExhibits(order, hk); MU.ex = g; MU.items = items; MU.scene.add(g);
+    const key = `${hk}|${w}|${d}`;
+    if (key !== MU.roomKey) { if (MU.room) { MU.scene.remove(MU.room); disposeTree(MU.room); } MU.room = buildRoom(hk, w, d); MU.scene.add(MU.room); MU.roomKey = key; }
+    const first = MU.bounds.w !== w || MU.bounds.d !== d || MU.hk !== hk; MU.bounds = { w, d }; MU.hk = hk;
+    if (first) { MU.pos.set(0, EYE, d / 2 - 1.4); MU.yaw = 0; MU.pitch = -0.06; MU.tween = null; }
+    muClamp(MU.pos); MU.hover = null;
+    // 札(HTML)。最初は出さない
+    const tags = root.querySelector("#mu-tags");
+    tags.innerHTML = items.map((it, i) => `<div class="mu-tag placard" data-tag="${it.id}" aria-hidden="true">${tagHtml(it.c, i)}</div>`).join("");
+    for (const it of items) it.tag = tags.querySelector(`[data-tag="${it.id}"]`);
+    MU.mapEl = root.querySelector("#mu-map");
+  }
+  let tagHtml = () => "";
+  function muTick(now) {
+    if (!MU.r || !MU.r.domElement.isConnected || !MU.room) return;
+    const cv = MU.r.domElement, w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
+    const dt = Math.min(0.05, (now - (MU.last || now)) / 1000); MU.last = now;
+    const pr = MU.r.getPixelRatio(); if (cv.width !== Math.round(w * pr) || cv.height !== Math.round(h * pr)) { MU.r.setSize(w, h, false); MU.cam.aspect = w / h; MU.cam.updateProjectionMatrix(); }
+    // 歩く(キー)
+    if (MU.keys.size) {
+      const k = MU.keys, sp = 2.6 * dt; if (k.has("arrowleft")) MU.yaw += 1.6 * dt; if (k.has("arrowright")) MU.yaw -= 1.6 * dt;
+      const f = (k.has("arrowup") || k.has("w") ? 1 : 0) - (k.has("arrowdown") || k.has("s") ? 1 : 0), s = (k.has("d") ? 1 : 0) - (k.has("a") ? 1 : 0);
+      if (f || s) { const fd = muDir(MU.yaw, 0), sd = new THREE.Vector3(-fd.z, 0, fd.x); muClamp(MU.pos.addScaledVector(fd, f * sp).addScaledVector(sd, s * sp)); }
+    }
+    if (MU.tween) {
+      const t = Math.min(1, (now - MU.tween.t0) / MU.tween.dur), e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2, a = MU.tween.from, b = MU.tween.to;
+      MU.pos.lerpVectors(a.p, b.p, e); MU.pos.y = EYE + Math.sin(t * Math.PI) * 0.03; MU.yaw = a.yaw + (b.yaw - a.yaw) * e; MU.pitch = a.pitch + (b.pitch - a.pitch) * e;
+      if (t >= 1) MU.tween = null;
+    }
+    MU.cam.position.copy(MU.pos); MU.cam.lookAt(MU.pos.clone().add(muDir()));
+    // 作品:ゆっくり回し、近いか指しているときは中を開く。札は近いか指したときだけ
+    const fwd = muDir(MU.yaw, 0);
+    for (const it of MU.items) {
+      const dx = it.x - MU.pos.x, dz = it.z - MU.pos.z, dist = Math.hypot(dx, dz), facing = (dx * fwd.x + dz * fwd.z) / (dist || 1);
+      const near = dist < 5.0 && facing > 0.55, on = MU.showAll || MU.hover === it || near;
+      if (!still.matches) it.model.rotation.y += dt * (MU.hover === it ? 0.6 : 0.12);
+      it.open += (((MU.hover === it || near) ? 1.4 : 1) - it.open) * Math.min(1, dt * 4); setOpen(it.model, it.open);
+      const p = new THREE.Vector3(it.x + it.pw / 2, PLINTH_H + 0.05, it.z + it.pw / 2).project(MU.cam), vis = on && p.z < 1 && Math.abs(p.x) < 1.05 && Math.abs(p.y) < 1.05;
+      it.tag.classList.toggle("on", vis); it.tag.setAttribute("aria-hidden", String(!vis));
+      if (vis) {
+        // 札は台座の右上に出す。右にはみ出すときは左側に出す
+        const sc = Math.max(0.72, Math.min(1, 3.4 / Math.max(dist, 1))), ax = ((p.x + 1) / 2) * w, ay = ((1 - p.y) / 2) * h, tw = (it.tag.offsetWidth || 240) * sc, th = (it.tag.offsetHeight || 120) * sc;
+        const left = ax + 14 + tw > w - 8, y = Math.max(th + 8, ay);
+        it.tag.classList.toggle("left", left);
+        it.tag.style.transform = `translate(${left ? ax - 14 - tw : ax + 14}px, ${y - th}px) scale(${sc})`; it.tag.style.zIndex = String(1000 - Math.round(dist * 10));
+      }
+    }
+    MU.r.render(MU.scene, MU.cam);
+    muMap();
+  }
+  // 館内の地図:作品の番号と、今いる場所・向き。押すとそこへ進む
+  function muMap() {
+    const cv = MU.mapEl; if (!cv) return; const x = cv.getContext("2d"), W = cv.width / 2, H = cv.height / 2, { w, d } = MU.bounds, s = Math.min((W - 16) / w, (H - 16) / d);
+    const tx = (X) => W / 2 + X * s, tz = (Z) => H / 2 + Z * s;
+    x.setTransform(2, 0, 0, 2, 0, 0); x.clearRect(0, 0, W, H); x.fillStyle = "rgba(20,20,22,.72)"; x.fillRect(0, 0, W, H);
+    x.strokeStyle = "rgba(255,255,255,.7)"; x.lineWidth = 1.5; x.strokeRect(tx(-w / 2), tz(-d / 2), w * s, d * s);
+    x.fillStyle = "rgba(255,255,255,.85)"; x.fillRect(tx(-0.9), tz(d / 2) - 1.5, 1.8 * s, 3); // 入口
+    x.font = "600 10px 'IBM Plex Mono', monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+    MU.items.forEach((it, i) => { x.fillStyle = MU.hover === it ? "#f0c98a" : "#e9e4da"; x.beginPath(); x.arc(tx(it.x), tz(it.z), 7, 0, 7); x.fill(); x.fillStyle = "#1b1b1b"; x.fillText(String(i + 1), tx(it.x), tz(it.z) + 0.5); });
+    const px = tx(MU.pos.x), pz = tz(MU.pos.z), f = muDir(MU.yaw, 0);
+    x.fillStyle = "rgba(102,190,255,.28)"; x.beginPath(); x.moveTo(px, pz); const a0 = Math.atan2(f.z, f.x); x.arc(px, pz, 26, a0 - 0.55, a0 + 0.55); x.closePath(); x.fill();
+    x.fillStyle = "#59b8ff"; x.strokeStyle = "#fff"; x.lineWidth = 2; x.beginPath(); x.arc(px, pz, 5, 0, 7); x.fill(); x.stroke();
+    cv.onclick = (e) => {
+      const r = cv.getBoundingClientRect(), mx = ((e.clientX - r.left) / r.width) * W, mz = ((e.clientY - r.top) / r.height) * H, X = (mx - W / 2) / s, Z = (mz - H / 2) / s;
+      const it = MU.items.find((q) => Math.hypot(q.x - X, q.z - Z) * s < 10); if (it) return muGoItem(it);
+      const p = muClamp(new THREE.Vector3(X, EYE, Z)); muGo(p, MU.yaw, MU.pitch, 1.2);
+    };
+  }
+  function muStep(dir) { // 前の作品・次の作品
+    if (!MU.items.length) return; let i = MU.items.findIndex((it) => Math.hypot(it.x - MU.pos.x, it.z + 3.6 - MU.pos.z) < 0.5);
+    i = i < 0 ? (dir > 0 ? 0 : MU.items.length - 1) : (i + dir + MU.items.length) % MU.items.length; muGoItem(MU.items[i]);
   }
 
   // ---- キューブのメニュー(展示・一覧・左の木の「⋯」から) ----
@@ -2159,11 +2496,10 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const memberCount = all.reduce((n, c) => n + usedAx(c).reduce((m, k) => m + members(c.axes[k]).length, 0), 0);
     const filled = [...stats.values()].reduce((n, s) => n + s.filled, 0);
     const hall = st.dashMode !== "list";
-    const head = `<div class="dash-head"><div><h1>ダッシュボード</h1><p class="hint" style="margin:0">${hall ? "作ったキューブを立体のまま並べて見ます。立体をクリックすると開き、「⋯」から名前の変更・複製・削除ができます。" : "作ったキューブの入り具合と合計を一覧で見ます。カードから立体表示や入力に進めます。"}</p></div>
+    const head = `<div class="dash-head"><div><h1>ダッシュボード</h1><p class="hint" style="margin:0">${hall ? "展示室を歩いてキューブを見ます。作品をクリックすると前まで進み、札の「立体で見る」で開きます。「⋯」から名前の変更・複製・削除ができます。" : "作ったキューブの入り具合と合計を一覧で見ます。カードから立体表示や入力に進めます。"}</p></div>
       <div class="dash-modes"><div class="seg" role="group" aria-label="並べ方"><button type="button" data-dmode="hall" aria-pressed="${hall}">展示</button><button type="button" data-dmode="list" aria-pressed="${!hall}">一覧</button></div>
       <button type="button" class="primary" data-act="new">＋ 新しいキューブ</button><button type="button" data-act="tpl">テンプレートから始める</button></div></div>`;
     if (!all.length) {
-      setExhibits([]);
       $("dash").innerHTML = `${head}<div class="dash-empty"><b>まだキューブがありません</b><p class="hint" style="margin:0">「＋ 新しいキューブ」で白紙から作るか、「テンプレートから始める」で入金管理などの例を読み込みます。</p></div>`;
       return;
     }
@@ -2185,35 +2521,39 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     };
     const order = []; const walk = (pid) => kids(pid).forEach((c) => { order.push(c); walk(c.id); }); walk(null);
     if (hall) {
-      const ex = (c, i) => { const s = stats.get(c.id), p = cube(c.parent);
-        return `<figure class="exhibit ${p ? "sub" : ""}">
-          <div class="vitrine"><canvas data-excv="${c.id}" tabindex="0" role="button" aria-label="${esc(c.name)}を立体で見る"></canvas></div>
-          <div class="plinth" aria-hidden="true"></div>
-          <figcaption class="placard">
-            <span class="no">No.${String(i + 1).padStart(2, "0")}${p ? ` ・ ${esc(p.name)}の下位` : ""}</span>
-            <b class="ttl">${esc(c.name)}</b>
-            <span class="axes">${usedAx(c).map((k) => `<i class="${k}">${esc(c.axes[k].name)}</i>`).join(" × ")}${c.axes.z.off ? "(2軸)" : ""}</span>
-            <span class="meta">${fmt(s.filled)} / ${fmt(s.total)} コマ${s.filled && c.value.type !== "text" ? ` ・ ${esc(c.value.name)} ${fmtV(c, s.sum)}` : ""}</span>
-            <span class="acts"><button type="button" data-open="${c.id}" data-v="cube">立体で見る</button>${c.synth ? "" : `<button type="button" data-open="${c.id}" data-v="data">値を入れる</button>`}<button type="button" data-cmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(c.name)}のメニュー">⋯</button></span>
-          </figcaption></figure>`; };
-      $("dash").innerHTML = `${head}<section class="hall" aria-label="キューブの展示">
-        <div class="hall-head"><p class="hall-kicker">CUBE COLLECTION</p><h2>収蔵キューブ</h2>
-          <p class="hall-sub">${all.length}点 ・ 目盛り ${fmt(memberCount)} ・ 入力済み ${fmt(filled)} コマ</p></div>
-        <div class="hall-floor">${order.map(ex).join("")}</div></section>`;
-      setExhibits(order); return;
+      const hk = HALLS[st.hallTheme] ? st.hallTheme : "modern";
+      tagHtml = (c, i) => { const s = stats.get(c.id), p = cube(c.parent);
+        return `<span class="no">No.${String(i + 1).padStart(2, "0")}${p ? ` ・ ${esc(p.name)}の下位` : ""}</span>
+          <b class="ttl">${esc(c.name)}</b>
+          <span class="axes">${usedAx(c).map((k) => `<i class="${k}">${esc(c.axes[k].name)}</i>`).join(" × ")}${c.axes.z.off ? "(2軸)" : ""}</span>
+          <span class="meta">${fmt(s.filled)} / ${fmt(s.total)} コマ${s.filled && c.value.type !== "text" ? ` ・ ${esc(c.value.name)} ${fmtV(c, s.sum)}` : ""}</span>
+          <span class="acts"><button type="button" data-open="${c.id}" data-v="cube">立体で見る</button>${c.synth ? "" : `<button type="button" data-open="${c.id}" data-v="data">値を入れる</button>`}<button type="button" data-cmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(c.name)}のメニュー">⋯</button></span>`; };
+      $("dash").innerHTML = `${head}<section class="museum" aria-label="キューブの展示室">
+        <div class="mu-stage" id="mu-stage"><div class="mu-tags" id="mu-tags"></div>
+          <div class="mu-top"><div class="mu-title"><span class="mu-kicker">CUBE COLLECTION</span><b>${esc(HALLS[hk].name)}</b><span>${all.length}点 ・ 入力済み ${fmt(filled)} コマ</span></div>
+            <label class="mu-theme"><span>展示場</span><select id="mu-theme">${HALL_ORDER.map((k, i) => `<option value="${k}" ${k === hk ? "selected" : ""}>${i + 1}. ${esc(HALLS[k].name)}</option>`).join("")}</select></label></div>
+          <canvas class="mu-map" id="mu-map" width="380" height="300" role="img" aria-label="館内の地図。番号を押すとその作品の前へ進みます"></canvas>
+          <div class="mu-nav"><button type="button" data-mu="prev">◀ 前の作品</button><button type="button" data-mu="entrance">入口へ</button><button type="button" data-mu="next">次の作品 ▶</button><button type="button" data-mu="tags" aria-pressed="${MU.showAll}">札をすべて表示</button></div>
+        </div>
+        <div class="mu-strip"><p class="mu-help">床をクリックでそこへ進む ・ 作品をクリックで作品の前へ ・ ドラッグで見回す ・ 矢印キーか WASD で歩く ・ 作品の前に立つか指すと札が出ます</p>
+          <div class="mu-list">${order.map((c, i) => `<button type="button" data-mugo="${c.id}"><span>${String(i + 1).padStart(2, "0")}</span>${esc(c.name)}</button>`).join("")}</div></div>
+      </section>`;
+      muSet(order, hk, $("dash")); return;
     }
-    setExhibits([]);
     $("dash").innerHTML = `${head}
       <div class="kpis"><div class="kpi"><div class="k">キューブ</div><div class="v">${all.length}</div></div><div class="kpi"><div class="k">目盛り(全部の軸)</div><div class="v">${fmt(memberCount)}</div></div><div class="kpi"><div class="k">入力済みのコマ</div><div class="v">${fmt(filled)}</div></div></div>
       <div class="cards">${order.map(card).join("")}</div>`;
   }
   $("dash").onclick = (e) => {
     const dm = e.target.closest("[data-dmode]"); if (dm) { st.dashMode = dm.dataset.dmode; render(); return; }
-    const cv = e.target.closest("[data-excv]"); if (cv) { st.selected = cv.dataset.excv; st.view = "cube"; render(); scrollTo(0, 0); return; }
+    const mu = e.target.closest("[data-mu]");
+    if (mu) { const a = mu.dataset.mu; if (a === "prev") muStep(-1); if (a === "next") muStep(1); if (a === "entrance") muEntrance(); if (a === "tags") { MU.showAll = !MU.showAll; mu.setAttribute("aria-pressed", MU.showAll); } return; }
+    const mg = e.target.closest("[data-mugo]"); if (mg) { const it = MU.items.find((x) => x.id === mg.dataset.mugo); if (it) muGoItem(it); return; }
     const o = e.target.closest("[data-open]"); if (o) { st.selected = o.dataset.open; st.view = o.dataset.v; render(); scrollTo(0, 0); return; }
     const a = e.target.closest("[data-act]"); if (!a) return;
     if (a.dataset.act === "new") $("new-cube").click(); else $("tpl-btn").click();
   };
+  $("dash").addEventListener("change", (e) => { if (e.target.id === "mu-theme") { st.hallTheme = e.target.value; render(); } });
   $("nav").onclick = (e) => { const b = e.target.closest("[data-view]"); if (!b) return; st.view = b.dataset.view; $("side").classList.remove("open"); $("menu-btn").setAttribute("aria-expanded", "false"); render(); scrollTo(0, 0); };
   $("menu-btn").onclick = () => { const open = $("side").classList.toggle("open"); $("menu-btn").setAttribute("aria-expanded", open); };
   $("tree").onclick = (e) => { const b = e.target.closest("button[data-id]"); if (b) { st.selected = b.dataset.id; if (st.view === "dash") st.view = "cube"; $("side").classList.remove("open"); sheet = null; bulk.ax = null; bulk.msg = ""; render(); } };
