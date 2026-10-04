@@ -527,6 +527,7 @@ create table cube_meta.built_axes (    -- キューブの3軸
   members     jsonb,                   -- kind = 'list' の目盛り(並び順どおり)
   month_from  text,                    -- kind = 'month' の範囲 'YYYY-MM'
   month_to    text,
+  month_to_now boolean not null default false,  -- true なら終わりは常に今月(月が変わると自動で伸びる。2026-10-04 ユーザー要望)
   show_labels jsonb not null default '[["base"]]',  -- 表示の並び。部品の配列で、部品は「または」でつなぐ表記の id の配列
   pack_empty  boolean not null default true,       -- 値のない部品を詰める
   primary key (cube_id, axis)

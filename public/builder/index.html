@@ -143,6 +143,7 @@ h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 10px; }
 .add-member input { flex: 1 1 140px; }
 .link-note { font-size: 12px; margin-top: 4px; color: var(--c); }
 .month-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.month-row .check { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
 
 /* データ入力 */
 .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
@@ -412,13 +413,16 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const monthsBetween = (a, b) => {
     if (!/^\d{4}-\d{2}$/.test(a) || !/^\d{4}-\d{2}$/.test(b) || a > b) return [];
     const out = []; let [y, m] = a.split("-").map(Number);
-    while (out.length < 60) { const s = `${y}-${String(m).padStart(2, "0")}`; out.push(s); if (s === b) break; m++; if (m > 12) { m = 1; y++; } }
+    while (out.length < 240) { const s = `${y}-${String(m).padStart(2, "0")}`; out.push(s); if (s === b) break; m++; if (m > 12) { m = 1; y++; } }
     return out;
   };
   // kind "seq" は架空の大きなキューブ用:「接頭辞+通し番号」の目盛りを count 件、その場で作る(保存しない)
   const seqCache = new Map();
   const seqMembers = (ax) => { const key = `${ax.prefix}|${ax.count}`; let m = seqCache.get(key); if (!m) { const d = String(ax.count).length; m = Array.from({ length: ax.count }, (_, i) => ax.prefix + String(i + 1).padStart(d, "0")); seqCache.set(key, m); } return m; };
-  const members = (ax) => (ax.kind === "month" ? monthsBetween(ax.from, ax.to) : ax.kind === "seq" ? seqMembers(ax) : ax.members);
+  // toNow が true の年月の軸は、終わりが「開いた日の今月」になる(月が変わると自動で1か月伸びる)
+  const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+  const monthTo = (ax) => (ax.toNow ? thisMonth() : ax.to);
+  const members = (ax) => (ax.kind === "month" ? monthsBetween(ax.from, monthTo(ax)) : ax.kind === "seq" ? seqMembers(ax) : ax.members);
   // 架空の大きなキューブの値:コマの値 = 店舗の重み × 顧客の重み × 日の重み(顧客の4人に1人は値なし)。
   // 掛け算に分かれるので、どんな塊の合計も各軸の累積和の掛け算で一瞬で出せる(データベースの「段ごとの集計表」の代わり)
   const synthCache = new Map();
@@ -673,7 +677,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         <div class="axis-head"><span class="badge">${k.toUpperCase()}</span><input aria-label="${AXNAME[k]}の名前" data-f="name" value="${esc(ax.name)}"><span class="dir">${AXDIR[k]}</span></div>
         <div class="row"><label>目盛り</label>
           <select data-f="kind" aria-label="目盛りの作り方"><option value="list" ${ax.kind === "list" ? "selected" : ""}>自分で並べる</option><option value="month" ${ax.kind === "month" ? "selected" : ""}>年月の範囲</option></select></div>
-        ${ax.kind === "month" ? `<div class="month-row"><input type="month" data-f="from" value="${esc(ax.from)}" aria-label="開始の年月"> 〜 <input type="month" data-f="to" value="${esc(ax.to)}" aria-label="終わりの年月"><span class="hint" style="margin:0">${members(ax).length}か月</span></div>`
+        ${ax.kind === "month" ? `<div class="month-row"><input type="month" data-f="from" value="${esc(ax.from)}" aria-label="開始の年月"> 〜 <input type="month" data-f="to" value="${esc(monthTo(ax))}" aria-label="終わりの年月" ${ax.toNow ? "disabled" : ""}><span class="hint" style="margin:0">${members(ax).length}か月</span>
+          <label class="check"><input type="checkbox" data-f="toNow" ${ax.toNow ? "checked" : ""}> 終わりは常に今月(月が変わると自動で伸びる)</label></div>`
         : `${membersBox(ax, k)}
            <div class="add-member"><input data-f="newmember" placeholder="目盛りを足す(、区切りで複数)" aria-label="${AXNAME[k]}の目盛りを足す"><button type="button" data-add>足す</button><button type="button" data-bulk>まとめて貼り付け</button></div>
            ${bulk.ax === k ? bulkPanel(ax) : ""}
@@ -720,6 +725,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       const f = e.target.dataset.f;
       if (f === "kind") { ax.kind = e.target.value; if (ax.kind === "month" && !ax.from) { ax.from = "2026-04"; ax.to = "2026-09"; } render(); }
       if (f === "from" || f === "to") { ax[f] = e.target.value; render(); }
+      if (f === "toNow") { ax.toNow = e.target.checked; if (!ax.toNow) ax.to = thisMonth(); render(); }
     };
     const addFrom = (card) => {
       const ax = c.axes[card.dataset.ax]; const inp = card.querySelector("[data-f=newmember]");
