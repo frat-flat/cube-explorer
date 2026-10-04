@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>白い現代美術館(Blender版)</title>
+<style>
+  :root { --bg: #eceae6; --ink: #1b2428; --muted: #5d6b71; --panel: rgba(255,255,255,.82); --line: #d5dde0; --accent: #0e6a70; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #121416; --ink: #e8ecee; --muted: #9aa6ab; --panel: rgba(24,28,30,.82); --line: #2c3438; --accent: #5cc3c9; } }
+  :root[data-theme="dark"] { --bg: #121416; --ink: #e8ecee; --muted: #9aa6ab; --panel: rgba(24,28,30,.82); --line: #2c3438; --accent: #5cc3c9; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.5 "Noto Sans JP", system-ui, sans-serif; overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  .top { position: fixed; left: 16px; top: 12px; right: 16px; display: flex; justify-content: space-between; gap: 12px; pointer-events: none; }
+  .title { background: var(--panel); backdrop-filter: blur(8px); border-radius: 10px; padding: 8px 12px; pointer-events: auto; }
+  .title b { display: block; font-size: 15px; }
+  .title span { color: var(--muted); font-size: 12px; }
+  .btns { position: fixed; right: 16px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  button { font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; backdrop-filter: blur(8px); }
+  button:hover { border-color: var(--accent); }
+  button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #load { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; }
+  .tag { position: fixed; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 12px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .25s; }
+  .tag.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="load">Blender で作った建物を読み込み中…</div>
+<div class="top"><div class="title"><b>白い現代美術館 — Blender版</b><span>光と影は Blender(Cycles)で焼き込み済み・ドラッグで見回す・床をタップで移動</span></div></div>
+<div id="tags"></div>
+<div class="btns">
+  <button id="prev">◀ 前の作品</button><button id="home">入口へ</button><button id="next">次の作品 ▶</button>
+  <button id="bake" aria-pressed="true">焼き込みの光</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+<script>
+(() => {
+  const GLB = new URLSearchParams(location.search).get("glb") || "modern.glb";
+  const stage = document.getElementById("stage");
+  const r = new THREE.WebGLRenderer({ antialias: true });
+  r.setPixelRatio(Math.min(devicePixelRatio, 2));
+  r.outputEncoding = THREE.sRGBEncoding;
+  r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.9;
+  r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+  stage.appendChild(r.domElement);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0xdedcd8);
+  const cam = new THREE.PerspectiveCamera(62, 1, 0.05, 100);
+  const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+  const S = { pos: V(0, 1.6, 12.4), yaw: 0, pitch: -0.04, tween: null, cur: -1 };
+  const baked = [], items = [];
+  let floorMesh = null;
+
+  // ---- 作品(サンプルのデータキューブ) ----
+  const unit = new THREE.BoxGeometry(1, 1, 1);
+  function dataCube(seed, [nx, ny, nz]) {
+    const g = new THREE.Group(), s = 0.16, gap = 0.03, N = nx * ny * nz;
+    let a = seed * 9301 + 49297; const rnd = () => ((a = (a * 9301 + 49297) % 233280) / 233280);
+    const im = new THREE.InstancedMesh(unit, new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.05, transparent: true, opacity: 0.95 }), N);
+    const lo = new THREE.Color("#d9eeef"), hi = new THREE.Color("#0e6a70"), c = new THREE.Color(), m = new THREE.Matrix4();
+    let k = 0;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let l = 0; l < nz; l++) {
+      const t = Math.min(1, Math.max(0, 0.15 + 0.6 * rnd() + 0.25 * (j / ny)));
+      m.makeScale(s - gap, s - gap, s - gap).setPosition((i - (nx - 1) / 2) * s, (j - (ny - 1) / 2) * s, (l - (nz - 1) / 2) * s);
+      im.setMatrixAt(k, m); im.setColorAt(k++, c.copy(lo).lerp(hi, t));
+    }
+    im.castShadow = true; g.add(im);
+    const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(nx * s, ny * s, nz * s)), new THREE.LineBasicMaterial({ color: 0x1b2428, transparent: true, opacity: 0.5 }));
+    g.add(frame); g.userData.h = ny * s; return g;
+  }
+  const SHAPES = [[6, 5, 4], [5, 7, 3], [8, 4, 4], [4, 6, 6]], NAMES = ["入金キューブ", "売上 × 月 × 店舗", "法人別の内訳", "申込者の推移"];
+
+  // ---- 読み込み ----
+  new THREE.GLTFLoader().load(GLB, (gltf) => {
+    const root = gltf.scene; scene.add(root);
+    const spots = [];
+    root.traverse((o) => {
+      if (/^spot_\d+$/.test(o.name)) spots.push(o);
+      if (!o.isMesh) return;
+      const m = o.material;
+      if (m.userData && m.userData.baked) {
+        // 焼き込んだ画像をそのまま見せる(光の計算はしない=軽い)。床だけうっすら映り込み
+        const b = new THREE.MeshBasicMaterial({ map: m.map, color: new THREE.Color(1.3, 1.3, 1.3), toneMapped: false });
+        b.userData.src = m; o.material = b; baked.push(o);
+        if (o.name === "floor") floorMesh = o;
+      } else if (m.emissiveMap || (m.emissive && m.emissive.getHex())) {
+        o.material = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+      }
+    });
+    spots.sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
+    // 床に作品の影だけ落とす
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(14, 28), new THREE.ShadowMaterial({ opacity: 0.28 }));
+    sh.rotation.x = -Math.PI / 2; sh.position.y = 0.002; sh.receiveShadow = true; scene.add(sh);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8782, 0.7));
+    spots.forEach((s, i) => {
+      const d = s.userData, side = d.x > 0 ? 1 : -1;
+      const sp = new THREE.SpotLight(0xffe2c2, 2.2, 12, 0.42, 0.6, 1.2);
+      sp.position.set(side * 2.6, 5.3, d.z); sp.target.position.set(d.x, 0.9, d.z); sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0005;
+      scene.add(sp, sp.target);
+      const top = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.ShadowMaterial({ opacity: 0.4 }));
+      top.rotation.x = -Math.PI / 2; top.position.set(d.x, d.y + 0.002, d.z); top.receiveShadow = true; scene.add(top);
+      const model = dataCube(i + 1, SHAPES[i % 4]); model.position.set(d.x, d.y + model.userData.h / 2 + 0.16, d.z); model.rotation.y = 0.35 * (i % 2 ? 1 : -1); scene.add(model);
+      const tag = document.createElement("div"); tag.className = "tag"; tag.textContent = `${String(i + 1).padStart(2, "0")}  ${NAMES[i % 4]}`; document.getElementById("tags").appendChild(tag);
+      items.push({ d, model, tag });
+    });
+    // 床の映り込み:鏡の面を床の下に置き、焼き込んだ床を少し透かして重ねる(磨いたコンクリート風)
+    if (floorMesh) {
+      const mir = new THREE.Reflector(new THREE.PlaneGeometry(14, 28), { textureWidth: 1024, textureHeight: 1024, color: 0x808080 });
+      mir.rotation.x = -Math.PI / 2; mir.position.y = -0.004; scene.add(mir);
+      Object.assign(floorMesh.material, { transparent: true, opacity: 0.9 });
+    }
+    document.getElementById("load").remove();
+  }, undefined, (e) => { document.getElementById("load").textContent = "読み込めませんでした: " + (e.message || e); });
+
+  // ---- 焼き込みの光の切り替え(比較用) ----
+  const bakeBtn = document.getElementById("bake");
+  bakeBtn.onclick = () => {
+    const on = bakeBtn.getAttribute("aria-pressed") !== "true"; bakeBtn.setAttribute("aria-pressed", on);
+    for (const o of baked) {
+      if (on) { o.material = o.userData.basic; continue; }
+      o.userData.basic = o.material;
+      o.material = new THREE.MeshLambertMaterial({ color: 0xd8d8d4 });
+    }
+  };
+
+  // ---- 歩く ----
+  const clamp = (p) => {
+    p.x = Math.max(-6.4, Math.min(6.4, p.x)); p.z = Math.max(-13.4, Math.min(13.4, p.z));
+    if (Math.abs(p.x) > 4.6) { // 小部屋の中:ひれを突き抜けない
+      const it = items.find((q) => Math.sign(q.d.x) === Math.sign(p.x) && Math.abs(q.d.z - p.z) < 2.25);
+      if (!it) p.x = Math.sign(p.x) * 4.6;
+    }
+    for (const q of items) { const dx = p.x - q.d.x, dz = p.z - q.d.z, dd = Math.hypot(dx, dz); if (dd < 1.25) { p.x = q.d.x + dx / (dd || 1) * 1.25; p.z = q.d.z + dz / (dd || 1) * 1.25; } }
+    return p;
+  };
+  function go(pos, yaw, pitch, dur = 1.1) { S.tween = { a: S.pos.clone(), b: pos, ya: S.yaw, yb: S.yaw + ((yaw - S.yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI), pa: S.pitch, pb: pitch, t: 0, dur }; }
+  function goItem(i) {
+    S.cur = (i + items.length) % items.length; const d = items[S.cur].d;
+    go(V(d.x + (d.x > 0 ? -d.dist : d.dist), 1.6, d.z), d.face, -0.12);
+  }
+  document.getElementById("next").onclick = () => goItem(S.cur + 1);
+  document.getElementById("prev").onclick = () => goItem(S.cur - 1);
+  document.getElementById("home").onclick = () => { S.cur = -1; go(V(0, 1.6, 12.4), 0, -0.04); };
+  let drag = null;
+  r.domElement.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, yaw: S.yaw, pitch: S.pitch, moved: 0 }; r.domElement.setPointerCapture(e.pointerId); });
+  r.domElement.addEventListener("pointermove", (e) => {
+    if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+    S.yaw = drag.yaw + dx * 0.004; S.pitch = Math.max(-1.2, Math.min(1.2, drag.pitch + dy * 0.004)); S.tween = null;
+  });
+  r.domElement.addEventListener("pointerup", (e) => {
+    const d = drag; drag = null; if (!d || d.moved > 6) return;
+    const rect = r.domElement.getBoundingClientRect(), ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1), cam);
+    const hitItem = items.findIndex((q) => ray.intersectObject(q.model, true).length);
+    if (hitItem >= 0) return goItem(hitItem);
+    if (floorMesh) { const h = ray.intersectObject(floorMesh)[0]; if (h) { const p = clamp(V(h.point.x, 1.6, h.point.z)); go(p, S.yaw, S.pitch, Math.min(2.2, 0.5 + p.distanceTo(S.pos) / 5)); } }
+  });
+  const keys = {}; addEventListener("keydown", (e) => keys[e.key.toLowerCase()] = true); addEventListener("keyup", (e) => keys[e.key.toLowerCase()] = false);
+
+  // ---- 描く ----
+  function size() { const w = stage.clientWidth, h = stage.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+  addEventListener("resize", size); size();
+  let last = performance.now();
+  const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  (function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const f = (keys.w || keys.arrowup ? 1 : 0) - (keys.s || keys.arrowdown ? 1 : 0), sd = (keys.d ? 1 : 0) - (keys.a ? 1 : 0), turn = (keys.arrowright ? 1 : 0) - (keys.arrowleft ? 1 : 0);
+    if (f || sd || turn) { S.tween = null; S.yaw -= turn * dt * 1.6; S.pos.x += (-Math.sin(S.yaw) * f + Math.cos(S.yaw) * sd) * dt * 3; S.pos.z += (-Math.cos(S.yaw) * f - Math.sin(S.yaw) * sd) * dt * 3; clamp(S.pos); }
+    if (S.tween) { const T = S.tween; T.t = Math.min(1, T.t + dt / T.dur); const k = ease(T.t); S.pos.lerpVectors(T.a, T.b, k); S.yaw = T.ya + (T.yb - T.ya) * k; S.pitch = T.pa + (T.pb - T.pa) * k; if (T.t >= 1) S.tween = null; }
+    cam.position.copy(S.pos); cam.rotation.set(S.pitch, S.yaw, 0, "YXZ");
+    for (const q of items) {
+      q.model.rotation.y += dt * 0.12;
+      const p = V(q.d.x, q.d.y + q.model.userData.h + 0.45, q.d.z).project(cam), near = S.pos.distanceTo(q.model.position) < 5.5;
+      q.tag.classList.toggle("on", near && p.z < 1);
+      q.tag.style.left = (p.x + 1) / 2 * stage.clientWidth + "px"; q.tag.style.top = (1 - p.y) / 2 * stage.clientHeight + "px";
+    }
+    r.render(scene, cam); requestAnimationFrame(loop);
+  })(last);
+})();
+</script>
+</body>
+</html>
