@@ -332,6 +332,53 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .lowers button { border: 0; background: none; padding: 0 2px; color: var(--accent); text-decoration: underline; font-size: 12px; }
 .dash-empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center; display: grid; gap: 10px; justify-items: center; }
 .notes-bar { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+/* キューブのメニュー(展示・一覧・左の木から開く) */
+.tree li { position: relative; }
+.tree li > button[data-id] { padding-right: 30px; }
+.tree .tree-more { width: auto; display: block; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--muted); padding: 2px 6px; line-height: 1; opacity: .55; }
+.tree li:hover .tree-more, .tree .tree-more:focus-visible, .tree li > button[aria-current="true"] + .tree-more { opacity: 1; }
+.cmenu { position: fixed; z-index: 30; width: 236px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.18); display: grid; gap: 1px; }
+.cmenu > button { border: 0; background: transparent; text-align: left; padding: 6px 8px; border-radius: 5px; }
+.cmenu > button:hover, .cmenu > button:focus-visible { background: var(--sunk); }
+.cmenu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; width: auto; }
+.cmenu .cm-t { margin: 2px 8px 6px; font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmenu .cm-t.warn, .cmenu .danger-t { color: var(--warn); }
+.cmenu .cm-n { margin: 0 8px 8px; font-size: 12px; color: var(--muted); }
+.cmenu input { margin: 0 4px 6px; }
+.cmenu .cm-row { display: flex; gap: 6px; padding: 0 4px 4px; }
+.cmenu button.danger { background: var(--warn); border-color: var(--warn); color: var(--surface); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: flex; gap: 10px; align-items: center; padding: 8px 10px 8px 14px; border-radius: 8px; background: var(--ink); color: var(--bg); font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+.toast button { background: transparent; color: var(--bg); border-color: color-mix(in srgb, var(--bg) 40%, transparent); }
+/* 展示:ダッシュボードの「展示」は、業務画面とは別の、暗い展示室の見た目にする(テーマに関係なく同じ) */
+.dash-modes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.hall { --h-ink: #ece6da; --h-muted: #a8a196; --h-paper: #f3eee4; --h-paper-ink: #26231f; --h-paper-muted: #7a7266; --h-line: #d9d0c1;
+  color-scheme: dark; color: var(--h-ink); border-radius: 14px; padding: 30px clamp(16px, 3vw, 40px) 40px; position: relative; overflow: hidden;
+  background: radial-gradient(90% 60% at 50% -10%, #3a3a3e 0%, rgba(58,58,62,0) 70%), linear-gradient(#1c1d20 0%, #17181a 72%, #222326 72.2%, #121314 100%); }
+.hall-head { display: grid; gap: 4px; margin-bottom: 26px; }
+.hall-kicker { margin: 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: .32em; color: var(--h-muted); }
+.hall-head h2 { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 700; letter-spacing: .04em; text-wrap: balance; }
+.hall-sub { margin: 0; font-size: 13px; color: var(--h-muted); font-variant-numeric: tabular-nums; }
+.hall-floor { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap: 34px 26px; align-items: end; }
+.exhibit { margin: 0; display: grid; justify-items: center; min-width: 0; }
+.vitrine { position: relative; width: 100%; height: 240px; }
+.vitrine::before { content: ""; position: absolute; inset: -30px 12% 18px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,236,204,.16), rgba(255,236,204,.02) 80%); clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); }
+.vitrine canvas { position: relative; display: block; width: 100%; height: 100%; cursor: pointer; }
+.vitrine canvas:focus-visible { outline: 2px solid #f0c98a; outline-offset: -2px; border-radius: 6px; }
+.plinth { position: relative; width: 62%; height: 46px; margin-top: -14px; background: linear-gradient(90deg, #b9b1a3, #e3ddd2 45%, #cfc7b9); box-shadow: 0 22px 26px -14px rgba(0,0,0,.85); }
+.plinth::before { content: ""; position: absolute; left: 0; right: 0; top: -9px; height: 9px; background: #f2eee7; clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%); }
+.placard { margin-top: 16px; width: min(100%, 290px); background: var(--h-paper); color: var(--h-paper-ink); padding: 10px 12px 10px; border-radius: 2px; display: grid; gap: 3px; font-size: 12px; box-shadow: 0 6px 14px rgba(0,0,0,.4); }
+.placard .no { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; color: var(--h-paper-muted); }
+.placard .ttl { font-family: var(--font-display); font-size: 15px; line-height: 1.35; }
+.placard .axes { color: var(--h-paper-muted); }
+.placard .axes i { font-style: normal; font-weight: 700; } .placard .axes .x { color: #6a3fa0; } .placard .axes .y { color: #23753e; } .placard .axes .z { color: #a9325f; }
+.placard .meta { font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--h-paper-ink); }
+.placard .acts { display: flex; gap: 6px; margin-top: 4px; }
+.placard .acts button { background: #fff; color: var(--h-paper-ink); border-color: var(--h-line); font-size: 12px; padding: 3px 9px; }
+.placard .acts button:hover { border-color: var(--h-paper-ink); }
+.exhibit.sub .vitrine { height: 190px; } .exhibit.sub .plinth { width: 50%; height: 34px; }
+.exhibit.sub .placard { width: min(100%, 250px); }
+.hall-empty { color: var(--h-muted); }
 .savebar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px 12px; margin-bottom: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
 .savebar.dirty { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); box-shadow: inset 4px 0 0 var(--warn); }
 .savebar .sv-name { font-weight: 700; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -392,6 +439,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 
   <main class="main">
     <div class="savebar" id="savebar" hidden></div>
+    <div class="cmenu" id="cmenu" role="menu" hidden></div>
+    <div class="toast" id="toast" role="status" hidden></div>
     <div id="blank-confirm" class="confirm" hidden>
       <span>作ったキューブと入力したデータをすべて消して、白紙に戻します。</span>
       <button id="blank-yes" type="button" class="danger">白紙にする</button>
@@ -584,6 +633,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const storeJ = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
   let versions = loadJ(VKEY, {}), presets = loadJ(PKEY, { axes: [], cubes: [] });
   presets.axes ??= []; presets.cubes ??= [];
+  { const ids = new Set(st.cubes.map((c) => c.id)); let gone = false; for (const id of Object.keys(versions)) if (!ids.has(id)) { delete versions[id]; gone = true; } if (gone) storeJ(VKEY, versions); } // 消したキューブの版は、次に開いたときに片付ける
   const snapOf = (c) => JSON.stringify({ name: c.name, axes: c.axes, value: c.value, cells: c.cells });
   const versOf = (c) => versions[c.id] || [];
   const baseOf = (c) => { const l = versOf(c); return l.find((v) => v.id === st.base?.[c.id]) || l[l.length - 1] || null; };
@@ -785,7 +835,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const out = [];
     const walk = (parent, depth) => kids(parent).forEach((c) => {
       const p = cube(c.parent);
-      out.push(`<li><button type="button" data-id="${c.id}" aria-current="${c.id === st.selected}" style="padding-left:${8 + depth * 16}px"><i class="ico"></i>${esc(c.name)}${p ? `<span class="via">${esc(p.axes[c.via].name)}ごと</span>` : ""}</button></li>`);
+      out.push(`<li><button type="button" data-id="${c.id}" aria-current="${c.id === st.selected}" style="padding-left:${8 + depth * 16}px"><i class="ico"></i>${esc(c.name)}${p ? `<span class="via">${esc(p.axes[c.via].name)}ごと</span>` : ""}</button><button type="button" class="tree-more" data-cmenu="${c.id}" aria-label="${esc(c.name)}のメニュー" aria-haspopup="menu">⋯</button></li>`);
       walk(c.id, depth + 1);
     });
     walk(null, 0);
@@ -1110,8 +1160,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     pane.addEventListener("toggle", (e) => { const k = e.target.dataset?.calcbox; if (k) (e.target.open ? calcOpen.add(k) : calcOpen.delete(k)); }, true);
     $("del-cube").onclick = () => {
       const all = []; const walk = (id) => { all.push(cube(id)); kids(id).forEach((k) => walk(k.id)); }; walk(c.id);
-      $("del-confirm").innerHTML = `<div class="confirm" style="margin-top:8px">「${esc(c.name)}」${all.length > 1 ? `と下位(${all.slice(1).map((x) => esc(x.name)).join("、")})` : ""}を削除します。入力したデータも消えます。<button type="button" class="danger" id="dc-yes">削除する</button><button type="button" id="dc-no">やめる</button></div>`;
-      $("dc-yes").onclick = () => { st.cubes = st.cubes.filter((x) => !all.includes(x)); st.selected = c.parent || st.cubes[0]?.id || null; render(); };
+      $("del-confirm").innerHTML = `<div class="confirm" style="margin-top:8px">「${esc(c.name)}」${all.length > 1 ? `と下位(${all.slice(1).map((x) => esc(x.name)).join("、")})` : ""}を削除します。入力したデータも消えます(直後なら下に出る「元に戻す」で取り消せます)。<button type="button" class="danger" id="dc-yes">削除する</button><button type="button" id="dc-no">やめる</button></div>`;
+      $("dc-yes").onclick = () => deleteCube(c);
       $("dc-no").onclick = () => { $("del-confirm").innerHTML = ""; };
     };
   }
@@ -1906,9 +1956,143 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     rotX += (targetX - rotX) * 0.15; rotY += (targetY - rotY) * 0.15;
     group.rotation.set(rotX, rotY, 0);
     camera.position.set(panX, panY, dist); camera.lookAt(panX, panY, 0);
-    group.updateMatrixWorld(); renderer.render(scene, camera); renderLabelsOnly();
+    if (!$("viewer").hidden) { group.updateMatrixWorld(); renderer.render(scene, camera); renderLabelsOnly(); }
+    if (!$("dash").hidden) drawExhibits();
     requestAnimationFrame(tick);
   }
+
+  // ---- 展示(ダッシュボードの立体) ----
+  // 立体ごとに WebGL を作ると重いので、描く係を1つだけ持ち、展示ごとに描いては各展示の絵(canvas)に写す
+  const galR = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  galR.setPixelRatio(1);
+  const galScene = new THREE.Scene(), galCam = new THREE.PerspectiveCamera(30, 1.2, 0.1, 100);
+  galScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  { const key = new THREE.DirectionalLight(0xfff1dc, 0.95); key.position.set(-2, 10, 6); galScene.add(key);
+    const rim = new THREE.DirectionalLight(0x9fd6ff, 0.35); rim.position.set(6, 1, -6); galScene.add(rim); }
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  let exhibits = [];
+  const GAL_N = 8; // 1軸あたり最大8塊にまとめた、粗い模型を飾る
+  const coarseWin = (c) => Object.fromEntries(AX.map((k) => { const tot = members(c.axes[k]).length, bs = Math.max(1, Math.ceil(tot / GAL_N)); return [k, { off: 0, span: tot, tot, bs, cnt: Math.ceil(tot / bs) || 0 }]; }));
+  const disposeTree = (o) => o.traverse((m) => { if (m.geometry && m.geometry !== unitBox) m.geometry.dispose(); if (m.material) m.material.dispose(); });
+  function buildModel(c) {
+    const g = new THREE.Group(), win = coarseWin(c);
+    const glass = (w, h, d) => { const geo = new THREE.BoxGeometry(w, h, d); g.add(new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: 0xbfd3d6, transparent: true, opacity: 0.08, depthWrite: false })), new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: 0xe8e1d4, transparent: true, opacity: 0.55 }))); };
+    if (!AX.every((k) => win[k].tot > 0)) { glass(3, 3, 3); return g; } // 目盛りがまだない:空のガラスケースだけ
+    const nx = win.x.cnt, ny = win.y.cnt, nz = win.z.cnt, u = 3.6 / Math.max(nx, ny, nz, 2), N = nx * ny * nz;
+    const val = blockValues(c, win), num = (v) => (typeof v === "number" ? Math.abs(v) : 1);
+    const cm = AX.map((k) => (win[k].bs === 1 && calcOf(c.axes[k]).length ? members(c.axes[k]).map((m) => isCalc(c.axes[k], m)) : null));
+    const isCalcN = (n) => { const k = n % nz, j = ((n - k) / nz) % ny, i = Math.floor(n / (ny * nz)); return !!(cm[0]?.[i] || cm[1]?.[j] || cm[2]?.[k]); };
+    let nFill = 0, max = 1; for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; if (!isCalcN(n)) max = Math.max(max, num(val[n])); }
+    if (nFill) {
+      const full = new THREE.InstancedMesh(unitBox, new THREE.MeshPhongMaterial({ shininess: 40, specular: 0x333333 }), nFill);
+      const lo = new THREE.Color("#244f53"), hi = new THREE.Color("#8ee6ea"), warm = new THREE.Color("#f0a868"), col = new THREE.Color();
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(u * 0.84, u * 0.84, u * 0.84); let a = 0;
+      for (let n = 0; n < N; n++) {
+        if (val[n] === undefined) continue;
+        const k = n % nz, j = ((n - k) / nz) % ny, i = Math.floor(n / (ny * nz));
+        m4.compose(new THREE.Vector3((i - (nx - 1) / 2) * u, ((ny - 1) / 2 - j) * u, ((nz - 1) / 2 - k) * u), q, sc);
+        full.setMatrixAt(a, m4); full.setColorAt(a++, isCalcN(n) ? warm : col.copy(lo).lerp(hi, 0.2 + 0.8 * Math.min(1, num(val[n]) / max)));
+      }
+      full.instanceMatrix.needsUpdate = true; if (full.instanceColor) full.instanceColor.needsUpdate = true; g.add(full);
+    }
+    glass(nx * u, ny * u, nz * u);
+    return g;
+  }
+  let exObs = null;
+  function setExhibits(order) {
+    exhibits.forEach((x) => disposeTree(x.model)); exObs?.disconnect();
+    exhibits = order.map((c, i) => ({ id: c.id, model: buildModel(c), angle: 0.7 + i * 0.9, hover: false, seen: true, drawn: false }));
+    exObs = new IntersectionObserver((es) => es.forEach((e) => { const x = exhibits.find((y) => y.id === e.target.dataset.excv); if (x) x.seen = e.isIntersecting; }));
+    document.querySelectorAll("[data-excv]").forEach((cv) => {
+      const x = exhibits.find((y) => y.id === cv.dataset.excv); if (!x) return; exObs.observe(cv); x.cv = cv;
+      cv.onpointerenter = () => { x.hover = true; }; cv.onpointerleave = () => { x.hover = false; };
+      cv.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cv.click(); } };
+    });
+  }
+  function drawExhibits() {
+    for (const x of exhibits) {
+      if (!x.cv || !x.seen) continue;
+      if (still.matches && x.drawn) continue; // 動きを減らす設定なら、1回描いて止める
+      const w = x.cv.clientWidth, h = x.cv.clientHeight; if (!w || !h) continue;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2), W = Math.round(w * dpr), H = Math.round(h * dpr);
+      if (x.cv.width !== W || x.cv.height !== H) { x.cv.width = W; x.cv.height = H; }
+      if (galR.domElement.width !== W || galR.domElement.height !== H) galR.setSize(W, H, false);
+      x.angle += still.matches ? 0 : x.hover ? 0.025 : 0.005;
+      x.model.rotation.set(-0.38, x.angle, 0);
+      galCam.aspect = w / h; galCam.fov = 30; galCam.position.set(0, 1.2, 10.5); galCam.lookAt(0, 0.1, 0); galCam.updateProjectionMatrix();
+      galScene.add(x.model); galR.render(galScene, galCam); galScene.remove(x.model);
+      const ctx = x.cv.getContext("2d"); ctx.clearRect(0, 0, W, H); ctx.drawImage(galR.domElement, 0, 0); x.drawn = true;
+    }
+  }
+
+  // ---- キューブのメニュー(展示・一覧・左の木の「⋯」から) ----
+  const subtree = (c) => { const out = []; const walk = (x) => { out.push(x); kids(x.id).forEach(walk); }; walk(c); return out; };
+  let lastDel = null, toastTimer = 0;
+  function toast(html, undo) {
+    const t = $("toast"); t.innerHTML = `<span>${html}</span>${undo ? `<button type="button" id="toast-undo">元に戻す</button>` : ""}<button type="button" id="toast-x" aria-label="閉じる">×</button>`; t.hidden = false;
+    if ($("toast-undo")) $("toast-undo").onclick = () => { undo(); t.hidden = true; };
+    $("toast-x").onclick = () => { t.hidden = true; };
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 12000);
+  }
+  function deleteCube(c) {
+    const all = subtree(c), at = st.cubes.indexOf(c);
+    st.cubes = st.cubes.filter((x) => !all.includes(x));
+    if (all.some((x) => x.id === st.selected)) st.selected = c.parent || st.cubes[0]?.id || null;
+    if (!st.cubes.length && st.view !== "dash") st.view = "dash";
+    lastDel = { all, at };
+    render();
+    toast(`「${esc(c.name)}」${all.length > 1 ? `と下位${all.length - 1}個` : ""}を削除しました。`, () => {
+      if (!lastDel) return; st.cubes.splice(Math.min(lastDel.at, st.cubes.length), 0, ...lastDel.all); st.selected = lastDel.all[0].id; lastDel = null; render();
+    });
+  }
+  function dupCube(c) {
+    const all = subtree(c), map = new Map(all.map((x) => [x.id, nid("c")]));
+    const copies = all.map((x) => { const y = JSON.parse(JSON.stringify(x)); y.id = map.get(x.id); if (map.has(x.parent)) y.parent = map.get(x.parent); return y; });
+    copies[0].name = `${c.name}のコピー`;
+    st.cubes.splice(st.cubes.indexOf(all[all.length - 1]) + 1, 0, ...copies);
+    for (const x of all) if (st.at[x.id] !== undefined) st.at[map.get(x.id)] = st.at[x.id];
+    for (const y of copies) saveVersion(y, `「${all.find((x) => map.get(x.id) === y.id).name}」を複製して作成`, true);
+    return copies[0];
+  }
+  const cm = { id: null, step: "", anchor: null };
+  function drawCubeMenu() {
+    const el = $("cmenu"), c = cube(cm.id); if (!c) { el.hidden = true; return; }
+    const all = subtree(c);
+    el.innerHTML = cm.step === "rename"
+      ? `<p class="cm-t">名前を変える</p><input id="cm-name" value="${esc(c.name)}" aria-label="キューブの名前"><div class="cm-row"><button type="button" class="primary" data-cm="rename-go">変える</button><button type="button" data-cm="back">戻る</button></div>`
+      : cm.step === "delete"
+      ? `<p class="cm-t warn">「${esc(c.name)}」を削除しますか</p><p class="cm-n">${all.length > 1 ? `下位の ${all.slice(1).map((x) => esc(x.name)).join("、")} も一緒に消えます。` : ""}入力した値も消えます。削除の直後なら「元に戻す」で取り消せます。</p><div class="cm-row"><button type="button" class="danger" data-cm="delete-go">削除する</button><button type="button" data-cm="back">やめる</button></div>`
+      : `<p class="cm-t">${esc(c.name)}</p>
+         ${c.synth ? `<button type="button" role="menuitem" data-cm="cube">立体で見る</button>` : `<button type="button" role="menuitem" data-cm="cube">立体で見る</button><button type="button" role="menuitem" data-cm="data">値を入れる</button><button type="button" role="menuitem" data-cm="axes">軸を直す</button><button type="button" role="menuitem" data-cm="members">目盛りを登録</button>`}
+         <hr><button type="button" role="menuitem" data-cm="rename">名前を変える</button>${c.synth ? "" : `<button type="button" role="menuitem" data-cm="dup">複製する${all.length > 1 ? "(下位も一緒に)" : ""}</button><button type="button" role="menuitem" data-cm="lower">下位のキューブを作る</button>`}
+         <hr><button type="button" role="menuitem" class="danger-t" data-cm="delete">削除する…</button>`;
+    el.hidden = false;
+    const r = cm.anchor?.isConnected ? cm.anchor.getBoundingClientRect() : { left: innerWidth / 2, right: innerWidth / 2, top: innerHeight / 3, bottom: innerHeight / 3 };
+    el.style.left = Math.max(8, Math.min(innerWidth - el.offsetWidth - 8, r.right - el.offsetWidth)) + "px";
+    el.style.top = (r.bottom + 4 + el.offsetHeight > innerHeight - 8 ? Math.max(8, r.top - el.offsetHeight - 4) : r.bottom + 4) + "px";
+    (el.querySelector("input") || el.querySelector("button"))?.focus();
+    if (cm.step === "rename") $("cm-name").select();
+  }
+  const closeMenu = (refocus) => { $("cmenu").hidden = true; if (refocus && cm.anchor?.isConnected) cm.anchor.focus(); cm.id = null; };
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-cmenu]");
+    if (b) { e.preventDefault(); if (cm.id === b.dataset.cmenu && !$("cmenu").hidden) { closeMenu(); return; } cm.id = b.dataset.cmenu; cm.step = ""; cm.anchor = b; drawCubeMenu(); return; }
+    if (!$("cmenu").hidden && !e.composedPath().includes($("cmenu"))) closeMenu(); // メニューの中身は押すと描き直すので、押した所ではなく経路で見る
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("cmenu").hidden) closeMenu(true); });
+  $("cmenu").onkeydown = (e) => { if (e.key === "Enter" && e.target.id === "cm-name") { e.preventDefault(); $("cmenu").querySelector('[data-cm="rename-go"]').click(); } };
+  $("cmenu").onclick = (e) => {
+    const b = e.target.closest("[data-cm]"); if (!b) return; const c = cube(cm.id); if (!c) return closeMenu();
+    const a = b.dataset.cm;
+    if (a === "rename" || a === "delete") { cm.step = a; return drawCubeMenu(); }
+    if (a === "back") { cm.step = ""; return drawCubeMenu(); }
+    if (a === "rename-go") { const v = $("cm-name").value.trim(); if (v) c.name = v; closeMenu(); render(); return; }
+    if (a === "delete-go") { closeMenu(); deleteCube(c); return; }
+    closeMenu(); $("side").classList.remove("open"); sheet = null; bulk.ax = null;
+    if (a === "dup") { const y = dupCube(c); st.selected = y.id; render(); toast(`「${esc(y.name)}」を作りました。`); return; }
+    if (a === "lower") { st.selected = c.id; $("add-lower").click(); return; }
+    st.selected = c.id; st.view = a; if (a !== "cube") st.tab = a; render(); scrollTo(0, 0);
+  };
 
   // ---- 全体の操作 ----
   // ---- 画面の切り替え ----
@@ -1974,9 +2158,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const all = st.cubes; const stats = new Map(all.map((c) => [c.id, cubeStats(c)]));
     const memberCount = all.reduce((n, c) => n + usedAx(c).reduce((m, k) => m + members(c.axes[k]).length, 0), 0);
     const filled = [...stats.values()].reduce((n, s) => n + s.filled, 0);
-    const head = `<div class="dash-head"><div><h1>ダッシュボード</h1><p class="hint" style="margin:0">作ったキューブの入り具合と合計を一覧で見ます。カードから立体表示や入力に進めます。</p></div>
-      <div class="card-actions"><button type="button" class="primary" data-act="new">＋ 新しいキューブ</button><button type="button" data-act="tpl">テンプレートから始める</button></div></div>`;
+    const hall = st.dashMode !== "list";
+    const head = `<div class="dash-head"><div><h1>ダッシュボード</h1><p class="hint" style="margin:0">${hall ? "作ったキューブを立体のまま並べて見ます。立体をクリックすると開き、「⋯」から名前の変更・複製・削除ができます。" : "作ったキューブの入り具合と合計を一覧で見ます。カードから立体表示や入力に進めます。"}</p></div>
+      <div class="dash-modes"><div class="seg" role="group" aria-label="並べ方"><button type="button" data-dmode="hall" aria-pressed="${hall}">展示</button><button type="button" data-dmode="list" aria-pressed="${!hall}">一覧</button></div>
+      <button type="button" class="primary" data-act="new">＋ 新しいキューブ</button><button type="button" data-act="tpl">テンプレートから始める</button></div></div>`;
     if (!all.length) {
+      setExhibits([]);
       $("dash").innerHTML = `${head}<div class="dash-empty"><b>まだキューブがありません</b><p class="hint" style="margin:0">「＋ 新しいキューブ」で白紙から作るか、「テンプレートから始める」で入金管理などの例を読み込みます。</p></div>`;
       return;
     }
@@ -1993,15 +2180,36 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
           <p class="hint" style="margin:4px 0 0">入力済み ${fmt(s.filled)} / ${fmt(s.total)} コマ(${pct}%)${s.filled && c.value.type !== "text" ? ` ・ ${esc(c.value.name)}の合計 <b style="color:var(--ink)">${fmtV(c, s.sum)}</b>` : ""}</p></div>
         ${s.filled && shown.length ? `<div class="bars" aria-label="${esc(c.axes[s.gk].name)}ごとの${c.value.type === "text" ? "件数" : "合計"}">${shown.map(([m, n]) => `<div class="bar"><span class="lb" title="${esc(disp(c.axes[s.gk], m))}">${esc(disp(c.axes[s.gk], m))}</span><span class="tr"><i style="width:${Math.round((Math.abs(n) / max) * 100)}%"></i></span><span class="nv">${fmtV(c, n)}</span></div>`).join("")}${entries.length > 8 ? `<p class="hint" style="margin:0">ほか ${entries.length - 8} 件</p>` : ""}</div>` : `<p class="hint" style="margin:0">まだ値が入っていません。</p>`}
         ${kids(c.id).length ? `<p class="lowers" style="margin:0">下位:${kids(c.id).map((k) => `<button type="button" data-open="${k.id}" data-v="cube">${esc(k.name)}</button>`).join("、")}</p>` : ""}
-        <div class="card-actions"><button type="button" class="primary" data-open="${c.id}" data-v="cube">立体で見る</button><button type="button" data-open="${c.id}" data-v="data">値を入れる</button><button type="button" data-open="${c.id}" data-v="axes">軸を直す</button></div>
+        <div class="card-actions"><button type="button" class="primary" data-open="${c.id}" data-v="cube">立体で見る</button><button type="button" data-open="${c.id}" data-v="data">値を入れる</button><button type="button" data-open="${c.id}" data-v="axes">軸を直す</button><button type="button" class="ghost" data-cmenu="${c.id}" aria-haspopup="menu" style="margin-left:auto">⋯ その他</button></div>
       </article>`;
     };
     const order = []; const walk = (pid) => kids(pid).forEach((c) => { order.push(c); walk(c.id); }); walk(null);
+    if (hall) {
+      const ex = (c, i) => { const s = stats.get(c.id), p = cube(c.parent);
+        return `<figure class="exhibit ${p ? "sub" : ""}">
+          <div class="vitrine"><canvas data-excv="${c.id}" tabindex="0" role="button" aria-label="${esc(c.name)}を立体で見る"></canvas></div>
+          <div class="plinth" aria-hidden="true"></div>
+          <figcaption class="placard">
+            <span class="no">No.${String(i + 1).padStart(2, "0")}${p ? ` ・ ${esc(p.name)}の下位` : ""}</span>
+            <b class="ttl">${esc(c.name)}</b>
+            <span class="axes">${usedAx(c).map((k) => `<i class="${k}">${esc(c.axes[k].name)}</i>`).join(" × ")}${c.axes.z.off ? "(2軸)" : ""}</span>
+            <span class="meta">${fmt(s.filled)} / ${fmt(s.total)} コマ${s.filled && c.value.type !== "text" ? ` ・ ${esc(c.value.name)} ${fmtV(c, s.sum)}` : ""}</span>
+            <span class="acts"><button type="button" data-open="${c.id}" data-v="cube">立体で見る</button>${c.synth ? "" : `<button type="button" data-open="${c.id}" data-v="data">値を入れる</button>`}<button type="button" data-cmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(c.name)}のメニュー">⋯</button></span>
+          </figcaption></figure>`; };
+      $("dash").innerHTML = `${head}<section class="hall" aria-label="キューブの展示">
+        <div class="hall-head"><p class="hall-kicker">CUBE COLLECTION</p><h2>収蔵キューブ</h2>
+          <p class="hall-sub">${all.length}点 ・ 目盛り ${fmt(memberCount)} ・ 入力済み ${fmt(filled)} コマ</p></div>
+        <div class="hall-floor">${order.map(ex).join("")}</div></section>`;
+      setExhibits(order); return;
+    }
+    setExhibits([]);
     $("dash").innerHTML = `${head}
       <div class="kpis"><div class="kpi"><div class="k">キューブ</div><div class="v">${all.length}</div></div><div class="kpi"><div class="k">目盛り(全部の軸)</div><div class="v">${fmt(memberCount)}</div></div><div class="kpi"><div class="k">入力済みのコマ</div><div class="v">${fmt(filled)}</div></div></div>
       <div class="cards">${order.map(card).join("")}</div>`;
   }
   $("dash").onclick = (e) => {
+    const dm = e.target.closest("[data-dmode]"); if (dm) { st.dashMode = dm.dataset.dmode; render(); return; }
+    const cv = e.target.closest("[data-excv]"); if (cv) { st.selected = cv.dataset.excv; st.view = "cube"; render(); scrollTo(0, 0); return; }
     const o = e.target.closest("[data-open]"); if (o) { st.selected = o.dataset.open; st.view = o.dataset.v; render(); scrollTo(0, 0); return; }
     const a = e.target.closest("[data-act]"); if (!a) return;
     if (a.dataset.act === "new") $("new-cube").click(); else $("tpl-btn").click();
