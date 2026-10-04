@@ -414,7 +414,24 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     while (out.length < 60) { const s = `${y}-${String(m).padStart(2, "0")}`; out.push(s); if (s === b) break; m++; if (m > 12) { m = 1; y++; } }
     return out;
   };
-  const members = (ax) => (ax.kind === "month" ? monthsBetween(ax.from, ax.to) : ax.members);
+  // kind "seq" は架空の大きなキューブ用:「接頭辞+通し番号」の目盛りを count 件、その場で作る(保存しない)
+  const seqCache = new Map();
+  const seqMembers = (ax) => { const key = `${ax.prefix}|${ax.count}`; let m = seqCache.get(key); if (!m) { const d = String(ax.count).length; m = Array.from({ length: ax.count }, (_, i) => ax.prefix + String(i + 1).padStart(d, "0")); seqCache.set(key, m); } return m; };
+  const members = (ax) => (ax.kind === "month" ? monthsBetween(ax.from, ax.to) : ax.kind === "seq" ? seqMembers(ax) : ax.members);
+  // 架空の大きなキューブの値:コマの値 = 店舗の重み × 顧客の重み × 日の重み(顧客の4人に1人は値なし)。
+  // 掛け算に分かれるので、どんな塊の合計も各軸の累積和の掛け算で一瞬で出せる(データベースの「段ごとの集計表」の代わり)
+  const synthCache = new Map();
+  function synthAxis(c, k) {
+    const key = `${c.id}|${k}`; let V = synthCache.get(key); if (V) return V;
+    const n = members(c.axes[k]).length, v = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const h = Math.imul(i + 1, 2654435761) >>> 0;
+      v[i] = k === "x" ? 10 + Math.round(40 * (1 + Math.sin(i / 6))) : k === "y" ? (h % 4 === 0 ? 0 : Math.round(20 + 100 * (1 + Math.sin(i / 7000)) + (h % 50))) : 1 + (i % 7 === 0 ? 2 : 0) + Math.round(1 + Math.cos(i / 9));
+    }
+    const ps = new Float64Array(n + 1), pc = new Float64Array(n + 1); let mx = 0, mn = Infinity;
+    for (let i = 0; i < n; i++) { ps[i + 1] = ps[i] + v[i]; pc[i + 1] = pc[i] + (v[i] ? 1 : 0); if (v[i]) { mx = Math.max(mx, v[i]); mn = Math.min(mn, v[i]); } }
+    V = { v, ps, pc, mx, mn, idx: new Map(members(c.axes[k]).map((m, i) => [m, i])) }; synthCache.set(key, V); return V;
+  }
   // 表記:目盛りごとに複数の書き方(法人名・PartyID・顧客番号など)を持てる。
   // labels[0](id "base")が基本の表記で、目盛りそのもの。ほかの表記の値は alt[目盛り][表記の id] に持つ。
   // show は表示の並び。1つの部品は表記の id の配列で、2つ以上なら「または」(値の入っている最初の表記を使う)。
@@ -490,6 +507,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const TEMPLATES = [
     { name: "入金管理(架空データ入り)", note: "取引先(法人と個人)× 年月 × 内訳の入金。取引先は顧客番号・法人名・屋号・代表者名の表記つき。下位に「ショップ別の入金」と「取引先の基本情報」。", make: depositTemplate },
     { name: "店舗の売上", note: "店舗 × 年月 × 商品カテゴリ。下位に「担当者別の売上」。データは空。", make: storeTemplate },
+    { name: "大きなキューブ(10億コマ・架空)", note: "店舗100 × 顧客10万 × 日100 = 10億コマ。値は式で作る架空の売上で、保存はしない。塊にまとめて描き、寄ると細かくなる動きを試すためのもの。", make: () => {
+      const c = newCube("大きなキューブ(10億コマ)"); c.synth = true;
+      c.axes = { x: { name: "店舗", kind: "seq", prefix: "S", count: 100 }, y: { name: "顧客", kind: "seq", prefix: "C", count: 100000 }, z: { name: "日", kind: "seq", prefix: "D", count: 100 } };
+      c.value = { name: "売上", type: "money", agg: "sum" };
+      return { ...st, cubes: [...st.cubes.filter((x) => !x.synth), c], selected: c.id, view: "cube" }; } }, // 今のキューブは残して足す
     { name: "軸だけのひな形", note: "X・Y・Z に名前だけ入った空のキューブを1つ。", make: () => { const c = newCube("新しいキューブ"); return { cubes: [c], selected: c.id, tab: "axes", at: {} }; } },
   ];
 
@@ -1176,12 +1198,51 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   new ResizeObserver(resize).observe(stage);
 
-  // 立体:コマは InstancedMesh でまとめて描く(1万件×数十でも描画は2回で済む)。
-  // 目盛りが多い軸はコマを薄くして、立体全体がだいたい同じ大きさに収まるようにする
-  const FIT = 16, CELL_BUDGET = 300000;
+  // 立体:コマは InstancedMesh でまとめて描く(30万コマまで)。
+  // それより多いときは、目盛りを並び順に塊へまとめ、塊を1コマとして描く(地図と同じ考え方)。
+  // 塊をクリックして「寄る」と、その範囲だけを細かい塊で描き直す。いちばん細かくなると1目盛り=1コマ
+  const FIT = 16, CELL_BUDGET = 150000;
   const unitBox = new THREE.BoxGeometry(1, 1, 1);
   let inst = { full: null, empty: null, fIdx: null, eIdx: null, val: null }, hl = null, panX = 0, panY = 0, baseDist = 14, lastCube = null;
   const cellPos = (i, j, k) => { const d = dims; return new THREE.Vector3((i - (d.nx - 1) / 2) * d.sx, ((d.ny - 1) / 2 - j) * d.sy, ((d.nz - 1) / 2 - k) * d.sz); };
+  // 塊 t の範囲(目盛りの番号 from 〜 to-1)と名前
+  const blockOf = (w, t) => { const from = w.off + t * w.bs; return { from, to: Math.min(w.off + w.span, from + w.bs) }; };
+  const blockLabel = (c, k, t) => { const w = dims.win[k], b = blockOf(w, t); return w.bs === 1 ? disp(c.axes[k], members(c.axes[k])[b.from]) : `${(b.from + 1).toLocaleString()}〜${b.to.toLocaleString()}`; };
+
+  // 塊ごとの値。ふつうのキューブはコマを1回なめて塊へ足し込む。架空のキューブは式から直接出す
+  function blockValues(c, win) {
+    const [W0, W1, W2] = AX.map((k) => win[k]), N = W0.cnt * W1.cnt * W2.cnt;
+    const agg = c.value.agg, text = c.value.type === "text";
+    const out = new Array(N);
+    if (c.synth) {
+      const per = AX.map((k) => { const w = win[k], V = synthAxis(c, k); const s = new Float64Array(w.cnt), n = new Float64Array(w.cnt), mx = new Float64Array(w.cnt), mn = new Float64Array(w.cnt).fill(Infinity);
+        for (let t = 0; t < w.cnt; t++) { const b = blockOf(w, t); s[t] = V.ps[b.to] - V.ps[b.from]; n[t] = V.pc[b.to] - V.pc[b.from]; for (let i = b.from; i < b.to; i++) { const v = V.v[i]; if (v) { if (v > mx[t]) mx[t] = v; if (v < mn[t]) mn[t] = v; } } }
+        return { s, n, mx, mn }; });
+      for (let i = 0; i < W0.cnt; i++) for (let j = 0; j < W1.cnt; j++) for (let k = 0; k < W2.cnt; k++) {
+        const cnt = per[0].n[i] * per[1].n[j] * per[2].n[k]; if (!cnt) continue;
+        const sum = per[0].s[i] * per[1].s[j] * per[2].s[k];
+        out[(i * W1.cnt + j) * W2.cnt + k] = { sum, count: cnt, avg: sum / cnt, max: per[0].mx[i] * per[1].mx[j] * per[2].mx[k], min: per[0].mn[i] * per[1].mn[j] * per[2].mn[k] }[agg];
+      }
+      return out;
+    }
+    const at = atOf(c), ix = AX.map((k) => new Map(members(c.axes[k]).map((m, i) => [m, i])));
+    const sum = new Float64Array(N), cnt = new Int32Array(N), mx = new Float64Array(N).fill(-Infinity), mn = new Float64Array(N).fill(Infinity), first = text ? new Array(N) : null;
+    for (const [key, v] of Object.entries(c.cells)) {
+      if (v === undefined || v === "") continue;
+      const q = key.split(SEP); if (q[0] !== at) continue;
+      const p = AX.map((k, a) => { const i = ix[a].get(q[a + 1]); const w = win[k]; return i === undefined || i < w.off || i >= w.off + w.span ? -1 : Math.floor((i - w.off) / w.bs); });
+      if (p[0] < 0 || p[1] < 0 || p[2] < 0) continue;
+      const n = (p[0] * W1.cnt + p[1]) * W2.cnt + p[2];
+      cnt[n]++; if (text) { if (cnt[n] === 1) first[n] = v; continue; }
+      const x = Number(v); if (!Number.isFinite(x)) continue; sum[n] += x; if (x > mx[n]) mx[n] = x; if (x < mn[n]) mn[n] = x;
+    }
+    for (let n = 0; n < N; n++) {
+      if (!cnt[n]) continue;
+      out[n] = text ? (agg === "count" || cnt[n] > 1 ? cnt[n] : first[n]) : { sum: sum[n], count: cnt[n], avg: sum[n] / cnt[n], max: mx[n], min: mn[n] }[agg];
+    }
+    return out;
+  }
+
   function renderPreview() {
     if ($("viewer").hidden) return; // 立体を出していない画面では描かない(出すときに render() から描く)
     meshes.forEach((m) => { group.remove(m); if (m.geometry !== unitBox) m.geometry.dispose(); m.material.dispose(); m.dispose?.(); });
@@ -1189,21 +1250,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const c = cube(st.selected);
     if (!c) { dims = { nx: 0, ny: 0, nz: 0 }; renderFace(); $("win-bar").hidden = true; return; }
     const win = winOf(c);
-    const [xs, ys, zs] = AX.map((k) => members(c.axes[k]).slice(win[k].off, win[k].off + win[k].size));
-    const nx = Math.max(xs.length, 1), ny = Math.max(ys.length, 1), nz = Math.max(zs.length, 1);
-    dims = { nx, ny, nz, xs, ys, zs, sx: Math.min(1, FIT / nx), sy: Math.min(1, FIT / ny), sz: Math.min(1, FIT / nz) };
-    const N = xs.length * ys.length * zs.length;
+    const nx = Math.max(win.x.cnt, 1), ny = Math.max(win.y.cnt, 1), nz = Math.max(win.z.cnt, 1);
+    dims = { nx, ny, nz, win, ready: AX.every((k) => win[k].tot > 0), sx: Math.min(1, FIT / nx), sy: Math.min(1, FIT / ny), sz: Math.min(1, FIT / nz) };
+    const N = dims.ready ? nx * ny * nz : 0;
     if (N) {
-      // 値を1回なめて、映す範囲のコマに割り当てる
-      const at = atOf(c), ix = [xs, ys, zs].map((l) => new Map(l.map((m, i) => [m, i])));
-      const val = new Array(N), Y = ys.length, Z = zs.length;
-      for (const [key, v] of Object.entries(c.cells)) {
-        if (v === undefined || v === "") continue;
-        const q = key.split(SEP); if (q[0] !== at) continue;
-        const i = ix[0].get(q[1]), j = ix[1].get(q[2]), k = ix[2].get(q[3]);
-        if (i !== undefined && j !== undefined && k !== undefined) val[(i * Y + j) * Z + k] = v;
-      }
-      const num = (v) => (c.value.type === "text" ? 1 : Math.abs(Number(v) || 0));
+      const val = blockValues(c, win), Y = ny, Z = nz;
+      const num = (v) => (typeof v === "number" ? Math.abs(v) : 1);
       let nFill = 0, max = 1;
       for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; max = Math.max(max, num(val[n])); }
       const lo = new THREE.Color(css("--accent-soft") || "#d9eeef"), hi = new THREE.Color(css("--accent") || "#0e6a70"), col = new THREE.Color();
@@ -1228,103 +1280,128 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     // 外枠
     const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(nx * dims.sx, ny * dims.sy, nz * dims.sz)), new THREE.LineBasicMaterial({ color: new THREE.Color(css("--muted") || "#5d6b71") }));
     group.add(box); meshes.push(box);
-    baseDist = Math.max(nx * dims.sx, ny * dims.sy, nz * dims.sz) * 2.1 + 4;
+    baseDist = Math.hypot(nx * dims.sx, ny * dims.sy, nz * dims.sz) * 1.75 + 4; // 対角線で決めて、ラベルの余白を残す
     if (lastCube !== c.id) { lastCube = c.id; dist = baseDist; panX = panY = 0; }
     renderPicked(); renderFace(); renderNotesBar(); renderWinBar(c, win);
   }
 
-  // 一度に映す数は選べる(全部=コマ30万個まで)。目盛りが多くて収まらない軸は「映す範囲」を送って見る
+  // 見る範囲(off から span 件)と、1コマに何件まとめるか(bs)を軸ごとに決める
   const LIMITS = [["all", "全部"], ["2000", "2,000件"], ["500", "500件"], ["100", "100件"], ["30", "30件"]];
   function winOf(c) {
     const saved = ((st.win ??= {})[c.id] ??= {});
     const lim = saved.lim && saved.lim !== "all" ? +saved.lim : Infinity;
-    const tot = Object.fromEntries(AX.map((k) => [k, members(c.axes[k]).length]));
-    const size = Object.fromEntries(AX.map((k) => [k, Math.max(1, Math.min(tot[k], lim))]));
-    for (let guard = 0; guard < 20; guard++) {
-      const prod = AX.reduce((n, k) => n * size[k], 1); if (prod <= CELL_BUDGET) break;
-      const k = [...AX].sort((p, q) => size[q] - size[p])[0];
-      const next = Math.max(30, Math.floor(size[k] * CELL_BUDGET / prod)); if (next >= size[k]) break; size[k] = next;
+    const w = {};
+    for (const k of AX) {
+      const tot = members(c.axes[k]).length;
+      const sv = saved[k] && typeof saved[k] === "object" ? saved[k] : (saved[k] = { off: 0, span: 0 });
+      const span = Math.max(1, Math.min(tot, sv.span || lim));
+      sv.off = Math.max(0, Math.min(sv.off || 0, tot - span));
+      w[k] = { off: sv.off, span, tot, cnt: span };
     }
-    return Object.fromEntries(AX.map((k) => { const off = Math.max(0, Math.min(saved[k] || 0, tot[k] - size[k])); saved[k] = off; return [k, { off, size: size[k], tot: tot[k] }]; }));
+    // コマが多すぎるときは、件数の多い軸からまとめていく
+    for (let guard = 0; guard < 60; guard++) {
+      const prod = AX.reduce((n, k) => n * w[k].cnt, 1); if (prod <= CELL_BUDGET) break;
+      const k = [...AX].sort((p, q) => w[q].cnt - w[p].cnt)[0];
+      w[k].cnt = Math.max(1, Math.floor(w[k].cnt / Math.min(10, Math.ceil(prod / CELL_BUDGET) + 0.0001)));
+      if (w[k].cnt < 1) break;
+    }
+    for (const k of AX) { const x = w[k]; x.bs = Math.ceil(x.span / Math.max(1, x.cnt)); x.cnt = Math.ceil(x.span / x.bs); }
+    return w;
   }
   function renderWinBar(c, win) {
-    const bar = $("win-bar"); const ks = AX.filter((k) => win[k].tot > win[k].size);
-    const big = AX.some((k) => win[k].tot > 30);
+    const bar = $("win-bar"); const big = AX.some((k) => win[k].tot > 30);
     bar.hidden = !big;
     if (!big) { bar.innerHTML = ""; return; }
-    const lim = st.win[c.id].lim || "all";
+    const lim = st.win[c.id].lim || "all"; const narrowed = AX.some((k) => win[k].span < win[k].tot);
+    const total = AX.reduce((n, k) => n * win[k].tot, 1);
     bar.innerHTML = `<div class="wl"><span>一度に映す数</span><select id="win-lim">${LIMITS.map(([v, t]) => `<option value="${v}" ${v === lim ? "selected" : ""}>${t}</option>`).join("")}</select>`
-      + `<span class="hint" style="margin:0">${AX.map((k) => `<span class="${k}">${k.toUpperCase()}</span> ${win[k].tot.toLocaleString()}件`).join(" ・ ")}</span></div>`
-      + ks.map((k) => { const w = win[k]; return `<div class="w"><span><span class="${k}">${k.toUpperCase()} ${esc(c.axes[k].name)}</span> ${(w.off + 1).toLocaleString()}–${(w.off + w.size).toLocaleString()} 件目 / 全${w.tot.toLocaleString()}件</span>`
-      + `<button type="button" data-win="${k}" data-d="-1" aria-label="前へ" ${w.off ? "" : "disabled"}>◀</button>`
-      + `<input type="range" data-win="${k}" min="0" max="${w.tot - w.size}" value="${w.off}" aria-label="${esc(c.axes[k].name)}の映す範囲">`
-      + `<button type="button" data-win="${k}" data-d="1" aria-label="次へ" ${w.off + w.size < w.tot ? "" : "disabled"}>▶</button></div>`; }).join("");
+      + `<span class="hint" style="margin:0">${AX.map((k) => `<span class="${k}">${k.toUpperCase()}</span> ${win[k].tot.toLocaleString()}件`).join(" × ")} = ${total.toLocaleString()}コマ</span>`
+      + (narrowed ? `<button type="button" id="win-all">全体に戻る</button>` : "") + `</div>`
+      + AX.filter((k) => win[k].span < win[k].tot || win[k].bs > 1).map((k) => { const w = win[k]; return `<div class="w"><span><span class="${k}">${k.toUpperCase()} ${esc(c.axes[k].name)}</span> ${(w.off + 1).toLocaleString()}〜${(w.off + w.span).toLocaleString()}件目 / 全${w.tot.toLocaleString()}件${w.bs > 1 ? `<b> ・1コマ=${w.bs.toLocaleString()}件分</b>` : ""}</span>`
+      + (w.span < w.tot ? `<button type="button" data-win="${k}" data-d="-1" aria-label="前へ" ${w.off ? "" : "disabled"}>◀</button>`
+      + `<input type="range" data-win="${k}" min="0" max="${w.tot - w.span}" value="${w.off}" aria-label="${esc(c.axes[k].name)}の映す範囲">`
+      + `<button type="button" data-win="${k}" data-d="1" aria-label="次へ" ${w.off + w.span < w.tot ? "" : "disabled"}>▶</button>` : `<span></span><span class="hint" style="margin:0">全体を表示中</span><span></span>`) + `</div>`; }).join("");
   }
   let winRaf = 0;
+  const winState = (c) => ((st.win ??= {})[c.id] ??= {});
   function moveWin(k, off) {
     const c = cube(st.selected); if (!c) return;
-    ((st.win ??= {})[c.id] ??= {})[k] = off;
+    winOf(c); winState(c)[k].off = off;
     cancelAnimationFrame(winRaf); winRaf = requestAnimationFrame(() => { renderPreview(); const r = $("win-bar").querySelector(`input[data-win="${k}"]`); if (r && document.activeElement !== r) r.focus(); });
   }
   $("win-bar").addEventListener("input", (e) => { const r = e.target.closest("input[data-win]"); if (r) moveWin(r.dataset.win, +r.value); });
-  $("win-bar").addEventListener("change", (e) => { if (e.target.id !== "win-lim") return; const c = cube(st.selected); st.win[c.id].lim = e.target.value; lastCube = null; renderPreview(); save(); });
+  $("win-bar").addEventListener("change", (e) => { if (e.target.id !== "win-lim") return; const c = cube(st.selected); const s = winState(c); s.lim = e.target.value; AX.forEach((k) => { s[k] = { off: s[k]?.off || 0, span: 0 }; }); lastCube = null; renderPreview(); save(); });
   $("win-bar").onclick = (e) => {
+    const c = cube(st.selected); if (!c) return;
+    if (e.target.id === "win-all") { const s = winState(c); s.lim = "all"; AX.forEach((k) => { s[k] = { off: 0, span: 0 }; }); lastCube = null; renderPreview(); save(); return; }
     const b = e.target.closest("button[data-win]"); if (!b) return;
-    const c = cube(st.selected); const w = winOf(c)[b.dataset.win];
-    moveWin(b.dataset.win, Math.max(0, Math.min(w.tot - w.size, w.off + Number(b.dataset.d) * w.size)));
+    const w = winOf(c)[b.dataset.win];
+    moveWin(b.dataset.win, Math.max(0, Math.min(w.tot - w.span, w.off + Number(b.dataset.d) * w.span)));
   };
+  // 選んだ塊に寄る:その塊の範囲だけを見る範囲にして描き直す
+  function zoomBlock(c, p) {
+    const s = winState(c);
+    AX.forEach((k, a) => { const w = dims.win[k]; if (w.bs <= 1) return; const b = blockOf(w, [p.i, p.j, p.k][a]); s[k] = { off: b.from, span: b.to - b.from }; });
+    lastCube = null; renderPreview(); save();
+  }
 
   // 軸ラベル:各軸の平行な4本の辺のうち、画面上でいちばん外側の辺に沿って置く。
-  // 目盛りが詰まって見えるときは、1・2・5・10…件おきに間引く(拡大すると細かく出る)
+  // 目盛りが詰まって見えるときは、1・2・5・10…コマおきに間引く(拡大すると細かく出る)
   const niceStep = (s) => { if (s <= 1) return 1; const p = 10 ** Math.floor(Math.log10(s)); return [1, 2, 5, 10].map((m) => m * p).find((v) => v >= s); };
   function project(v) { const p = v.clone().applyMatrix4(group.matrixWorld).project(camera); return { x: (p.x + 1) / 2 * stage.clientWidth, y: (1 - p.y) / 2 * stage.clientHeight, z: p.z }; }
   function renderLabelsOnly() {
     labelsEl.innerHTML = "";
-    const c = cube(st.selected); if (!c || !dims.xs) return;
+    const c = cube(st.selected); if (!c || !dims.ready) return;
     const { nx, ny, nz, sx, sy, sz } = dims; const hx = nx * sx / 2, hy = ny * sy / 2, hz = nz * sz / 2;
     const center = project(new THREE.Vector3(0, 0, 0));
     const specs = {
-      x: { list: dims.xs, gap: 44, along: (t) => new THREE.Vector3((t - (nx - 1) / 2) * sx, 0, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(0, a * hy, b * hz)) },
-      y: { list: dims.ys, gap: 20, along: (t) => new THREE.Vector3(0, ((ny - 1) / 2 - t) * sy, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, 0, b * hz)) },
-      z: { list: dims.zs, gap: 30, along: (t) => new THREE.Vector3(0, 0, ((nz - 1) / 2 - t) * sz), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, b * hy, 0)) },
+      x: { n: nx, gap: 44, along: (t) => new THREE.Vector3((t - (nx - 1) / 2) * sx, 0, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(0, a * hy, b * hz)) },
+      y: { n: ny, gap: 20, along: (t) => new THREE.Vector3(0, ((ny - 1) / 2 - t) * sy, 0), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, 0, b * hz)) },
+      z: { n: nz, gap: 30, along: (t) => new THREE.Vector3(0, 0, ((nz - 1) / 2 - t) * sz), edges: [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([a, b]) => new THREE.Vector3(a * hx, b * hy, 0)) },
     };
     const W = stage.clientWidth, H = stage.clientHeight;
     const placed = [];
     const overlaps = (r) => placed.some((q) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t);
+    const queue = [];
     for (const k of AX) {
-      const sp = specs[k];
+      const sp = specs[k], bs = dims.win[k].bs;
       let best = null, bestD = -1;
       for (const e of sp.edges) { const p = project(e); const d = Math.hypot(p.x - center.x, p.y - center.y); if (d > bestD) { bestD = d; best = e; } }
       const mid = project(best); const dx = mid.x - center.x, dy = mid.y - center.y, len = Math.hypot(dx, dy) || 1;
       const off = { x: (dx / len) * 16, y: (dy / len) * 16 };
       const p0 = project(sp.along(0).add(best)), p1 = project(sp.along(1).add(best));
       const seg = Math.max(Math.hypot(p1.x - p0.x, p1.y - p0.y), 1e-6), u = { x: (p1.x - p0.x) / seg, y: (p1.y - p0.y) / seg };
-      const step = niceStep(sp.gap / seg);
+      const step = niceStep((sp.gap * (bs > 1 ? 2.2 : 1)) / seg);
       // 拡大して辺が画面の外に出たときは、ラベルを画面の端に寄せて出す(軸に沿った向きに外れたものは出さない)
       const pin = (p) => { const x = Math.min(W - 24, Math.max(24, p.x)), y = Math.min(H - 12, Math.max(12, p.y)); return Math.abs((x - p.x) * u.x + (y - p.y) * u.y) < 8 ? { x, y } : null; };
-      const items = [];
       // 画面に入る範囲だけを、間引きの刻みで見る
-      let lo = 0, hi = sp.list.length - 1;
-      { const a = project(sp.along(0).add(best)), b = project(sp.along(sp.list.length - 1).add(best)); const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const tAt = (x, y) => ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / (L * L) * (sp.list.length - 1);
+      let lo = 0, hi = sp.n - 1;
+      { const a = project(sp.along(0).add(best)), b = project(sp.along(sp.n - 1).add(best)); const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const tAt = (x, y) => ((x - a.x) * (b.x - a.x) + (y - a.y) * (b.y - a.y)) / (L * L) * (sp.n - 1);
         const ts = [[0, 0], [W, 0], [0, H], [W, H]].map(([x, y]) => tAt(x, y));
-        lo = Math.max(0, Math.floor(Math.min(...ts)) - 1); hi = Math.min(sp.list.length - 1, Math.ceil(Math.max(...ts)) + 1); }
+        lo = Math.max(0, Math.floor(Math.min(...ts)) - 1); hi = Math.min(sp.n - 1, Math.ceil(Math.max(...ts)) + 1); }
+      const items = [];
       for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) {
         const p = project(sp.along(t).add(best)); if (p.z > 1) continue;
         const q = pin({ x: p.x + off.x, y: p.y + off.y }); if (!q) continue;
-        items.push({ m: disp(c.axes[k], sp.list[t]), x: q.x, y: q.y });
+        items.push({ m: blockLabel(c, k, t), x: q.x, y: q.y });
         if (items.length > 200) break;
       }
       // 名前
-      const ends = [project(sp.along(-0.9).add(best)), project(sp.along(sp.list.length - 0.1).add(best))];
+      const ends = [project(sp.along(-0.9).add(best)), project(sp.along(sp.n - 0.1).add(best))];
       const tp = ends.sort((a, b) => Math.hypot(b.x - center.x, b.y - center.y) - Math.hypot(a.x - center.x, a.y - center.y))[0];
-      const title = { m: `${k.toUpperCase()} ${c.axes[k].name}${step > 1 ? `(${step}件おき)` : ""}`, x: tp.x + off.x * 1.8, y: tp.y + off.y * 1.8, title: true };
-      for (const it of [title, ...items]) {
+      const unit = bs > 1 ? `1コマ=${bs.toLocaleString()}件` : "";
+      const title = { m: `${k.toUpperCase()} ${c.axes[k].name}${unit || step > 1 ? `(${[unit, step > 1 ? `${step}コマおきに表示` : ""].filter(Boolean).join("・")})` : ""}`, x: tp.x + off.x * 1.8, y: tp.y + off.y * 1.8, title: true };
+      queue.push({ k, off, it: title }, ...items.map((it) => ({ k, off, it })));
+    }
+    // 軸の名前を先に置き、目盛りは空いている所に置く
+    for (const { k, off, it } of queue.sort((p, q) => !!q.it.title - !!p.it.title)) {
         const w = [...it.m].reduce((n, ch) => n + (ch.charCodeAt(0) < 256 ? 6.6 : 11), 0) * (it.title ? 1.1 : 1) + 10, h = 18;
         // 重なるときは、もう1段外側にずらして置く(ずらしても重なれば省く)
         let r = null;
-        for (const s of it.title ? [0, 1] : [0, 1, 2]) {
-          const ix = it.x + off.x * 1.15 * s, iy = it.y + off.y * 1.15 * s;
+        for (const s of [0, 1, 2]) {
+          let ix = it.x + off.x * 1.15 * s, iy = it.y + off.y * 1.15 * s;
+          if (it.title) { ix = Math.min(W - 4 - w / 2, Math.max(4 + w / 2, ix)); iy = Math.min(H - 4 - h / 2, Math.max(4 + h / 2, iy)); } // 軸の名前は画面の内側に寄せてでも出す
           const q = { l: ix - w / 2, r: ix + w / 2, t: iy - h / 2, b: iy + h / 2 };
           if (q.l < 2 || q.t < 2 || q.r > W - 2 || q.b > H - 2 || overlaps(q)) continue;
           r = q; it.x = ix; it.y = iy; break;
@@ -1333,7 +1410,6 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         placed.push(r);
         const el = document.createElement("span"); el.className = `lbl ${k}${it.title ? " title" : ""}`; el.textContent = it.m;
         el.style.left = it.x + "px"; el.style.top = it.y + "px"; labelsEl.appendChild(el);
-      }
     }
   }
 
@@ -1360,7 +1436,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const hit = ray.intersectObjects([inst.full, inst.empty].filter((m) => m && m.count))[0];
     if (!hit) { picked = null; renderPicked(); return; }
     const n = (hit.object === inst.full ? inst.fIdx : inst.eIdx)[hit.instanceId];
-    const Y = dims.ys.length, Z = dims.zs.length, k = n % Z, j = ((n - k) / Z) % Y, i = Math.floor(n / (Y * Z));
+    const Y = dims.ny, Z = dims.nz, k = n % Z, j = ((n - k) / Z) % Y, i = Math.floor(n / (Y * Z));
     picked = { i, j, k, n }; renderPicked();
   });
   function setFaceButtons(f) { document.querySelectorAll("#snap button[data-face]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.face === f)); }
@@ -1386,29 +1462,40 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     if (hl) hl.visible = !!picked;
     if (!c || !picked) { $("cellinfo").innerHTML = `<span class="k">コマをクリックすると中身が出ます。</span>`; return; }
     hl.position.copy(cellPos(picked.i, picked.j, picked.k)); hl.scale.set(dims.sx, dims.sy, dims.sz);
-    const d = { x: dims.xs[picked.i], y: dims.ys[picked.j], z: dims.zs[picked.k], v: inst.val[picked.n] };
-    const lowers = kids(c.id);
-    $("cellinfo").innerHTML = `${AX.map((k) => `<span class="${k}">${esc(c.axes[k].name)}:${esc(disp(c.axes[k], d[k]))}</span>`).join("")}
-      <span>${esc(c.value.name)} <b>${d.v === undefined || d.v === "" ? "(空)" : esc(c.value.type === "text" ? d.v : fmt(Number(d.v)))}</b></span>
-      ${lowers.map((l) => `<button type="button" data-down="${l.id}" data-m="${esc(d[l.via])}">${esc(disp(c.axes[l.via], d[l.via]))}の「${esc(l.name)}」へ</button>`).join("")}`;
+    const ts = { x: picked.i, y: picked.j, z: picked.k }, v = inst.val[picked.n];
+    const grouped = AX.some((k) => dims.win[k].bs > 1);
+    const mem = (k) => (dims.win[k].bs === 1 ? members(c.axes[k])[blockOf(dims.win[k], ts[k]).from] : null);
+    const lowers = kids(c.id).filter((l) => mem(l.via) !== null);
+    const vtext = v === undefined || v === "" ? "(空)" : typeof v === "number" ? fmt(v) : esc(v);
+    $("cellinfo").innerHTML = `${AX.map((k) => `<span class="${k}">${esc(c.axes[k].name)}:${esc(blockLabel(c, k, ts[k]))}${dims.win[k].bs > 1 ? "件目" : ""}</span>`).join("")}
+      <span>${esc(c.value.name)}${grouped ? `(${AGG[c.value.agg]})` : ""} <b>${vtext}</b></span>
+      ${grouped ? `<button type="button" class="primary" data-zoomin>この塊に寄って細かく見る</button>` : ""}
+      ${lowers.map((l) => `<button type="button" data-down="${l.id}" data-m="${esc(mem(l.via))}">${esc(disp(c.axes[l.via], mem(l.via)))}の「${esc(l.name)}」へ</button>`).join("")}`;
   }
-  $("cellinfo").onclick = (e) => { const b = e.target.closest("[data-down]"); if (!b) return; st.at[b.dataset.down] = b.dataset.m; st.selected = b.dataset.down; render(); };
+  $("cellinfo").onclick = (e) => {
+    if (e.target.closest("[data-zoomin]")) { const c = cube(st.selected); if (c && picked) zoomBlock(c, picked); return; }
+    const b = e.target.closest("[data-down]"); if (!b) return; st.at[b.dataset.down] = b.dataset.m; st.selected = b.dataset.down; render();
+  };
 
   function renderFace() {
     const c = cube(st.selected);
-    if (!c || !dims.xs || !dims.xs.length || !dims.ys.length || !dims.zs.length) { faceV = null; $("face").innerHTML = `<p class="empty">${c ? "3つの軸に目盛りを入れると、ここに面の表が出ます。" : "キューブを作ると、ここに立体と表が出ます。"}</p>`; $("face-title").textContent = ""; labelsEl.innerHTML = ""; return; }
+    if (!c || !dims.ready) { faceV = null; $("face").innerHTML = `<p class="empty">${c ? "3つの軸に目盛りを入れると、ここに面の表が出ます。" : "キューブを作ると、ここに立体と表が出ます。"}</p>`; $("face-title").textContent = ""; labelsEl.innerHTML = ""; return; }
     const at = atOf(c);
     const pair = { front: ["y", "x", "z"], top: ["z", "x", "y"], side: ["y", "z", "x"] }[face];
     const [rk, ck, dk] = pair; const R = members(c.axes[rk]), C = members(c.axes[ck]);
     // 面の表は全部の目盛りを出す。コマを1回なめて行×列ごとにまとめる(目盛りが多くても重くならないように)
-    const ok = AX.map((k) => new Set(members(c.axes[k]))); const ri = AX.indexOf(rk) + 1, ci = AX.indexOf(ck) + 1;
+    const ok = c.synth ? [] : AX.map((k) => new Set(members(c.axes[k]))); const ri = AX.indexOf(rk) + 1, ci = AX.indexOf(ck) + 1;
     const bucket = new Map();
-    for (const [key, v] of Object.entries(c.cells)) {
+    if (!c.synth) for (const [key, v] of Object.entries(c.cells)) {
       if (v === undefined || v === "") continue;
       const q = key.split(SEP); if (q[0] !== at || !ok[0].has(q[1]) || !ok[1].has(q[2]) || !ok[2].has(q[3])) continue;
       const bk = q[ri] + SEP + q[ci]; const a = bucket.get(bk); if (a) a.push(v); else bucket.set(bk, [v]);
     }
-    const cellOf = (r, col) => reduceVals(c, bucket.get(r + SEP + col) || []);
+    let cellOf = (r, col) => reduceVals(c, bucket.get(r + SEP + col) || []);
+    if (c.synth) {
+      const VR = synthAxis(c, rk), VC = synthAxis(c, ck), VD = synthAxis(c, dk), nD = VD.v.length, sD = VD.ps[nD], cD = VD.pc[nD];
+      cellOf = (r, col) => { const a = VR.v[VR.idx.get(r)], b = VC.v[VC.idx.get(col)]; if (!a || !b || !cD) return null; const sum = a * b * sD; return { sum, count: cD, avg: sum / cD, max: a * b * VD.mx, min: a * b * VD.mn }[c.value.agg]; };
+    }
     const show = (v) => (v === null ? "" : typeof v === "number" ? fmt(v) : esc(v));
     $("face-title").innerHTML = `${c.parent ? `${esc(cube(c.parent).axes[c.via].name)}「${esc(disp(cube(c.parent).axes[c.via], at))}」の中 / ` : ""}行 <span class="${rk}">${esc(c.axes[rk].name)}</span> × 列 <span class="${ck}">${esc(c.axes[ck].name)}</span>(<span class="${dk}">${esc(c.axes[dk].name)}</span>は${AGG[c.value.agg]})`;
     const rowHtml = (r) => `<tr><th class="h${rk === "x" ? "x" : rk === "y" ? "y" : ""}" style="${rk === "z" ? "color:var(--ax-z)" : ""}">${esc(disp(c.axes[rk], r))}</th>${C.map((col) => { const v = cellOf(r, col); return `<td class="v ${v === null ? "zero" : ""}">${v === null ? "–" : show(v)}</td>`; }).join("")}</tr>`;
@@ -1466,6 +1553,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         <p class="hint">よくある形から始めるときは、左下の「テンプレートから始める」を使ってください。</p>`;
       return;
     }
+    if (c.synth) {
+      $("editor").innerHTML = `<h2>${esc(c.name)}</h2><p class="notice">これは10億コマの見え方を試すための架空のキューブです。値は式で作っていて保存しないので、軸・目盛り・値は変えられません。左の「キューブを見る」で開いてください。</p><button type="button" class="primary" data-view-go="cube">キューブを見る</button>`;
+      $("editor").querySelector("[data-view-go]").onclick = () => { st.view = "cube"; render(); };
+      return;
+    }
     const chain = chainOf(c);
     $("editor").innerHTML = `
       <div class="crumbs">${chain.map((k, i) => i === chain.length - 1 ? `<span>${esc(k.name)}</span>` : `<button type="button" data-go="${k.id}">${esc(k.name)}</button><span>›</span>`).join("")}</div>
@@ -1476,6 +1568,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 
   // ---- ダッシュボード ----
   function cubeStats(c) {
+    if (c.synth) {
+      const V = AX.map((k) => synthAxis(c, k)), tot = (a) => V[a].ps[V[a].v.length], cnt = (a) => V[a].pc[V[a].v.length];
+      const by = new Map(members(c.axes.x).map((m, i) => [m, V[0].v[i] * tot(1) * tot(2)]));
+      return { total: AX.reduce((n, k) => n * members(c.axes[k]).length, 1), filled: cnt(0) * cnt(1) * cnt(2), sum: tot(0) * tot(1) * tot(2), gk: "x", by };
+    }
     const p = cube(c.parent);
     const xs = members(c.axes.x), ys = members(c.axes.y), zs = members(c.axes.z), ats = p ? members(p.axes[c.via]) : [""];
     const ok = { 0: new Set(ats), 1: new Set(xs), 2: new Set(ys), 3: new Set(zs) };
