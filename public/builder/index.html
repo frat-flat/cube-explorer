@@ -144,6 +144,23 @@ h2 { font-family: var(--font-display); font-size: 18px; margin: 0 0 10px; }
 .link-note { font-size: 12px; margin-top: 4px; color: var(--c); }
 .month-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .month-row .check { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+.axis-card .zoff { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.axis-card.off { background: var(--sunk); border-left-style: dashed; }
+.axis-card.off .badge { opacity: .5; }
+.member.calc { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 45%, transparent); color: var(--warn); font-weight: 700; }
+.calcs { margin-top: 8px; padding-top: 6px; border-top: 1px dashed color-mix(in srgb, var(--c) 40%, transparent); }
+.calcs summary { cursor: pointer; font-size: 13px; color: var(--c); display: flex; gap: 8px; align-items: baseline; }
+.calcs code { font-family: var(--font-mono); font-size: 12px; background: var(--surface); padding: 0 4px; border-radius: 4px; }
+.calc-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+.calc-row .cn { font-weight: 700; color: var(--warn); min-width: 5em; font-size: 13px; }
+.calc-row input[data-calc], .calc-row input[data-f=calcexpr] { flex: 1 1 14em; min-width: 0; font-family: var(--font-mono); font-size: 13px; }
+.calc-row input[data-f=calcname] { flex: 0 1 8em; min-width: 0; }
+.calc-err { flex-basis: 100%; font-size: 12px; color: var(--warn); }
+.calc-quick { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.calc-quick button { font-size: 12px; padding: 1px 6px; font-family: var(--font-mono); }
+.sheet td.calc { background: var(--warn-soft); color: var(--warn); text-align: right; font-family: var(--font-mono); padding: 5px 6px; font-weight: 700; }
+.sheet th.calc, .sheet tr.calc th { color: var(--warn); }
+#face td.calc, #face tr.calc td, #face tr.calc th, #face th.calc { background: var(--warn-soft); font-weight: 700; }
 
 /* データ入力 */
 .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
@@ -403,6 +420,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const VTYPE = { money: "金額", number: "数値", text: "文字" };
   const AGG = { sum: "合計", avg: "平均", count: "件数", max: "最大", min: "最小" };
   const SEP = "\u0001";
+  const AXI = { x: 1, y: 2, z: 3 }; // セルのキーの中での位置(0 は上位の目盛り)
+  const usedAx = (c) => AX.filter((k) => !c.axes[k].off);
   const fmt = (n) => (Number.isFinite(n) ? (Math.round(n * 100) / 100).toLocaleString("ja-JP") : "");
 
   // ---- キューブの形 ----
@@ -422,7 +441,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   // toNow が true の年月の軸は、終わりが「開いた日の今月」になる(月が変わると自動で1か月伸びる)
   const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
   const monthTo = (ax) => (ax.toNow ? thisMonth() : ax.to);
-  const members = (ax) => (ax.kind === "month" ? monthsBetween(ax.from, monthTo(ax)) : ax.kind === "seq" ? seqMembers(ax) : ax.members);
+  // Z軸は「使わない」にできる(off)。そのときは目盛りが空文字1つだけの軸として扱い、2軸の表になる
+  const members = (ax) => (ax.off ? [""] : ax.kind === "month" ? monthsBetween(ax.from, monthTo(ax)) : ax.kind === "seq" ? seqMembers(ax) : ax.members);
   // 架空の大きなキューブの値:コマの値 = 店舗の重み × 顧客の重み × 日の重み(顧客の4人に1人は値なし)。
   // 掛け算に分かれるので、どんな塊の合計も各軸の累積和の掛け算で一瞬で出せる(データベースの「段ごとの集計表」の代わり)
   const synthCache = new Map();
@@ -473,6 +493,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       "C-0005": { n1: "P-10140", n3: "やまだ雑貨", n4: "山田 太郎", n5: "個人" },
       "C-0006": { n1: "P-10152", n4: "小林 咲", n5: "個人" },
     });
+    corp.axes.z.members.push("入金額"); corp.axes.z.calc = { 入金額: "SUM()" }; // 計算の目盛りの例:売上 + システム利用料(マイナス)
     corp.axes.x.show = [["base"], ["n2", "n3"], ["n4"]]; // 顧客番号 / 法人名または屋号 / 代表者名(空欄は詰める)
     const shop = newCube("ショップ別の入金", corp.id, "x");
     shop.axes = { x: newAxis("ショップ", ["楽天市場店", "Yahoo!店", "自社サイト"]), y: { name: "年月", kind: "month", members: [], from: "2026-04", to: "2026-09" }, z: newAxis("内訳", ["売上", "システム利用料"]) };
@@ -526,7 +547,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   try { st = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { st = null; }
   const blank = () => ({ cubes: [], selected: null, tab: "axes", view: "dash", at: {} });
   if (!st || !Array.isArray(st.cubes)) st = blank();
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* 保存できなくても動かす */ } };
+  const save = () => { calcVer++; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* 保存できなくても動かす */ } };
   let face = "front", picked = null, importState = null, pendingDelete = null;
 
   const cube = (id) => st.cubes.find((c) => c.id === id);
@@ -552,6 +573,107 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     if (!nums.length) return null;
     return { sum: () => nums.reduce((a, b) => a + b, 0), avg: () => nums.reduce((a, b) => a + b, 0) / nums.length, max: () => Math.max(...nums), min: () => Math.min(...nums) }[c.value.agg]();
   }
+
+  // ---- 計算の目盛り(小計・合計など) ----
+  // ax.calc = { 目盛りの名前: "式" }。計算の目盛りも ax.members に並び、値は入れずに式で出す。
+  // 式は [目盛りの名前] と + - * / ( ) と数字。SUM() は計算でない目盛りすべての合計、SUM([a],[b]) は指定したものの合計。
+  // 全角の記号(＋－×÷（）［］)も読む。eval は使わず、自前で読む
+  const isCalc = (ax, m) => !!ax.calc && ax.kind === "list" && !ax.off && Object.prototype.hasOwnProperty.call(ax.calc, m);
+  const calcOf = (ax) => (ax.calc && ax.kind === "list" && !ax.off ? ax.members.filter((m) => isCalc(ax, m)) : []);
+  const OPS = { "＋": "+", "－": "-", "−": "-", "×": "*", "＊": "*", "÷": "/", "／": "/", "（": "(", "）": ")", "，": ",", "、": "," };
+  function parseFormula(src) {
+    const toks = []; const t = String(src ?? "");
+    for (let i = 0; i < t.length;) {
+      const ch = t[i];
+      if (/\s/.test(ch)) { i++; continue; }
+      if (ch === "[" || ch === "［") { const j = t.slice(i + 1).search(/[\]］]/); if (j < 0) throw new Error("［ に対応する ］ がありません"); toks.push({ r: t.slice(i + 1, i + 1 + j).trim() }); i += j + 2; continue; }
+      const n = t.slice(i).normalize("NFKC").match(/^\d+(\.\d+)?/); if (n) { toks.push({ n: Number(n[0]) }); i += n[0].length; continue; }
+      const w = t.slice(i).match(/^(SUM|ＳＵＭ|合計)\s*[(（]/i); if (w) { toks.push({ f: "sum" }); i += w[0].length; continue; }
+      const op = OPS[ch] || ("+-*/(),".includes(ch) ? ch : null); if (op) { toks.push({ o: op }); i++; continue; }
+      throw new Error(`「${ch}」は式に使えません(目盛りは [ ] で囲みます)`);
+    }
+    let p = 0; const peek = () => toks[p], isO = (o) => toks[p]?.o === o;
+    const expr = () => { let a = term(); while (isO("+") || isO("-")) { const o = toks[p++].o; a = { op: o, a, b: term() }; } return a; };
+    const term = () => { let a = unary(); while (isO("*") || isO("/")) { const o = toks[p++].o; a = { op: o, a, b: unary() }; } return a; };
+    const unary = () => { if (isO("-")) { p++; return { op: "neg", a: unary() }; } if (isO("+")) { p++; return unary(); } return atom(); };
+    const atom = () => {
+      const k = peek(); if (!k) throw new Error("式が途中で終わっています");
+      p++;
+      if (k.n !== undefined) return { n: k.n };
+      if (k.r !== undefined) return { r: k.r };
+      if (k.f) { const args = []; if (!isO(")")) { do { if (isO(",")) p++; args.push(expr()); } while (isO(",")); } if (!isO(")")) throw new Error("SUM( の ) がありません"); p++; return { sum: args.length ? args : null }; }
+      if (k.o === "(") { const a = expr(); if (!isO(")")) throw new Error("( に対応する ) がありません"); p++; return a; }
+      throw new Error("式の形が読めません");
+    };
+    if (!toks.length) throw new Error("式が空です");
+    const ast = expr(); if (p < toks.length) throw new Error("式の形が読めません"); return ast;
+  }
+  const refsOf = (ast, out = []) => { if (!ast) return out; if (ast.r !== undefined) out.push(ast.r); if (ast.sum) ast.sum.forEach((a) => refsOf(a, out)); refsOf(ast.a, out); refsOf(ast.b, out); return out; };
+  // 軸の式をまとめて読む。{ plans: {目盛り: ast}, errors: {目盛り: 文} }
+  function compileCalc(ax) {
+    const plans = {}, errors = {}; const cm = calcOf(ax);
+    for (const m of cm) {
+      try {
+        const ast = parseFormula(ax.calc[m]);
+        const bad = refsOf(ast).filter((r) => !ax.members.includes(r));
+        if (bad.length) throw new Error(`目盛り「${bad[0]}」が軸にありません`);
+        plans[m] = ast;
+      } catch (e) { errors[m] = e.message; }
+    }
+    // 循環(小計が合計を使い、合計が小計を使う など)を見つける
+    const deps = (m) => (plans[m] ? refsOf(plans[m]) : []);
+    for (const m of Object.keys(plans)) {
+      const seen = new Set(), stack = [m];
+      while (stack.length) { const x = stack.pop(); for (const r of deps(x)) { if (r === m) { errors[m] = "式が自分自身を使っています(循環)"; stack.length = 0; break; } if (!seen.has(r) && plans[r]) { seen.add(r); stack.push(r); } } }
+      if (errors[m]) delete plans[m];
+    }
+    return { plans, errors, plain: ax.members.filter((x) => !isCalc(ax, x)) };
+  }
+  // 1つの組(計算の軸以外が同じコマの集まり)で、計算の目盛りの値を出す。参照する値が1つも無ければ空
+  function evalCalcs(cp, G) {
+    const memo = new Map();
+    const val = (m) => { if (!(m in cp.plans)) return G.has(m) ? { v: G.get(m), any: true } : { v: 0, any: false }; if (memo.has(m)) return memo.get(m); memo.set(m, { v: NaN, any: false }); const r = ev(cp.plans[m]); memo.set(m, r); return r; };
+    const ev = (a) => {
+      if (a.n !== undefined) return { v: a.n, any: false };
+      if (a.r !== undefined) return val(a.r);
+      if (a.sum !== undefined) { let v = 0, any = false; for (const x of a.sum ? a.sum.map(ev) : cp.plain.map(val)) { v += x.v; any ||= x.any; } return { v, any }; }
+      if (a.op === "neg") { const x = ev(a.a); return { v: -x.v, any: x.any }; }
+      const x = ev(a.a), y = ev(a.b);
+      return { v: a.op === "+" ? x.v + y.v : a.op === "-" ? x.v - y.v : a.op === "*" ? x.v * y.v : x.v / y.v, any: x.any || y.any };
+    };
+    const out = [];
+    for (const m of Object.keys(cp.plans)) { const r = val(m); if (r.any && Number.isFinite(r.v)) out.push([m, Math.round(r.v * 1e6) / 1e6]); }
+    return out;
+  }
+  // 入っているコマ+計算の目盛りのコマ。編集のたびに calcVer が進み、次に読むとき作り直す
+  let calcVer = 0; const effCache = new WeakMap();
+  function cellsOf(c) {
+    if (c.synth || c.value.type === "text") return c.cells;
+    const ks = AX.filter((k) => calcOf(c.axes[k]).length); if (!ks.length) return c.cells;
+    const hit = effCache.get(c); if (hit && hit.ver === calcVer && hit.src === c.cells) return hit.cells;
+    let cur = {};
+    for (const [key, v] of Object.entries(c.cells)) {
+      if (v === undefined || v === "" || !Number.isFinite(Number(v))) continue;
+      const q = key.split(SEP); if (ks.some((k) => isCalc(c.axes[k], q[AXI[k]]))) continue; // 計算の目盛りの位置に残った古い値は使わない
+      cur[key] = Number(v);
+    }
+    // 軸ごとに順に計算する。先に出した小計も次の軸の材料になる(行の合計 × 列の合計 も出る)
+    for (const k of ks) {
+      const ax = c.axes[k], i = AXI[k], cp = compileCalc(ax); const groups = new Map();
+      for (const [key, v] of Object.entries(cur)) {
+        const q = key.split(SEP); const m = q[i]; q[i] = ""; const g = q.join(SEP);
+        let G = groups.get(g); if (!G) groups.set(g, (G = new Map())); G.set(m, v);
+      }
+      for (const [g, G] of groups) for (const [m, v] of evalCalcs(cp, G)) { const q = g.split(SEP); q[i] = m; cur[q.join(SEP)] = v; }
+    }
+    effCache.set(c, { ver: calcVer, src: c.cells, cells: cur }); return cur;
+  }
+  // 目盛りの名前を変えたら、式の中の [旧名] も直す
+  const renameInCalc = (ax, from, to) => {
+    if (!ax.calc) return;
+    if (from in ax.calc) { ax.calc[to] = ax.calc[from]; delete ax.calc[from]; }
+    for (const m of Object.keys(ax.calc)) ax.calc[m] = ax.calc[m].replace(/[\[［]([^\]］]*)[\]］]/g, (all, r) => (r.trim() === from ? `[${to}]` : all));
+  };
 
   // ---- 木 ----
   function renderTree() {
@@ -659,22 +781,42 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     bulk.text = ""; bulk.msg = `<p class="notice">${added}件を足し、${updated}件を更新しました${skipped ? `(${esc(ax.labels.find((l) => l.id === "base").name)}が空の${skipped}行は飛ばしました)` : ""}。</p>`;
   }
 
+  const calcOpen = new Set(), calcMsg = {}; let lastCalcInput = null;
   function renderAxes(c) {
     const p = cube(c.parent);
     // 目盛りが多い軸は札を全部並べず、先頭だけ見せて残りは開閉式にする(一覧と編集は ② の表で)
-    const chip = (m, i) => `<span class="member">${esc(m)}<button type="button" data-del="${i}" aria-label="${esc(m)}を外す">×</button></span>`;
+    const chip = (m, i, ax) => `<span class="member${isCalc(ax, m) ? " calc" : ""}">${isCalc(ax, m) ? "＝" : ""}${esc(m)}<button type="button" data-del="${i}" aria-label="${esc(m)}を外す">×</button></span>`;
     const membersBox = (ax, k) => {
       const ms = ax.members, HEAD = 12;
       if (!ms.length) return `<div class="members"><span class="hint" style="margin:0">まだ目盛りがありません</span></div>`;
-      if (ms.length <= HEAD) return `<div class="members">${ms.map(chip).join("")}</div>`;
+      if (ms.length <= HEAD) return `<div class="members">${ms.map((m, i) => chip(m, i, ax)).join("")}</div>`;
       // 多いときは件数と先頭だけ。中身は「表で見る」で ② の表へ移って見る
       return `<div class="more-members"><b>${ms.length.toLocaleString()}件</b> <span class="hint" style="margin:0">${ms.slice(0, 5).map(esc).join("、")} …</span> <button type="button" data-mview="${k}">表で見る</button></div>`;
+    };
+    // 計算の目盛り(小計・合計):目盛りの1つとして並び、値は式で出る
+    const calcBox = (ax, k) => {
+      if (c.value.type === "text") return "";
+      const cm = calcOf(ax), cp = compileCalc(ax), plain = cp.plain;
+      const ex = plain.length >= 2 ? `[${plain[0]}] + [${plain[1]}]` : "[売上] + [手数料]";
+      return `<details class="calcs" ${cm.length || calcOpen.has(k) ? "open" : ""} data-calcbox="${k}">
+        <summary>計算の目盛り <span class="hint" style="margin:0">${cm.length ? cm.map((m) => esc(m)).join("・") : "小計・合計など"}</span></summary>
+        <p class="hint" style="margin:0 0 6px">値を入れず、式で出す目盛りです。目盛りは [ ] で囲み、+ − × ÷ と ( ) が使えます。<code>SUM()</code> は計算でない目盛りすべての合計です。例:小計 = <code>${esc(ex)}</code>、合計 = <code>SUM()</code></p>
+        ${cm.map((m) => `<div class="calc-row"><span class="cn">＝ ${esc(m)}</span><input data-calc="${esc(m)}" value="${esc(ax.calc[m])}" aria-label="${esc(m)}の式" spellcheck="false"><button type="button" class="ghost" data-calcdel="${esc(m)}" aria-label="${esc(m)}を外す">×</button>${cp.errors[m] ? `<span class="calc-err">${esc(cp.errors[m])}</span>` : ""}</div>`).join("")}
+        <div class="calc-row add"><input data-f="calcname" placeholder="名前(例:合計)" aria-label="計算の目盛りの名前" size="8"><span>=</span><input data-f="calcexpr" placeholder="${esc(ex)}" aria-label="計算の式" spellcheck="false"><button type="button" data-calcadd>足す</button></div>
+        <div class="calc-quick">${plain.slice(0, 12).map((m) => `<button type="button" class="ghost" data-calcins="${esc(m)}">[${esc(m)}]</button>`).join("")}<button type="button" class="ghost" data-calcins="SUM()">SUM()</button></div>
+        ${calcMsg[k] || ""}
+      </details>`;
     };
     const axisCard = (k) => {
       const ax = c.axes[k];
       const lowers = kids(c.id).filter((d) => d.via === k);
+      const offBox = k === "z" ? `<label class="check zoff"><input type="checkbox" data-f="off" ${ax.off ? "checked" : ""}> Z軸を使わない(縦×横の2軸の表にする)</label>` : "";
+      if (ax.off) return `<div class="axis-card ${k} off" data-ax="${k}">
+        <div class="axis-head"><span class="badge">${k.toUpperCase()}</span><input aria-label="${AXNAME[k]}の名前" data-f="name" value="${esc(ax.name)}" disabled><span class="dir">使わない</span></div>
+        ${offBox}<p class="hint" style="margin:4px 0 0">奥行きのない、X × Y の平たいキューブになります。目盛りと入れた値は残っていて、チェックを外すと戻ります。</p></div>`;
       return `<div class="axis-card ${k}" data-ax="${k}">
         <div class="axis-head"><span class="badge">${k.toUpperCase()}</span><input aria-label="${AXNAME[k]}の名前" data-f="name" value="${esc(ax.name)}"><span class="dir">${AXDIR[k]}</span></div>
+        ${offBox}
         <div class="row"><label>目盛り</label>
           <select data-f="kind" aria-label="目盛りの作り方"><option value="list" ${ax.kind === "list" ? "selected" : ""}>自分で並べる</option><option value="month" ${ax.kind === "month" ? "selected" : ""}>年月の範囲</option></select></div>
         ${ax.kind === "month" ? `<div class="month-row"><input type="month" data-f="from" value="${esc(ax.from)}" aria-label="開始の年月"> 〜 <input type="month" data-f="to" value="${esc(monthTo(ax))}" aria-label="終わりの年月" ${ax.toNow ? "disabled" : ""}><span class="hint" style="margin:0">${members(ax).length}か月</span>
@@ -682,12 +824,13 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         : `${membersBox(ax, k)}
            <div class="add-member"><input data-f="newmember" placeholder="目盛りを足す(、区切りで複数)" aria-label="${AXNAME[k]}の目盛りを足す"><button type="button" data-add>足す</button><button type="button" data-bulk>まとめて貼り付け</button></div>
            ${bulk.ax === k ? bulkPanel(ax) : ""}
+           ${calcBox(ax, k)}
            ${notesSection(ax, k)}`}
         ${lowers.length ? `<p class="link-note">この軸の目盛りごとに下位:${lowers.map((d) => esc(d.name)).join("、")}</p>` : ""}
       </div>`;
     };
     $("pane").innerHTML = `${guide(["軸を決める", "目盛りを登録する", "値を入れる"], 0)}
-      <div class="guide-box"><b>キューブの形を決めます。</b>名前を付け、X(横)・Y(縦)・Z(奥)の軸にそれぞれ名前を付けます(例:X 法人情報、Y お客様、Z 年月)。年月の軸は「年月の範囲」を選ぶと月が自動で並びます。最後にコマに入れる値(例:入金額)を決めたら、② に進みます。</div>
+      <div class="guide-box"><b>キューブの形を決めます。</b>名前を付け、X(横)・Y(縦)・Z(奥)の軸にそれぞれ名前を付けます(例:X 法人情報、Y お客様、Z 年月)。Z軸は使わずに2軸の表にもできます。小計や合計は、軸の「計算の目盛り」に式で作ります。年月の軸は「年月の範囲」を選ぶと月が自動で並びます。最後にコマに入れる値(例:入金額)を決めたら、② に進みます。</div>
       <div class="row"><label for="cube-name">名前</label><input id="cube-name" value="${esc(c.name)}"></div>
       ${p ? `<div class="row"><label for="cube-via">上位から</label><select id="cube-via">${AX.map((k) => `<option value="${k}" ${k === c.via ? "selected" : ""}>「${esc(p.name)}」の${esc(p.axes[k].name)}ごと</option>`).join("")}</select></div>` : ""}
       ${AX.map(axisCard).join("")}
@@ -726,6 +869,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       if (f === "kind") { ax.kind = e.target.value; if (ax.kind === "month" && !ax.from) { ax.from = "2026-04"; ax.to = "2026-09"; } render(); }
       if (f === "from" || f === "to") { ax[f] = e.target.value; render(); }
       if (f === "toNow") { ax.toNow = e.target.checked; if (!ax.toNow) ax.to = thisMonth(); render(); }
+      if (f === "off") { ax.off = e.target.checked; if (ax.off && face !== "front") { face = "front"; [targetX, targetY] = FACES.iso; setFaceButtons("iso"); } render(); }
+      if (e.target.dataset.calc !== undefined) { ax.calc[e.target.dataset.calc] = e.target.value.trim(); calcMsg[card.dataset.ax] = ""; render(); }
     };
     const addFrom = (card) => {
       const ax = c.axes[card.dataset.ax]; const inp = card.querySelector("[data-f=newmember]");
@@ -747,8 +892,28 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         return;
       }
       if (card && e.target.closest("[data-add]")) addFrom(card);
+      const ci = e.target.closest("[data-calcins]");
+      if (card && ci) {
+        // 式の入力欄(最後に触った欄。無ければ新しい式の欄)のカーソル位置に差し込む
+        const inp = (lastCalcInput?.isConnected && card.contains(lastCalcInput) ? lastCalcInput : null) || card.querySelector("[data-f=calcexpr]");
+        const t = ci.dataset.calcins === "SUM()" ? "SUM()" : `[${ci.dataset.calcins}]`; const a = inp.selectionStart ?? inp.value.length, b = inp.selectionEnd ?? a;
+        const pre = inp.value.slice(0, a), add = (pre && !/[\s(（+\-*/＋－×÷]$/.test(pre) ? " + " : "") + t;
+        inp.value = pre + add + inp.value.slice(b); inp.focus(); inp.setSelectionRange(a + add.length, a + add.length);
+        if (inp.dataset.calc !== undefined) inp.dispatchEvent(new Event("change", { bubbles: true }));
+        return;
+      }
+      if (card && e.target.closest("[data-calcadd]")) {
+        const k = card.dataset.ax, ax = c.axes[k];
+        const name = card.querySelector("[data-f=calcname]").value.trim(), expr = card.querySelector("[data-f=calcexpr]").value.trim();
+        if (!name || !expr) { calcMsg[k] = `<p class="notice warn">名前と式の両方を書いてください。</p>`; render(); return; }
+        if (ax.members.includes(name) && !isCalc(ax, name)) { calcMsg[k] = `<p class="notice warn">「${esc(name)}」はふつうの目盛りとして登録済みです。別の名前にしてください。</p>`; render(); return; }
+        ax.calc ??= {}; ax.calc[name] = expr; if (!ax.members.includes(name)) ax.members.push(name);
+        calcOpen.add(k); calcMsg[k] = ""; render(); return;
+      }
+      const cd = e.target.closest("[data-calcdel]");
+      if (card && cd) { const ax = c.axes[card.dataset.ax], m = cd.dataset.calcdel; delete ax.calc[m]; ax.members = ax.members.filter((x) => x !== m); render(); return; }
       const del = e.target.closest("[data-del]");
-      if (card && del) { const ax = c.axes[card.dataset.ax]; const [m] = ax.members.splice(+del.dataset.del, 1); if (ax.alt) delete ax.alt[m]; render(); }
+      if (card && del) { const ax = c.axes[card.dataset.ax]; const [m] = ax.members.splice(+del.dataset.del, 1); if (ax.alt) delete ax.alt[m]; if (ax.calc) delete ax.calc[m]; render(); }
       if (card && e.target.closest("[data-addnote]")) {
         const ax = ensureLabels(c.axes[card.dataset.ax]);
         const id = nid("n"); ax.labels.push({ id, name: `表記${ax.labels.length + 1}` }); render();
@@ -762,7 +927,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         render();
       }
     };
-    pane.onkeydown = (e) => { if (e.key === "Enter" && e.target.dataset.f === "newmember") { e.preventDefault(); addFrom(e.target.closest(".axis-card")); } };
+    pane.onkeydown = (e) => {
+      if (e.key === "Enter" && e.target.dataset.f === "newmember") { e.preventDefault(); addFrom(e.target.closest(".axis-card")); }
+      if (e.key === "Enter" && (e.target.dataset.f === "calcexpr" || e.target.dataset.f === "calcname")) { e.preventDefault(); e.target.closest(".axis-card").querySelector("[data-calcadd]").click(); }
+    };
+    pane.addEventListener("focusin", (e) => { if (e.target.dataset.calc !== undefined || e.target.dataset.f === "calcexpr") lastCalcInput = e.target; });
+    pane.addEventListener("toggle", (e) => { const k = e.target.dataset?.calcbox; if (k) (e.target.open ? calcOpen.add(k) : calcOpen.delete(k)); }, true);
     $("del-cube").onclick = () => {
       const all = []; const walk = (id) => { all.push(cube(id)); kids(id).forEach((k) => walk(k.id)); }; walk(c.id);
       $("del-confirm").innerHTML = `<div class="confirm" style="margin-top:8px">「${esc(c.name)}」${all.length > 1 ? `と下位(${all.slice(1).map((x) => esc(x.name)).join("、")})` : ""}を削除します。入力したデータも消えます。<button type="button" class="danger" id="dc-yes">削除する</button><button type="button" id="dc-no">やめる</button></div>`;
@@ -795,14 +965,14 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   let membersMsg = "", pendingFocus = null, ROW_H = 35, mScroll = { key: "", top: 0 };
   function renameMember(c, k, from, to) {
     const ax = c.axes[k]; const i = ax.members.indexOf(from); if (i < 0 || !to || ax.members.includes(to)) return false;
-    ax.members[i] = to; if (ax.alt?.[from]) { ax.alt[to] = ax.alt[from]; delete ax.alt[from]; }
+    ax.members[i] = to; renameInCalc(ax, from, to); if (ax.alt?.[from]) { ax.alt[to] = ax.alt[from]; delete ax.alt[from]; }
     const pos = { x: 1, y: 2, z: 3 }[k];
     const move = (cb, idx) => { const out = {}; for (const [key, v] of Object.entries(cb.cells)) { const p = key.split(SEP); if (p[idx] === from) p[idx] = to; out[p.join(SEP)] = v; } cb.cells = out; };
     move(c, pos); kids(c.id).filter((d) => d.via === k).forEach((d) => { move(d, 0); if (st.at[d.id] === from) st.at[d.id] = to; });
     return true;
   }
   function renderMembers(c) {
-    const listAxes = AX.filter((k) => c.axes[k].kind === "list");
+    const listAxes = usedAx(c).filter((k) => c.axes[k].kind === "list");
     if (!listAxes.includes(st.mAx)) st.mAx = listAxes.includes("y") ? "y" : listAxes[0];
     const k = st.mAx;
     if (!k) { $("pane").innerHTML = `<p class="notice">どの軸も「年月の範囲」なので、登録する目盛りはありません。③ に進んでください。</p><button type="button" class="primary" data-tab="data">③ 値を入れるへ</button>`; return; }
@@ -825,7 +995,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     $("pane").innerHTML = `
       <div class="guide-box"><b>目盛りを登録します。</b>軸を選び、表に1つずつ書きます(例:お客様を1人ずつ)。顧客番号・法人名のように書き方が複数あるときは「＋ 表記」で足します。Excel の範囲をコピーしてマスに貼り付けることもでき、1行目(横並びなら1列目)が表記の名前なら、それに合わせて入ります。</div>
       <div class="mtools">
-        <div class="axis-pick">${AX.map((a) => `<button type="button" class="${a}" data-max="${a}" aria-pressed="${a === k}" ${c.axes[a].kind === "list" ? "" : "disabled title=\"年月の範囲で決まる軸です\""}>${a.toUpperCase()} ${esc(c.axes[a].name)} <span>${members(c.axes[a]).length}</span></button>`).join("")}</div>
+        <div class="axis-pick">${AX.map((a) => `<button type="button" class="${a}" data-max="${a}" aria-pressed="${a === k}" ${c.axes[a].off ? "disabled title=\"使わない軸です\"" : c.axes[a].kind === "list" ? "" : "disabled title=\"年月の範囲で決まる軸です\""}>${a.toUpperCase()} ${esc(c.axes[a].name)} <span>${members(c.axes[a]).length}</span></button>`).join("")}</div>
         <div class="seg" role="group" aria-label="並べ方"><span>並べ方</span><button type="button" data-dir="v" aria-pressed="${vert}">目盛りを縦に</button><button type="button" data-dir="h" aria-pressed="${!vert}">目盛りを横に</button></div>
       </div>
       <div class="scroll sheet-wrap tall" id="mwrap">${table}</div>
@@ -938,7 +1108,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     });
     tb.onclick = (e) => {
       const d = e.target.closest("[data-mdel]");
-      if (d) { const m = ax.members[+d.dataset.mdel]; ax.members.splice(+d.dataset.mdel, 1); delete ax.alt[m]; membersMsg = `<p class="notice">「${esc(m)}」を消しました(入っていた値は表示されなくなります)。</p>`; render(); return; }
+      if (d) { const m = ax.members[+d.dataset.mdel]; ax.members.splice(+d.dataset.mdel, 1); delete ax.alt[m]; if (ax.calc) delete ax.calc[m]; membersMsg = `<p class="notice">「${esc(m)}」を消しました(入っていた値は表示されなくなります)。</p>`; render(); return; }
       const dc = e.target.closest("[data-mdelcol]");
       if (dc) { const id = dc.dataset.mdelcol; ax.labels = ax.labels.filter((l) => l.id !== id); ax.show = partsOf(ax); for (const m of Object.keys(ax.alt)) delete ax.alt[m][id]; membersMsg = `<p class="notice">表記を消しました。</p>`; render(); return; }
       if (e.target.closest("[data-addcol]")) { const id = nid("n"); ax.labels.push({ id, name: `表記${ax.labels.length + 1}` }); render(); document.querySelector(`[data-lname="${id}"]`)?.select(); }
@@ -953,6 +1123,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   // ---- ③ 値を入れる(行と列に軸を1つずつ選ぶ表。残りの軸はシートで切り替える) ----
   let dataMsg = "", pasteOpen = false, longOpen = false;
   function dataLayout(c) {
+    if (c.axes.z.off) { const r = st.rowAx === "x" ? "x" : "y"; return { r, col: r === "x" ? "y" : "x", s: "z" }; } // 2軸のときは行と列が X・Y
     let r = st.rowAx in c.axes ? st.rowAx : "y", col = st.colAx in c.axes ? st.colAx : "x";
     if (r === col) col = AX.find((k) => k !== r);
     const s = AX.find((k) => k !== r && k !== col);
@@ -961,7 +1132,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const keyOf = (at, o) => [at, o.x, o.y, o.z].join(SEP);
   const crossTsv = (c, at, L, sv) => {
     const R = members(c.axes[L.r]), C = members(c.axes[L.col]);
-    return [[`${c.axes[L.r].name}＼${c.axes[L.col].name}`, ...C].join("\t"), ...R.map((rv) => [rv, ...C.map((cv) => cellText(c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]))].join("\t"))].join("\n");
+    const E = cellsOf(c);
+    return [[`${c.axes[L.r].name}＼${c.axes[L.col].name}`, ...C].join("\t"), ...R.map((rv) => [rv, ...C.map((cv) => cellText(E[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]))].join("\t"))].join("\n");
   };
   function pasteCross(c, at, L, sv, text) {
     const rows = text.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim() !== "").map((l) => l.split("\t"));
@@ -971,8 +1143,9 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const cols = rows[0].map((h, i) => (i === 0 ? null : resolve(c.axes[L.col], h)));
     for (const r of rows.slice(1)) {
       const rv = resolve(c.axes[L.r], r[0]); if (!rv) continue;
+      if (isCalc(c.axes[L.r], rv)) continue; // 計算の目盛りには入れない
       cols.forEach((cv, i) => {
-        if (!cv || r[i] === undefined) return;
+        if (!cv || r[i] === undefined || isCalc(c.axes[L.col], cv) || isCalc(c.axes[L.s], sv)) return;
         const v = toValue(c, r[i]); if (v === undefined) return; if (v === null) { bad++; return; }
         c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })] = v; filled++;
       });
@@ -985,9 +1158,10 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   function renderData(c) {
     const L = dataLayout(c); const R = members(c.axes[L.r]), C = members(c.axes[L.col]), S = members(c.axes[L.s]);
     const head = guide(["軸を決める", "目盛りを登録する", "値を入れる"], 2);
-    const axSel = (id, cur) => `<select id="${id}">${AX.map((k) => `<option value="${k}" ${k === cur ? "selected" : ""}>${k.toUpperCase()} ${esc(c.axes[k].name)}</option>`).join("")}</select>`;
+    const axSel = (id, cur) => `<select id="${id}">${usedAx(c).map((k) => `<option value="${k}" ${k === cur ? "selected" : ""}>${k.toUpperCase()} ${esc(c.axes[k].name)}</option>`).join("")}</select>`;
     const empty = [L.r, L.col, L.s].filter((k) => !members(c.axes[k]).length);
-    const layout = `<div class="guide-box"><b>値を入れます。</b>表の縦(行)と横(列)にする軸を選ぶと、その2軸の表になります。残りの軸「${esc(c.axes[L.s].name)}」は、表の上のシートで切り替えます。マスに直接書くか、Excel の範囲をマスに貼り付けてください。</div>
+    const flat = !!c.axes.z.off;
+    const layout = `<div class="guide-box"><b>値を入れます。</b>${flat ? "縦(行)と横(列)にする軸を選びます(Z軸は使わない設定なので、X × Y の1枚の表です)。" : `表の縦(行)と横(列)にする軸を選ぶと、その2軸の表になります。残りの軸「${esc(c.axes[L.s].name)}」は、表の上のシートで切り替えます。`}マスに直接書くか、Excel の範囲をマスに貼り付けてください。色の付いた「＝」の行・列は計算の目盛りで、式から出るので入力できません。</div>
       <div class="tools"><label>縦(行)の軸${axSel("row-ax", L.r)}</label><label>横(列)の軸${axSel("col-ax", L.col)}</label>${atSelect(c, "at-sel")}</div>`;
     if (empty.length) {
       $("pane").innerHTML = `${head}${layout}<p class="notice warn">${empty.map((k) => `${k.toUpperCase()}「${esc(c.axes[k].name)}」`).join("・")}にまだ目盛りがありません。② で登録してください。</p>
@@ -997,8 +1171,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     if (!S.includes(st.dataS)) st.dataS = S[0];
     const sv = st.dataS; const at = atOf(c); const num = c.value.type !== "text";
     $("pane").innerHTML = `${head}${layout}
-      <div class="sheet-tabs" role="tablist" aria-label="${esc(c.axes[L.s].name)}のシート"><span class="${L.s}">${L.s.toUpperCase()} ${esc(c.axes[L.s].name)}:</span>${S.map((m) => `<button type="button" class="${L.s}" data-sv="${esc(m)}" aria-selected="${m === sv}">${esc(disp(c.axes[L.s], m))}</button>`).join("")}</div>
-      <div class="scroll sheet-wrap tall" id="gwrap"><table class="sheet"><thead><tr><th class="corner"><span class="h${L.r}">${esc(c.axes[L.r].name)}</span> ＼ <span class="h${L.col}">${esc(c.axes[L.col].name)}</span></th>${C.map((cv) => `<th class="h${L.col}">${esc(disp(c.axes[L.col], cv))}</th>`).join("")}</tr></thead>
+      <div class="sheet-tabs" role="tablist" aria-label="${esc(c.axes[L.s].name)}のシート" ${flat ? "hidden" : ""}><span class="${L.s}">${L.s.toUpperCase()} ${esc(c.axes[L.s].name)}:</span>${S.map((m) => `<button type="button" class="${L.s}" data-sv="${esc(m)}" aria-selected="${m === sv}">${esc(disp(c.axes[L.s], m))}</button>`).join("")}</div>
+      <div class="scroll sheet-wrap tall" id="gwrap"><table class="sheet"><thead><tr><th class="corner"><span class="h${L.r}">${esc(c.axes[L.r].name)}</span> ＼ <span class="h${L.col}">${esc(c.axes[L.col].name)}</span></th>${C.map((cv) => `<th class="h${L.col}${isCalc(c.axes[L.col], cv) ? " calc" : ""}">${isCalc(c.axes[L.col], cv) ? "＝" : ""}${esc(disp(c.axes[L.col], cv))}</th>`).join("")}</tr></thead>
       <tbody id="grid"></tbody></table></div>
       <div class="tools" style="margin-top:8px">
         <button type="button" id="face-copy">この表を Excel 用にコピー</button>
@@ -1012,7 +1186,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     dataMsg = "";
     bindLayout(c);
     if (longOpen) renderImport(c, $("long"));
-    $("pane").querySelector("details.long").addEventListener("toggle", (e) => { longOpen = e.target.open; if (longOpen) renderImport(c, $("long")); });
+    $("pane").querySelector("details.long").addEventListener("toggle", (e) => { const was = longOpen; longOpen = e.target.open; if (longOpen && !was) renderImport(c, $("long")); }); // 開いたまま描き直したときの toggle では作り直さない(結果の表示が消えるため)
     $("pane").querySelector(".sheet-tabs").onclick = (e) => { const b = e.target.closest("[data-sv]"); if (b) { st.dataS = b.dataset.sv; render(); } };
     $("face-copy").onclick = async () => {
       const t = crossTsv(c, at, L, sv);
@@ -1023,7 +1197,9 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     if ($("face-paste-go")) $("face-paste-go").onclick = () => { dataMsg = pasteCross(c, at, L, sv, $("face-paste").value); pasteOpen = false; render(); };
     const grid = $("grid"), gwrap = $("gwrap");
     // 見えている行だけ描く(1万行でも軽く)。描き直しても、入力中のマスは選んだままにする
-    const rowHtml = (rv) => `<tr><th class="h${L.r}">${esc(disp(c.axes[L.r], rv))}</th>${C.map((cv) => { const v = c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]; return `<td><input ${num ? 'inputmode="decimal" class="num"' : ""} data-rv="${esc(rv)}" data-cv="${esc(cv)}" value="${esc(v ?? "")}" aria-label="${esc(rv)}・${esc(cv)}"></td>`; }).join("")}</tr>`;
+    const calcAt = (rv, cv) => isCalc(c.axes[L.r], rv) || isCalc(c.axes[L.col], cv) || isCalc(c.axes[L.s], sv);
+    const calcTd = (rv, cv) => { const v = cellsOf(c)[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]; return `<td class="calc" data-crv="${esc(rv)}" data-ccv="${esc(cv)}">${v === undefined ? "" : num ? fmt(v) : esc(v)}</td>`; };
+    const rowHtml = (rv) => `<tr${isCalc(c.axes[L.r], rv) ? ' class="calc"' : ""}><th class="h${L.r}">${isCalc(c.axes[L.r], rv) ? "＝" : ""}${esc(disp(c.axes[L.r], rv))}</th>${C.map((cv) => { if (calcAt(rv, cv)) return calcTd(rv, cv); const v = c.cells[keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv })]; return `<td><input ${num ? 'inputmode="decimal" class="num"' : ""} data-rv="${esc(rv)}" data-cv="${esc(cv)}" value="${esc(v ?? "")}" aria-label="${esc(rv)}・${esc(cv)}"></td>`; }).join("")}</tr>`;
     const gv = { from: -1, to: -1 };
     const cellSel = (rv, cv) => `input[data-rv="${CSS.escape(rv)}"][data-cv="${CSS.escape(cv)}"]`;
     const drawGrid = (force) => {
@@ -1039,6 +1215,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       if (first && first.offsetHeight > 0 && Math.abs(first.offsetHeight - GRID_H) > 1) { GRID_H = first.offsetHeight; drawGrid(true); return; }
       if (keep) grid.querySelector(cellSel(keep.rv, keep.cv))?.focus({ preventScroll: true });
     };
+    // 値を変えたら、見えている計算のマスだけ書き直す(入力中のマスはそのまま)
+    const refreshCalc = () => { const E = cellsOf(c); grid.querySelectorAll("td.calc").forEach((td) => { const v = E[keyOf(at, { [L.r]: td.dataset.crv, [L.col]: td.dataset.ccv, [L.s]: sv })]; td.textContent = v === undefined ? "" : num ? fmt(v) : v; }); };
     gwrap.addEventListener("scroll", () => requestAnimationFrame(() => drawGrid(false)));
     drawGrid(true);
     grid.onchange = (e) => {
@@ -1046,7 +1224,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       const k = keyOf(at, { [L.r]: i.dataset.rv, [L.col]: i.dataset.cv, [L.s]: sv }); const v = toValue(c, i.value);
       if (v !== null && (c.cells[k] ?? "") === (v ?? "")) return;
       if (v === undefined) delete c.cells[k]; else if (v === null) { i.value = ""; delete c.cells[k]; } else c.cells[k] = v;
-      save(); renderPreview();
+      save(); renderPreview(); refreshCalc();
     };
     grid.onkeydown = (e) => {
       if (e.key !== "Enter") return; e.preventDefault(); const i = e.target;
@@ -1063,7 +1241,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       const rows = t.replace(/\r?\n$/, "").split(/\r?\n/).map((l) => l.split("\t"));
       const r0 = R.indexOf(inp.dataset.rv), c0 = C.indexOf(inp.dataset.cv); let filled = 0, bad = 0;
       rows.forEach((r, i) => r.forEach((raw, j) => {
-        const rv = R[r0 + i], cv = C[c0 + j]; if (!rv || !cv) return;
+        const rv = R[r0 + i], cv = C[c0 + j]; if (rv === undefined || cv === undefined || calcAt(rv, cv)) return;
         const v = toValue(c, raw); const k = keyOf(at, { [L.r]: rv, [L.col]: cv, [L.s]: sv });
         if (v === undefined) delete c.cells[k]; else if (v === null) bad++; else { c.cells[k] = v; filled++; }
       }));
@@ -1084,12 +1262,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const p = cube(c.parent);
     const axT = (key, ax, label) => (hasNotes(ax) ? ax.labels.map((l) => [l.id === "base" ? key : `${key}:${l.id}`, `${label}(${l.name})`]) : [[key, label]]);
     return [["", "使わない"], ...(p ? axT("at", p.axes[c.via], `上位:${p.axes[c.via].name}`) : []),
-      ...AX.flatMap((k) => axT(k, c.axes[k], `${k.toUpperCase()}:${c.axes[k].name}`)), ["v", `値:${c.value.name}`]];
+      ...usedAx(c).flatMap((k) => axT(k, c.axes[k], `${k.toUpperCase()}:${c.axes[k].name}`)), ["v", `値:${c.value.name}`]];
   };
   // 見出しの文字から列の割り当てを推し量る(軸の名前・表記の名前・値の名前)
   const guessCol = (c, h) => {
     const p = cube(c.parent); const n = (s) => String(s ?? "").replace(/\s/g, ""); if (!n(h)) return "";
-    for (const key of [...(p ? ["at"] : []), ...AX]) {
+    for (const key of [...(p ? ["at"] : []), ...usedAx(c)]) {
       const ax = key === "at" ? p.axes[c.via] : c.axes[key];
       if (n(h) === n(ax.name)) return key;
       if (hasNotes(ax)) { const l = ax.labels.find((l) => n(l.name) === n(h)); if (l) return l.id === "base" ? key : `${key}:${l.id}`; }
@@ -1099,13 +1277,14 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const blankRows = (n, w) => Array.from({ length: n }, () => Array(w).fill(""));
   function newSheet(c, all) {
     const p = cube(c.parent);
-    const cols = [...(p ? ["at"] : []), "x", "y", "z", "v"];
+    const zon = !c.axes.z.off;
+    const cols = [...(p ? ["at"] : []), "x", "y", ...(zon ? ["z"] : []), "v"];
     const rows = [];
     for (const at of p ? members(p.axes[c.via]) : [""]) for (const z of members(c.axes.z)) for (const y of members(c.axes.y)) for (const x of members(c.axes.x)) {
       const v = c.cells[[at, x, y, z].join(SEP)];
       if (!all && (v === undefined || v === "")) continue;
       if (rows.length >= 2000) break;
-      rows.push([...(p ? [at] : []), x, y, z, cellText(v)]);
+      rows.push([...(p ? [at] : []), x, y, ...(zon ? [z] : []), cellText(v)]);
     }
     return { cube: c.id, cols, rows: [...rows, ...blankRows(rows.length ? 5 : 10, cols.length)], msg: "", capped: rows.length >= 2000 };
   }
@@ -1126,9 +1305,9 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   }
   function sheetApply(c) {
     const p = cube(c.parent);
-    const need = ["x", "y", "z", "v", ...(p ? ["at"] : [])].filter((k) => !sheet.cols.some((m) => m === k || m.startsWith(k + ":")));
+    const need = [...usedAx(c), "v", ...(p ? ["at"] : [])].filter((k) => !sheet.cols.some((m) => m === k || m.startsWith(k + ":")));
     if (need.length) { const t = sheetTargets(c); return `<p class="notice warn">見出しで選ばれていないものがあります:${need.map((k) => esc(t.find((x) => x[0] === k)[1])).join("、")}</p>`; }
-    let n = 0, added = 0, bad = 0; const missed = new Set();
+    let n = 0, added = 0, bad = 0, calcSkip = 0; const missed = new Set();
     const resolve = (r, key, ax) => {
       const i = sheet.cols.findIndex((m) => m === key || m.startsWith(key + ":"));
       const val = (r[i] ?? "").trim(); if (!val) return null;
@@ -1139,8 +1318,9 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     for (const r of sheet.rows) {
       if (r.every((x) => !String(x).trim())) continue;
       const at = p ? resolve(r, "at", p.axes[c.via]) : "";
-      const xyz = { x: resolve(r, "x", c.axes.x), y: resolve(r, "y", c.axes.y), z: resolve(r, "z", c.axes.z) };
-      if (at === null || !xyz.x || !xyz.y || !xyz.z) continue;
+      const xyz = { x: resolve(r, "x", c.axes.x), y: resolve(r, "y", c.axes.y), z: c.axes.z.off ? "" : resolve(r, "z", c.axes.z) };
+      if (at === null || !xyz.x || !xyz.y || xyz.z === null) continue;
+      if (AX.some((k) => isCalc(c.axes[k], xyz[k]))) { calcSkip++; continue; }
       const v = toValue(c, r[sheet.cols.indexOf("v")] ?? "");
       const k = [at, xyz.x, xyz.y, xyz.z].join(SEP);
       if (v === undefined) continue; if (v === null) { bad++; continue; }
@@ -1148,6 +1328,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     }
     return `<p class="notice">${n}コマを入れました${added ? `(新しい目盛り ${added}個を軸に足しました)` : ""}。</p>`
       + (bad ? `<p class="notice warn">数字として読めない値が${bad}個あり、入れませんでした。</p>` : "")
+      + (calcSkip ? `<p class="notice warn">計算の目盛りの行が${calcSkip}行あり、式で出すので入れませんでした。</p>` : "")
       + (missed.size ? `<p class="notice warn">見つからない目盛りの行は入れませんでした:${[...missed].slice(0, 5).map(esc).join("、")}${missed.size > 5 ? ` ほか${missed.size - 5}件` : ""}(年月の範囲外か、表記の値が未登録です)</p>` : "");
   }
   const colClass = (k) => (k.startsWith("x") ? "hx" : k.startsWith("y") ? "hy" : k.startsWith("z") ? "hz" : k === "v" ? "hv" : "");
@@ -1242,10 +1423,13 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       return out;
     }
     const at = atOf(c), ix = AX.map((k) => new Map(members(c.axes[k]).map((m, i) => [m, i])));
+    // 塊が複数の目盛りをまとめる軸では、計算の目盛り(小計・合計)を足さない(二重に数えないため)
+    const skipCalc = AX.map((k) => (win[k].bs > 1 && calcOf(c.axes[k]).length ? c.axes[k] : null));
     const sum = new Float64Array(N), cnt = new Int32Array(N), mx = new Float64Array(N).fill(-Infinity), mn = new Float64Array(N).fill(Infinity), first = text ? new Array(N) : null;
-    for (const [key, v] of Object.entries(c.cells)) {
+    for (const [key, v] of Object.entries(cellsOf(c))) {
       if (v === undefined || v === "") continue;
       const q = key.split(SEP); if (q[0] !== at) continue;
+      if (skipCalc[0] && isCalc(skipCalc[0], q[1]) || skipCalc[1] && isCalc(skipCalc[1], q[2]) || skipCalc[2] && isCalc(skipCalc[2], q[3])) continue;
       const p = AX.map((k, a) => { const i = ix[a].get(q[a + 1]); const w = win[k]; return i === undefined || i < w.off || i >= w.off + w.span ? -1 : Math.floor((i - w.off) / w.bs); });
       if (p[0] < 0 || p[1] < 0 || p[2] < 0) continue;
       const n = (p[0] * W1.cnt + p[1]) * W2.cnt + p[2];
@@ -1272,9 +1456,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     if (N) {
       const val = blockValues(c, win), Y = ny, Z = nz;
       const num = (v) => (typeof v === "number" ? Math.abs(v) : 1);
+      // 計算の目盛りのコマ(小計・合計)は別の色にし、色の濃さの基準(いちばん大きい値)からも外す
+      const cm = AX.map((k) => (win[k].bs === 1 && calcOf(c.axes[k]).length ? members(c.axes[k]).map((m) => isCalc(c.axes[k], m)) : null));
+      const isCalcN = (n) => { const k = n % Z, j = ((n - k) / Z) % Y, i = Math.floor(n / (Y * Z)); return !!(cm[0]?.[win.x.off + i] || cm[1]?.[win.y.off + j] || cm[2]?.[win.z.off + k]); };
       let nFill = 0, max = 1;
-      for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; max = Math.max(max, num(val[n])); }
-      const lo = new THREE.Color(css("--accent-soft") || "#d9eeef"), hi = new THREE.Color(css("--accent") || "#0e6a70"), col = new THREE.Color();
+      for (let n = 0; n < N; n++) if (val[n] !== undefined) { nFill++; if (!isCalcN(n)) max = Math.max(max, num(val[n])); }
+      const lo = new THREE.Color(css("--accent-soft") || "#d9eeef"), hi = new THREE.Color(css("--accent") || "#0e6a70"), col = new THREE.Color(), calcCol = new THREE.Color(css("--warn") || "#9a4b0c");
       const full = new THREE.InstancedMesh(unitBox, new THREE.MeshLambertMaterial({ transparent: true, opacity: 0.92 }), Math.max(nFill, 1));
       const empty = new THREE.InstancedMesh(unitBox, new THREE.MeshLambertMaterial({ color: new THREE.Color(css("--line") || "#d5dde0"), transparent: true, opacity: 0.28, depthWrite: false }), Math.max(N - nFill, 1));
       full.count = nFill; empty.count = N - nFill;
@@ -1284,7 +1471,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       for (let n = 0; n < N; n++) {
         const k = n % Z, j = ((n - k) / Z) % Y, i = Math.floor(n / (Y * Z));
         m4.compose(cellPos(i, j, k), rot, scl);
-        if (val[n] !== undefined) { full.setMatrixAt(a, m4); full.setColorAt(a, col.copy(lo).lerp(hi, 0.25 + 0.75 * (num(val[n]) / max))); fIdx[a++] = n; }
+        if (val[n] !== undefined) { full.setMatrixAt(a, m4); full.setColorAt(a, isCalcN(n) ? calcCol : col.copy(lo).lerp(hi, 0.25 + 0.75 * Math.min(1, num(val[n]) / max))); fIdx[a++] = n; }
         else { empty.setMatrixAt(b, m4); eIdx[b++] = n; }
       }
       full.instanceMatrix.needsUpdate = true; if (full.instanceColor) full.instanceColor.needsUpdate = true; empty.instanceMatrix.needsUpdate = true;
@@ -1298,6 +1485,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     group.add(box); meshes.push(box);
     baseDist = Math.hypot(nx * dims.sx, ny * dims.sy, nz * dims.sz) * 1.75 + 4; // 対角線で決めて、ラベルの余白を残す
     if (lastCube !== c.id) { lastCube = c.id; dist = baseDist; panX = panY = 0; }
+    // Z軸を使わないときは、上面・側面は意味がないので押せなくする
+    document.querySelectorAll('#snap button[data-face="top"], #snap button[data-face="side"]').forEach((b) => { b.disabled = !!c.axes.z.off; b.title = c.axes.z.off ? "Z軸を使わない設定です" : ""; });
     renderPicked(); renderFace(); renderNotesBar(); renderWinBar(c, win);
   }
 
@@ -1325,13 +1514,13 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     return w;
   }
   function renderWinBar(c, win) {
-    const bar = $("win-bar"); const big = AX.some((k) => win[k].tot > 30);
+    const bar = $("win-bar"); const UA = usedAx(c); const big = UA.some((k) => win[k].tot > 30);
     bar.hidden = !big;
     if (!big) { bar.innerHTML = ""; return; }
     const lim = st.win[c.id].lim || "all"; const narrowed = AX.some((k) => win[k].span < win[k].tot);
     const total = AX.reduce((n, k) => n * win[k].tot, 1);
     bar.innerHTML = `<div class="wl"><span>一度に映す数</span><select id="win-lim">${LIMITS.map(([v, t]) => `<option value="${v}" ${v === lim ? "selected" : ""}>${t}</option>`).join("")}</select>`
-      + `<span class="hint" style="margin:0">${AX.map((k) => `<span class="${k}">${k.toUpperCase()}</span> ${win[k].tot.toLocaleString()}件`).join(" × ")} = ${total.toLocaleString()}コマ</span>`
+      + `<span class="hint" style="margin:0">${UA.map((k) => `<span class="${k}">${k.toUpperCase()}</span> ${win[k].tot.toLocaleString()}件`).join(" × ")} = ${total.toLocaleString()}コマ</span>`
       + (narrowed ? `<button type="button" id="win-all">全体に戻る</button>` : "") + `</div>`
       + AX.filter((k) => win[k].span < win[k].tot || win[k].bs > 1).map((k) => { const w = win[k]; return `<div class="w"><span><span class="${k}">${k.toUpperCase()} ${esc(c.axes[k].name)}</span> ${(w.off + 1).toLocaleString()}〜${(w.off + w.span).toLocaleString()}件目 / 全${w.tot.toLocaleString()}件${w.bs > 1 ? `<b> ・1コマ=${w.bs.toLocaleString()}件分</b>` : ""}</span>`
       + (w.span < w.tot ? `<button type="button" data-win="${k}" data-d="-1" aria-label="前へ" ${w.off ? "" : "disabled"}>◀</button>`
@@ -1379,7 +1568,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const placed = [];
     const overlaps = (r) => placed.some((q) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t);
     const queue = [];
-    for (const k of AX) {
+    for (const k of usedAx(c)) {
       const sp = specs[k], bs = dims.win[k].bs;
       let best = null, bestD = -1;
       for (const e of sp.edges) { const p = project(e); const d = Math.hypot(p.x - center.x, p.y - center.y); if (d > bestD) { bestD = d; best = e; } }
@@ -1400,7 +1589,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) {
         const p = project(sp.along(t).add(best)); if (p.z > 1) continue;
         const q = pin({ x: p.x + off.x, y: p.y + off.y }); if (!q) continue;
-        items.push({ m: blockLabel(c, k, t), x: q.x, y: q.y });
+        items.push({ m: (bs === 1 && isCalc(c.axes[k], members(c.axes[k])[dims.win[k].off + t]) ? "＝" : "") + blockLabel(c, k, t), x: q.x, y: q.y });
         if (items.length > 200) break;
       }
       // 名前
@@ -1483,8 +1672,9 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const mem = (k) => (dims.win[k].bs === 1 ? members(c.axes[k])[blockOf(dims.win[k], ts[k]).from] : null);
     const lowers = kids(c.id).filter((l) => mem(l.via) !== null);
     const vtext = v === undefined || v === "" ? "(空)" : typeof v === "number" ? fmt(v) : esc(v);
-    $("cellinfo").innerHTML = `${AX.map((k) => `<span class="${k}">${esc(c.axes[k].name)}:${esc(blockLabel(c, k, ts[k]))}${dims.win[k].bs > 1 ? "件目" : ""}</span>`).join("")}
-      <span>${esc(c.value.name)}${grouped ? `(${AGG[c.value.agg]})` : ""} <b>${vtext}</b></span>
+    const isc = AX.some((k) => mem(k) !== null && isCalc(c.axes[k], mem(k)));
+    $("cellinfo").innerHTML = `${usedAx(c).map((k) => `<span class="${k}">${esc(c.axes[k].name)}:${esc(blockLabel(c, k, ts[k]))}${dims.win[k].bs > 1 ? "件目" : ""}</span>`).join("")}
+      <span>${esc(c.value.name)}${grouped ? `(${AGG[c.value.agg]})` : ""} <b>${vtext}</b>${isc ? `<span class="hint" style="margin:0"> 計算の目盛り(式で出した値)</span>` : ""}</span>
       ${grouped ? `<button type="button" class="primary" data-zoomin>この塊に寄って細かく見る</button>` : ""}
       ${lowers.map((l) => `<button type="button" data-down="${l.id}" data-m="${esc(mem(l.via))}">${esc(disp(c.axes[l.via], mem(l.via)))}の「${esc(l.name)}」へ</button>`).join("")}`;
   }
@@ -1502,9 +1692,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     // 面の表は全部の目盛りを出す。コマを1回なめて行×列ごとにまとめる(目盛りが多くても重くならないように)
     const ok = c.synth ? [] : AX.map((k) => new Set(members(c.axes[k]))); const ri = AX.indexOf(rk) + 1, ci = AX.indexOf(ck) + 1;
     const bucket = new Map();
-    if (!c.synth) for (const [key, v] of Object.entries(c.cells)) {
+    const dAx = c.axes[dk], di = AXI[dk]; // 奥の軸の小計・合計は、まとめるときに足さない(二重に数えないため)
+    if (!c.synth) for (const [key, v] of Object.entries(cellsOf(c))) {
       if (v === undefined || v === "") continue;
       const q = key.split(SEP); if (q[0] !== at || !ok[0].has(q[1]) || !ok[1].has(q[2]) || !ok[2].has(q[3])) continue;
+      if (isCalc(dAx, q[di])) continue;
       const bk = q[ri] + SEP + q[ci]; const a = bucket.get(bk); if (a) a.push(v); else bucket.set(bk, [v]);
     }
     let cellOf = (r, col) => reduceVals(c, bucket.get(r + SEP + col) || []);
@@ -1513,10 +1705,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       cellOf = (r, col) => { const a = VR.v[VR.idx.get(r)], b = VC.v[VC.idx.get(col)]; if (!a || !b || !cD) return null; const sum = a * b * sD; return { sum, count: cD, avg: sum / cD, max: a * b * VD.mx, min: a * b * VD.mn }[c.value.agg]; };
     }
     const show = (v) => (v === null ? "" : typeof v === "number" ? fmt(v) : esc(v));
-    $("face-title").innerHTML = `${c.parent ? `${esc(cube(c.parent).axes[c.via].name)}「${esc(disp(cube(c.parent).axes[c.via], at))}」の中 / ` : ""}行 <span class="${rk}">${esc(c.axes[rk].name)}</span> × 列 <span class="${ck}">${esc(c.axes[ck].name)}</span>(<span class="${dk}">${esc(c.axes[dk].name)}</span>は${AGG[c.value.agg]})`;
-    const rowHtml = (r) => `<tr><th class="h${rk === "x" ? "x" : rk === "y" ? "y" : ""}" style="${rk === "z" ? "color:var(--ax-z)" : ""}">${esc(disp(c.axes[rk], r))}</th>${C.map((col) => { const v = cellOf(r, col); return `<td class="v ${v === null ? "zero" : ""}">${v === null ? "–" : show(v)}</td>`; }).join("")}</tr>`;
+    $("face-title").innerHTML = `${c.parent ? `${esc(cube(c.parent).axes[c.via].name)}「${esc(disp(cube(c.parent).axes[c.via], at))}」の中 / ` : ""}行 <span class="${rk}">${esc(c.axes[rk].name)}</span> × 列 <span class="${ck}">${esc(c.axes[ck].name)}</span>${dAx.off ? "" : `(<span class="${dk}">${esc(c.axes[dk].name)}</span>は${AGG[c.value.agg]})`}`;
+    const cc = C.map((col) => isCalc(c.axes[ck], col));
+    const rowHtml = (r) => `<tr${isCalc(c.axes[rk], r) ? ' class="calc"' : ""}><th class="h${rk === "x" ? "x" : rk === "y" ? "y" : ""}" style="${rk === "z" ? "color:var(--ax-z)" : ""}">${isCalc(c.axes[rk], r) ? "＝" : ""}${esc(disp(c.axes[rk], r))}</th>${C.map((col, ci) => { const v = cellOf(r, col); return `<td class="v ${v === null ? "zero" : ""}${cc[ci] ? " calc" : ""}">${v === null ? "–" : show(v)}</td>`; }).join("")}</tr>`;
     faceV = { R, rowHtml, cols: C.length + 1, from: -1, to: -1 };
-    $("face").innerHTML = `<table><thead><tr><th></th>${C.map((col) => `<th style="color:var(--ax-${ck});text-align:right">${esc(disp(c.axes[ck], col))}</th>`).join("")}</tr></thead><tbody id="fbody"></tbody></table>`;
+    $("face").innerHTML = `<table><thead><tr><th></th>${C.map((col, ci) => `<th class="${cc[ci] ? "calc" : ""}" style="color:var(--ax-${ck});text-align:right">${cc[ci] ? "＝" : ""}${esc(disp(c.axes[ck], col))}</th>`).join("")}</tr></thead><tbody id="fbody"></tbody></table>`;
     drawFace(true);
   }
   // 面の表も、見えている行だけ描く(1万行でも軽く)
@@ -1547,6 +1740,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const EDIT = { axes: 1, members: 1, data: 1 };
   const VIEW_NAME = { dash: "ダッシュボード", cube: "キューブを見る", axes: "軸を決める", members: "目盛りを登録", data: "値を入れる" };
   function render() {
+    calcVer++;
     renderTree();
     const v = VIEW_NAME[st.view] ? st.view : "dash"; st.view = v;
     if (v !== "dash" && !cube(st.selected) && st.cubes.length) st.selected = st.cubes[0].id;
@@ -1603,7 +1797,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   }
   function renderDash() {
     const all = st.cubes; const stats = new Map(all.map((c) => [c.id, cubeStats(c)]));
-    const memberCount = all.reduce((n, c) => n + AX.reduce((m, k) => m + members(c.axes[k]).length, 0), 0);
+    const memberCount = all.reduce((n, c) => n + usedAx(c).reduce((m, k) => m + members(c.axes[k]).length, 0), 0);
     const filled = [...stats.values()].reduce((n, s) => n + s.filled, 0);
     const head = `<div class="dash-head"><div><h1>ダッシュボード</h1><p class="hint" style="margin:0">作ったキューブの入り具合と合計を一覧で見ます。カードから立体表示や入力に進めます。</p></div>
       <div class="card-actions"><button type="button" class="primary" data-act="new">＋ 新しいキューブ</button><button type="button" data-act="tpl">テンプレートから始める</button></div></div>`;
@@ -1619,7 +1813,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       return `<article class="card">
         ${chain.length ? `<span class="crumb">${chain.map((k) => esc(k.name)).join(" › ")} ›</span>` : ""}
         <h3>${esc(c.name)}</h3>
-        <div class="chips">${AX.map((k) => `<span class="chip ${k}">${k.toUpperCase()} ${esc(c.axes[k].name)} ${members(c.axes[k]).length}</span>`).join("")}<span class="chip">値 ${esc(c.value.name)}(${VTYPE[c.value.type]})</span></div>
+        <div class="chips">${AX.map((k) => (c.axes[k].off ? `<span class="chip">Zなし</span>` : `<span class="chip ${k}">${k.toUpperCase()} ${esc(c.axes[k].name)} ${members(c.axes[k]).length}</span>`)).join("")}<span class="chip">値 ${esc(c.value.name)}(${VTYPE[c.value.type]})</span></div>
         <div><div class="meter" role="img" aria-label="入力済み ${pct}%"><i style="width:${pct}%"></i></div>
           <p class="hint" style="margin:4px 0 0">入力済み ${fmt(s.filled)} / ${fmt(s.total)} コマ(${pct}%)${s.filled && c.value.type !== "text" ? ` ・ ${esc(c.value.name)}の合計 <b style="color:var(--ink)">${fmtV(c, s.sum)}</b>` : ""}</p></div>
         ${s.filled && shown.length ? `<div class="bars" aria-label="${esc(c.axes[s.gk].name)}ごとの${c.value.type === "text" ? "件数" : "合計"}">${shown.map(([m, n]) => `<div class="bar"><span class="lb" title="${esc(disp(c.axes[s.gk], m))}">${esc(disp(c.axes[s.gk], m))}</span><span class="tr"><i style="width:${Math.round((Math.abs(n) / max) * 100)}%"></i></span><span class="nv">${fmtV(c, n)}</span></div>`).join("")}${entries.length > 8 ? `<p class="hint" style="margin:0">ほか ${entries.length - 8} 件</p>` : ""}</div>` : `<p class="hint" style="margin:0">まだ値が入っていません。</p>`}
