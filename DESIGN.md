@@ -586,6 +586,49 @@ create table cube_data.built_cells (   -- コマ
 - **データベース**:式は `built_axes.calc` に持ち、計算したコマは保存しない(表示のたびに計算する)。大きなキューブの段ごとの集計表(下の節)には、計算でない目盛りだけを足す
 - **目盛りの名前を変えたとき**は、式の中の `[旧名]` も新しい名前に直す
 
+#### 保存の区切り(版)とプリセット(2026-10-04 追加)
+
+ユーザー要望「保存がないから前のキューブに戻りたくても戻れないし、区切りがわからない」「計算式系だとセットを追加するような機能が欲しい(計算式に限らないけどプリセットが組めるように)」。
+
+- **下書きと保存**:入力は今までどおり下書きとして自動で残す(閉じても消えない)。画面の上の「保存」(Ctrl+S)で、その時点のキューブを**版**として残す。メモ(例:4月分を入力)を付けられる
+- **今の状態を常に見せる**:キューブを開いている間は上に「✓ 保存済み(版3)」か「● 保存していない変更があります」を出し、最後に保存した日時とメモを並べる
+- **戻す**:「最後の保存に戻す」と、履歴の各版の「この版に戻す」。戻す前に保存していない変更があれば、それを「戻す前の内容」という版として残してから戻す(戻したことも取り消せる)。版は1キューブ30個まで残し、古いものから消える。履歴から版を消せる
+- **版の中身**:キューブの名前・軸(目盛り・表記・計算の目盛り)・値の決め方・コマ。下位のキューブは別々に版を持つ
+- **テンプレートから作ったとき**は、作った時点を版1として自動で残す
+- **軸のプリセット**:目盛り・計算の目盛り・表記・年月の範囲をひとまとまりで持つ。① の各軸で選んで「足す」(ない目盛りだけ足し、計算の目盛りの式も入れる)か「置き換える」(軸をそのプリセットにする)。今の軸を「この軸をプリセットに保存」で残せる。用意するもの:合計を足す(SUM)・売上/原価/粗利・損益(小計つき)・入金の内訳・年月(今月まで自動)
+- **自分のテンプレート**:① の「この形をテンプレートに保存」で、キューブの形(軸・目盛り・計算の目盛り・値の決め方。入力した値は含めない)を残し、「テンプレートから始める」で新しいキューブとして足す。用意したテンプレートと違い、今の内容は置き換えない
+- **データベース**:
+
+```sql
+create table cube_meta.built_cube_versions (   -- 保存した版
+  cube_id    uuid not null references cube_meta.built_cubes(id) on delete cascade,
+  no         int not null,                      -- 版の番号(キューブごとに1から)
+  memo       text not null default '',
+  is_auto    boolean not null default false,    -- 「戻す前の内容」「テンプレートから作成」など自動で残したもの
+  definition jsonb not null,                    -- 名前・軸・値の決め方
+  cell_count int not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  primary key (cube_id, no)
+);
+create table cube_data.built_cell_versions (    -- 版の時点のコマ(版ごとの写し)
+  cube_id uuid not null, no int not null, parent_path text not null, x text not null, y text not null, z text not null, value jsonb not null,
+  primary key (cube_id, no, parent_path, x, y, z),
+  foreign key (cube_id, no) references cube_meta.built_cube_versions(cube_id, no) on delete cascade
+);
+create table cube_meta.built_presets (          -- 軸のプリセットと自分のテンプレート
+  id         uuid primary key default gen_random_uuid(),
+  kind       text not null check (kind in ('axis', 'cube')),
+  name       text not null,
+  body       jsonb not null,                    -- axis:軸の定義 / cube:軸3つと値の決め方(コマは持たない)
+  created_by text not null,
+  created_at timestamptz not null default now()
+);
+```
+
+- 版のコマは写しで持つので、コマが多いキューブ(目安10万コマ超)は版を残すと容量が増える。その大きさでは、写しではなく変更の履歴(スプリント6の履歴)から版の時点を組み立てる方式に切り替える。試作はブラウザの保存(約5MB)に入れるので、いっぱいになると古い版から消える
+- 版を残す・戻す・プリセットを作る操作は、編集できる人なら誰でもできる(権限を分けるかは13章の「編集の権限」と合わせて決める)
+
 #### 大きなキューブの表示(2026-10-04 追加)
 
 ユーザー要望「10万×100×100、最大10億コマくらいは表示できるようにしたい」。ブラウザが全部のコマを持って描く方式では、値だけで 8GB を超え、画面の点(200万ほど)より多いコマは見分けられないため、**地図と同じく「まとめて送り、拡大した所だけ細かく取り寄せる」**形にする。

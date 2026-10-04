@@ -332,6 +332,32 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .lowers button { border: 0; background: none; padding: 0 2px; color: var(--accent); text-decoration: underline; font-size: 12px; }
 .dash-empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center; display: grid; gap: 10px; justify-items: center; }
 .notes-bar { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
+.savebar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px 12px; margin-bottom: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.savebar.dirty { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); box-shadow: inset 4px 0 0 var(--warn); }
+.savebar .sv-name { font-weight: 700; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.savebar .sv-state { font-size: 13px; font-weight: 700; color: var(--accent); }
+.savebar.dirty .sv-state { color: var(--warn); }
+.savebar .sv-last { font-size: 12px; color: var(--muted); }
+.savebar .sv-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; align-items: center; }
+.savebar #sv-memo { width: 14em; }
+.sv-list { flex-basis: 100%; display: grid; gap: 2px; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--line); max-height: 320px; overflow: auto; }
+.sv-item { display: grid; grid-template-columns: 3.2em 7.5em minmax(0, 1fr) auto auto; gap: 8px; align-items: center; font-size: 13px; padding: 3px 4px; border-radius: 4px; }
+.sv-item.cur { background: var(--accent-soft); }
+.sv-item .no { font-family: var(--font-mono); color: var(--muted); }
+.sv-item .at { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sv-item .memo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-item .memo .hint { margin: 0; }
+.sv-msg { flex-basis: 100%; }
+.sv-msg .notice { margin: 0; }
+@media (max-width: 600px) { .savebar { position: static; } .sv-item { grid-template-columns: 3em minmax(0, 1fr) auto auto; } .sv-item .at { display: none; } .savebar .sv-acts { margin-left: 0; } }
+.preset-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px dashed color-mix(in srgb, var(--c) 40%, transparent); font-size: 13px; }
+.preset-row > span:first-child { color: var(--c); }
+.preset-row select { max-width: 16em; }
+.preset-save { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.tpl-sec { margin: 12px 0 6px; font-size: 13px; font-weight: 700; }
+.tpl.mine { border-style: dashed; }
+.pre-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pre-list .member { font-size: 13px; }
 @media (prefers-reduced-motion: no-preference) { .tree button, .tabs button { transition: background .12s; } }
 </style>
 
@@ -365,13 +391,14 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   </aside>
 
   <main class="main">
+    <div class="savebar" id="savebar" hidden></div>
     <div id="blank-confirm" class="confirm" hidden>
       <span>作ったキューブと入力したデータをすべて消して、白紙に戻します。</span>
       <button id="blank-yes" type="button" class="danger">白紙にする</button>
       <button id="blank-no" type="button">やめる</button>
     </div>
     <div id="tpl-panel" class="panel" hidden>
-      <p class="panel-title">テンプレート(選ぶと今の内容は置き換わります)</p>
+      <p class="panel-title">テンプレート</p>
       <div class="tpls" id="tpls"></div>
       <div style="margin-top:8px"><button id="tpl-close" type="button">閉じる</button></div>
     </div>
@@ -547,7 +574,85 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   try { st = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { st = null; }
   const blank = () => ({ cubes: [], selected: null, tab: "axes", view: "dash", at: {} });
   if (!st || !Array.isArray(st.cubes)) st = blank();
-  const save = () => { calcVer++; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* 保存できなくても動かす */ } };
+  const save = () => { calcVer++; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch { /* 保存できなくても動かす */ } queueSavebar(); };
+
+  // ---- 保存(版)----
+  // 入力はこれまでどおりブラウザに自動で下書きとして残す。「保存」を押すと、その時点のキューブを「版」として履歴に残し、
+  // あとでどの版にも戻せる。戻すときは、今の内容も「戻す前の内容」として履歴に残すので、戻したことも取り消せる
+  const VKEY = "cube-builder-versions-v1", PKEY = "cube-builder-presets-v1";
+  const loadJ = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || "null") ?? d; } catch { return d; } };
+  const storeJ = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } };
+  let versions = loadJ(VKEY, {}), presets = loadJ(PKEY, { axes: [], cubes: [] });
+  presets.axes ??= []; presets.cubes ??= [];
+  const snapOf = (c) => JSON.stringify({ name: c.name, axes: c.axes, value: c.value, cells: c.cells });
+  const versOf = (c) => versions[c.id] || [];
+  const baseOf = (c) => { const l = versOf(c); return l.find((v) => v.id === st.base?.[c.id]) || l[l.length - 1] || null; };
+  const dirtyOf = (c) => { const b = baseOf(c); return !b || b.snap !== snapOf(c); };
+  let svMsg = "", svOpen = false;
+  function saveVersion(c, memo, auto) {
+    const l = (versions[c.id] ??= []); const no = (l[l.length - 1]?.no || 0) + 1;
+    const v = { id: nid("v"), no, at: Date.now(), memo: memo || "", auto: !!auto, n: Object.keys(c.cells).length, snap: snapOf(c) };
+    l.push(v); while (l.length > 30) l.shift();
+    // ブラウザの保存の容量が足りないときは、ほかのキューブも含めて古い版から捨てる
+    while (!storeJ(VKEY, versions)) {
+      const victim = Object.values(versions).filter((x) => x.length > 1).sort((a, b) => a[0].at - b[0].at)[0];
+      if (!victim) { l.pop(); storeJ(VKEY, versions); return null; }
+      victim.shift();
+    }
+    (st.base ??= {})[c.id] = v.id; return v;
+  }
+  function restoreVersion(c, v) {
+    if (dirtyOf(c)) saveVersion(c, `戻す前の内容(版${v.no}に戻すとき)`, true);
+    const s = JSON.parse(v.snap); c.name = s.name; c.axes = s.axes; c.value = s.value; c.cells = s.cells;
+    (st.base ??= {})[c.id] = v.id; sheet = null; bulk.ax = null;
+    svMsg = `<p class="notice">版${v.no}${v.memo ? `「${esc(v.memo)}」` : ""}に戻しました。戻す前の内容は履歴に残っています。</p>`;
+    render();
+  }
+  const when = (t) => { const d = new Date(t), p = (n) => String(n).padStart(2, "0"); return `${d.getMonth() + 1}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+  let svTimer = 0;
+  const queueSavebar = () => { clearTimeout(svTimer); svTimer = setTimeout(renderSavebar, 250); };
+  function renderSavebar() {
+    const bar = $("savebar"); const c = cube(st.selected);
+    if (!c || c.synth || st.view === "dash") { bar.hidden = true; return; }
+    const memoNow = $("sv-memo")?.value ?? "", focusMemo = document.activeElement?.id === "sv-memo";
+    const l = versOf(c), b = baseOf(c), dirty = dirtyOf(c);
+    bar.hidden = false; bar.classList.toggle("dirty", dirty);
+    bar.innerHTML = `<span class="sv-name">${esc(c.name)}</span>
+      <span class="sv-state">${dirty ? (b ? "● 保存していない変更があります" : "● まだ保存していません") : `✓ 保存済み(版${b.no})`}</span>
+      ${b ? `<span class="sv-last">最後の保存 ${when(b.at)}${b.memo ? `「${esc(b.memo)}」` : ""}</span>` : `<span class="sv-last">入力はこのブラウザに下書きとして自動で残ります。「保存」で区切りを付けると、あとでその時点に戻せます。</span>`}
+      <span class="sv-acts">
+        <input id="sv-memo" placeholder="メモ(任意)例:4月分を入力" aria-label="この保存のメモ" value="${esc(memoNow)}">
+        <button type="button" class="primary" id="sv-save" title="Ctrl+S でも保存できます">保存</button>
+        ${b && dirty ? `<button type="button" id="sv-revert">最後の保存に戻す</button>` : ""}
+        <button type="button" id="sv-hist" aria-expanded="${svOpen}" ${l.length ? "" : "disabled"}>履歴 ${l.length}</button>
+      </span>
+      ${svMsg ? `<div class="sv-msg">${svMsg}</div>` : ""}
+      ${svOpen && l.length ? `<div class="sv-list" role="list" aria-label="保存の履歴">${[...l].reverse().map((v) => `<div class="sv-item ${b && v.id === b.id ? "cur" : ""}" role="listitem">
+          <span class="no">版${v.no}</span><span class="at">${when(v.at)}</span>
+          <span class="memo">${v.memo ? esc(v.memo) : `<span class="hint">メモなし</span>`} <span class="hint">・${fmt(v.n)}コマ${b && v.id === b.id ? (dirty ? "・今の元" : "・今の内容") : ""}</span></span>
+          <button type="button" data-vback="${v.id}" ${b && v.id === b.id && !dirty ? "disabled" : ""}>この版に戻す</button>
+          <button type="button" class="ghost" data-vdel="${v.id}" aria-label="版${v.no}を消す">×</button></div>`).join("")}</div>` : ""}`;
+    svMsg = "";
+    if (focusMemo) { const m = $("sv-memo"); m.focus(); m.setSelectionRange(m.value.length, m.value.length); }
+  }
+  const doSave = () => {
+    const c = cube(st.selected); if (!c || c.synth) return;
+    const memo = ($("sv-memo")?.value || "").trim(); if ($("sv-memo")) $("sv-memo").value = "";
+    const v = saveVersion(c, memo);
+    svMsg = v ? `<p class="notice">版${v.no}として保存しました。履歴からいつでもこの時点に戻せます。</p>` : `<p class="notice warn">ブラウザの保存の容量がいっぱいで、保存できませんでした。古い版を消してください。</p>`;
+    save(); renderSavebar();
+  };
+  $("savebar").onclick = (e) => {
+    const c = cube(st.selected); if (!c) return;
+    if (e.target.closest("#sv-save")) return doSave();
+    if (e.target.closest("#sv-hist")) { svOpen = !svOpen; return renderSavebar(); }
+    if (e.target.closest("#sv-revert")) return restoreVersion(c, baseOf(c));
+    const back = e.target.closest("[data-vback]"); if (back) return restoreVersion(c, versOf(c).find((v) => v.id === back.dataset.vback));
+    const del = e.target.closest("[data-vdel]");
+    if (del) { const l = versOf(c); const i = l.findIndex((v) => v.id === del.dataset.vdel); if (i >= 0) { const [v] = l.splice(i, 1); storeJ(VKEY, versions); svMsg = `<p class="notice">版${v.no}を履歴から消しました。</p>`; } return renderSavebar(); }
+  };
+  $("savebar").onkeydown = (e) => { if (e.key === "Enter" && e.target.id === "sv-memo") { e.preventDefault(); doSave(); } };
+  document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); doSave(); } });
   let face = "front", picked = null, importState = null, pendingDelete = null;
 
   const cube = (id) => st.cubes.find((c) => c.id === id);
@@ -782,6 +887,48 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   }
 
   const calcOpen = new Set(), calcMsg = {}; let lastCalcInput = null;
+  // ---- プリセット ----
+  // 軸のプリセット:目盛り・計算の目盛り・表記をまとめて持ち、どの軸にも「足す」か「置き換える」ができる
+  const BUILTIN_AX = [
+    { id: "b-total", name: "合計を足す(SUM)", ax: { kind: "list", members: ["合計"], calc: { 合計: "SUM()" } } },
+    { id: "b-pl", name: "売上・原価・粗利", ax: { name: "科目", kind: "list", members: ["売上", "原価", "粗利"], calc: { 粗利: "[売上] - [原価]" } } },
+    { id: "b-pl2", name: "損益(小計つき)", ax: { name: "科目", kind: "list", members: ["売上", "返品", "純売上", "原価", "販管費", "経費計", "利益"], calc: { 純売上: "[売上] - [返品]", 経費計: "[原価] + [販管費]", 利益: "[純売上] - [経費計]" } } },
+    { id: "b-dep", name: "入金の内訳(入金額つき)", ax: { name: "内訳", kind: "list", members: ["売上", "システム利用料", "入金額"], calc: { 入金額: "SUM()" } } },
+    { id: "b-month", name: "年月(今月まで自動で伸びる)", ax: { name: "年月", kind: "month", from: "2026-04", to: "", toNow: true, members: [] } },
+  ];
+  const AX_KEEP = ["name", "kind", "members", "calc", "labels", "alt", "show", "pack", "from", "to", "toNow"];
+  const axCopy = (ax) => JSON.parse(JSON.stringify(Object.fromEntries(AX_KEEP.filter((f) => ax[f] !== undefined).map((f) => [f, ax[f]]))));
+  const presetAx = (id) => [...BUILTIN_AX, ...presets.axes].find((p) => p.id === id);
+  const pState = { k: null, msg: {} };
+  function applyAxPreset(c, k, p, mode) {
+    const ax = c.axes[k], src = axCopy(p.ax);
+    if (mode === "replace") {
+      for (const f of AX_KEEP) if (f !== "name") delete ax[f];
+      Object.assign(ax, { kind: "list", members: [], from: "", to: "" }, src, { name: src.name || ax.name });
+      return `「${esc(p.name)}」で置き換えました。`;
+    }
+    if (src.kind === "month") { Object.assign(ax, { kind: "month", from: src.from, to: src.to, toNow: src.toNow }); return `年月の範囲を「${esc(p.name)}」にしました。`; }
+    if (ax.kind !== "list") return `この軸は年月の範囲なので、目盛りは足せません。「置き換える」を使ってください。`;
+    let added = 0; const clash = [];
+    for (const m of src.members || []) {
+      const calc = src.calc && m in src.calc;
+      if (ax.members.includes(m)) { if (calc && !isCalc(ax, m)) clash.push(m); else if (calc) ax.calc[m] = src.calc[m]; continue; }
+      ax.members.push(m); added++; if (calc) (ax.calc ??= {})[m] = src.calc[m];
+      if (src.alt?.[m]) (ax.alt ??= {})[m] = src.alt[m];
+    }
+    return `「${esc(p.name)}」から${added}個の目盛りを足しました。` + (clash.length ? `「${clash.map(esc).join("」「")}」はふつうの目盛りとして登録済みなので、計算の目盛りにはしていません。` : "");
+  }
+  const presetRow = (ax, k) => {
+    const mine = presets.axes;
+    return `<div class="preset-row"><span>プリセット</span>
+      <select data-preset aria-label="${AXNAME[k]}に使うプリセット"><option value="">選ぶ…</option>
+        <optgroup label="用意したもの">${BUILTIN_AX.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>
+        ${mine.length ? `<optgroup label="自分で保存したもの">${mine.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>` : ""}</select>
+      <button type="button" data-padd>足す</button><button type="button" data-prep>置き換える</button>
+      <button type="button" class="ghost" data-psave>この軸をプリセットに保存</button></div>
+      ${pState.k === k ? `<div class="preset-save"><input data-pname placeholder="プリセットの名前" aria-label="プリセットの名前" value="${esc(ax.name)}"><button type="button" class="primary" data-psavego>保存</button><button type="button" data-psaveno>やめる</button></div>` : ""}
+      ${pState.msg[k] ? `<p class="notice">${pState.msg[k]}</p>` : ""}`;
+  };
   function renderAxes(c) {
     const p = cube(c.parent);
     // 目盛りが多い軸は札を全部並べず、先頭だけ見せて残りは開閉式にする(一覧と編集は ② の表で)
@@ -827,6 +974,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
            ${calcBox(ax, k)}
            ${notesSection(ax, k)}`}
         ${lowers.length ? `<p class="link-note">この軸の目盛りごとに下位:${lowers.map((d) => esc(d.name)).join("、")}</p>` : ""}
+        ${presetRow(ax, k)}
       </div>`;
     };
     $("pane").innerHTML = `${guide(["軸を決める", "目盛りを登録する", "値を入れる"], 0)}
@@ -842,9 +990,23 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
         <button type="button" class="danger" id="del-cube">このキューブを削除</button>
+        <button type="button" id="tpl-save">この形をテンプレートに保存</button>
         <button type="button" class="primary" data-tab="members" style="margin-left:auto">② 目盛りを登録するへ</button>
       </div>
-      <div id="del-confirm"></div>`;
+      <div id="del-confirm"></div><div id="tpl-save-box"></div>`;
+    // キューブの形(軸・計算の目盛り・値の決め方。入力した値は含めない)を、自分のテンプレートとして残す
+    $("tpl-save").onclick = () => {
+      $("tpl-save-box").innerHTML = `<div class="preset-save"><input id="tpl-name" value="${esc(c.name)}" aria-label="テンプレートの名前"><button type="button" class="primary" id="tpl-save-go">保存</button><button type="button" id="tpl-save-no">やめる</button><span class="hint" style="margin:0">軸・目盛り・計算の目盛り・値の決め方を残します(入力した値は入りません)。</span></div>`;
+      $("tpl-name").select();
+      $("tpl-save-no").onclick = () => { $("tpl-save-box").innerHTML = ""; };
+      $("tpl-save-go").onclick = () => {
+        const name = $("tpl-name").value.trim() || c.name;
+        presets.cubes.push({ id: nid("t"), name, cube: { name: c.name, axes: { x: axCopy(c.axes.x), y: axCopy(c.axes.y), z: { ...axCopy(c.axes.z), off: !!c.axes.z.off } }, value: { ...c.value } } });
+        storeJ(PKEY, presets); renderTpls();
+        $("tpl-save-box").innerHTML = `<p class="notice">テンプレート「${esc(name)}」を保存しました。左下の「テンプレートから始める」から、新しいキューブとして作れます。</p>`;
+      };
+    };
+    pState.msg = {}; // 知らせは1回だけ出す
     $("cube-name").oninput = (e) => { c.name = e.target.value; renderTree(); save(); renderLabelsOnly(); };
     if ($("cube-via")) $("cube-via").onchange = (e) => { c.via = e.target.value; render(); };
     $("v-name").oninput = (e) => { c.value.name = e.target.value; save(); renderFace(); };
@@ -892,6 +1054,18 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
         return;
       }
       if (card && e.target.closest("[data-add]")) addFrom(card);
+      if (card && (e.target.closest("[data-padd]") || e.target.closest("[data-prep]"))) {
+        const k = card.dataset.ax, p = presetAx(card.querySelector("[data-preset]").value);
+        if (!p) { pState.msg[k] = "プリセットを選んでください。"; render(); return; }
+        pState.msg[k] = applyAxPreset(c, k, p, e.target.closest("[data-prep]") ? "replace" : "add"); render(); return;
+      }
+      if (card && e.target.closest("[data-psave]")) { pState.k = pState.k === card.dataset.ax ? null : card.dataset.ax; render(); document.querySelector(`.axis-card[data-ax="${card.dataset.ax}"] [data-pname]`)?.select(); return; }
+      if (card && e.target.closest("[data-psaveno]")) { pState.k = null; render(); return; }
+      if (card && e.target.closest("[data-psavego]")) {
+        const k = card.dataset.ax, name = card.querySelector("[data-pname]").value.trim() || c.axes[k].name;
+        presets.axes.push({ id: nid("p"), name, ax: axCopy(c.axes[k]) }); storeJ(PKEY, presets);
+        pState.k = null; pState.msg[k] = `プリセット「${esc(name)}」を保存しました。ほかのキューブの軸でも選べます。`; renderTpls(); render(); return;
+      }
       const ci = e.target.closest("[data-calcins]");
       if (card && ci) {
         // 式の入力欄(最後に触った欄。無ければ新しい式の欄)のカーソル位置に差し込む
@@ -930,6 +1104,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     pane.onkeydown = (e) => {
       if (e.key === "Enter" && e.target.dataset.f === "newmember") { e.preventDefault(); addFrom(e.target.closest(".axis-card")); }
       if (e.key === "Enter" && (e.target.dataset.f === "calcexpr" || e.target.dataset.f === "calcname")) { e.preventDefault(); e.target.closest(".axis-card").querySelector("[data-calcadd]").click(); }
+      if (e.key === "Enter" && e.target.dataset.pname !== undefined) { e.preventDefault(); e.target.closest(".axis-card").querySelector("[data-psavego]").click(); }
     };
     pane.addEventListener("focusin", (e) => { if (e.target.dataset.calc !== undefined || e.target.dataset.f === "calcexpr") lastCalcInput = e.target; });
     pane.addEventListener("toggle", (e) => { const k = e.target.dataset?.calcbox; if (k) (e.target.open ? calcOpen.add(k) : calcOpen.delete(k)); }, true);
@@ -1754,7 +1929,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     if (v in EDIT) renderEditor(c, v);
     $("viewer-title").textContent = v === "axes" ? "プレビュー" : c ? c.name : "キューブがまだありません";
     $("viewer-sub").textContent = c && v === "cube" ? [chainOf(c).slice(0, -1).map((k) => k.name).join(" › "), kids(c.id).length ? `下位:${kids(c.id).map((k) => k.name).join("、")}` : ""].filter(Boolean).join(" / ") : "";
-    renderPreview(); save();
+    renderPreview(); save(); renderSavebar();
   }
   function renderEditor(c, tab) {
     if (!c) {
@@ -1857,8 +2032,29 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   $("blank-yes").onclick = () => { st = blank(); sheet = null; $("blank-confirm").hidden = true; render(); };
   $("tpl-btn").onclick = () => { $("blank-confirm").hidden = true; $("tpl-panel").hidden = false; };
   $("tpl-close").onclick = () => { $("tpl-panel").hidden = true; };
-  $("tpls").innerHTML = TEMPLATES.map((t, i) => `<button type="button" class="tpl" data-i="${i}"><b>${esc(t.name)}</b><span>${esc(t.note)}</span></button>`).join("");
-  $("tpls").onclick = (e) => { const b = e.target.closest("button[data-i]"); if (!b) return; st = TEMPLATES[+b.dataset.i].make(); sheet = null; $("tpl-panel").hidden = true; render(); };
+  // 用意したテンプレートは今の内容を置き換える。自分で保存したテンプレートは、新しいキューブとして足す
+  const axSummary = (cb) => AX.filter((k) => !cb.axes[k].off).map((k) => cb.axes[k].name).join(" × ");
+  function renderTpls() {
+    $("tpls").innerHTML = TEMPLATES.map((t, i) => `<button type="button" class="tpl" data-i="${i}"><b>${esc(t.name)}</b><span>${esc(t.note)}${i === 2 ? "" : "(選ぶと今の内容は置き換わります)"}</span></button>`).join("")
+      + (presets.cubes.length ? `<p class="tpl-sec" style="grid-column:1/-1">自分のテンプレート(選ぶと新しいキューブとして足します)</p>` + presets.cubes.map((t) => `<div class="tpl-wrap" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px"><button type="button" class="tpl mine" data-u="${t.id}"><b>${esc(t.name)}</b><span>${esc(axSummary(t.cube))} ・ 値:${esc(t.cube.value.name)}${AX.some((k) => calcOf(t.cube.axes[k]).length) ? " ・ 計算の目盛りあり" : ""}</span></button><button type="button" class="ghost" data-udel="${t.id}" aria-label="${esc(t.name)}を消す">×</button></div>`).join("") : "")
+      + (presets.axes.length ? `<p class="tpl-sec" style="grid-column:1/-1">自分で保存した軸のプリセット(① の各軸の「プリセット」で使います)</p><div class="pre-list" style="grid-column:1/-1">${presets.axes.map((p) => `<span class="member">${esc(p.name)}<button type="button" data-pdel="${p.id}" aria-label="${esc(p.name)}を消す">×</button></span>`).join("")}</div>` : "");
+  }
+  renderTpls();
+  $("tpls").onclick = (e) => {
+    const ud = e.target.closest("[data-udel]"); if (ud) { presets.cubes = presets.cubes.filter((t) => t.id !== ud.dataset.udel); storeJ(PKEY, presets); renderTpls(); return; }
+    const pd = e.target.closest("[data-pdel]"); if (pd) { presets.axes = presets.axes.filter((p) => p.id !== pd.dataset.pdel); storeJ(PKEY, presets); renderTpls(); if (st.view === "axes") render(); return; }
+    const u = e.target.closest("[data-u]");
+    if (u) {
+      const t = presets.cubes.find((x) => x.id === u.dataset.u); const c = newCube(t.name);
+      c.axes = JSON.parse(JSON.stringify(t.cube.axes)); c.value = { ...t.cube.value };
+      st.cubes.push(c); st.selected = c.id; st.tab = st.view = "axes"; sheet = null; $("tpl-panel").hidden = true;
+      saveVersion(c, `テンプレート「${t.name}」から作成`, true); render(); return;
+    }
+    const b = e.target.closest("button[data-i]"); if (!b) return;
+    st = TEMPLATES[+b.dataset.i].make(); sheet = null; $("tpl-panel").hidden = true;
+    for (const c of st.cubes) if (!c.synth && !versOf(c).length) saveVersion(c, "テンプレートから作成", true);
+    render();
+  };
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => renderPreview());
 
   resize(); render(); tick();
