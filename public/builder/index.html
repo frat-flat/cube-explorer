@@ -2114,6 +2114,21 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     pearl: { lo: "#1d5a78", hi: "#fff2dc", calc: "#ff8a65", mat: () => phys({ roughness: 0.15, clearcoat: 1 }) },
     holo: { lo: "#1b5cff", hi: "#7ff9ff", calc: "#ff4fd8", mat: () => basic({ opacity: 0.85, ...ADD }), edge: 0x6ff6ff, dot: 0x2a8cff },
   };
+  let _cellWin, _stone, _marble;
+  const cellWin = () => _cellWin || (KEEP.add(_cellWin = cvTex(128, 128, (x, w, h, rr) => { // ビルの1区画:窓が4×4
+    x.fillStyle = "#565b63"; x.fillRect(0, 0, w, h);
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) { const lit = rr() < 0.18; x.fillStyle = lit ? "#fff1c8" : `hsl(210 25% ${78 + rr() * 16}%)`; x.fillRect(6 + i * 30, 6 + j * 30, 24, 22); x.fillStyle = "rgba(255,255,255,.35)"; x.fillRect(6 + i * 30, 6 + j * 30, 24, 3); }
+  }, 120)), _cellWin);
+  const stoneT = () => _stone || (KEEP.add(_stone = cvTex(128, 128, (x, w, h, rr) => { // 遺跡の石積み
+    noise(x, w, rr, "#d9d0c0", 0.18, 3000, 2); x.fillStyle = "rgba(60,40,20,.55)"; for (let y = 0; y < h; y += 32) { x.fillRect(0, y, w, 3); for (let xx = (y / 32) % 2 ? 0 : 32; xx < w; xx += 64) x.fillRect(xx, y, 3, 32); }
+    x.strokeStyle = "rgba(60,40,20,.35)"; x.lineWidth = 2; x.strokeRect(46, 44, 36, 40); x.beginPath(); x.arc(64, 64, 10, 0, 7); x.stroke();
+  }, 121)), _stone);
+  const marbleT = () => _marble || (KEEP.add(_marble = cvTex(128, 128, (x, w, h, rr) => TX.marble("#f4f1ea", "#9a9284")(x, w, rr), 122)), _marble);
+  Object.assign(PAL, {
+    tower: { lo: "#2a3c5c", hi: "#d6ecff", calc: "#ffb460", mat: () => std({ map: cellWin(), roughness: 0.18, metalness: 0.5, envMapIntensity: 1.3 }), noGlass: true, dot: 0x9aa8b8 },
+    stone: { lo: "#9a6236", hi: "#f6e2b8", calc: "#3fb0a8", mat: () => std({ map: stoneT(), roughness: 0.95 }), noGlass: true, dot: 0xc8a878 },
+    marble: { lo: "#2e4a86", hi: "#fff6e4", calc: "#e8a24a", mat: () => std({ map: marbleT(), roughness: 0.35 }), noGlass: true, dot: 0xdfe6f0 },
+  });
   function buildModel(c, P) {
     const g = new THREE.Group(), win = coarseWin(c);
     const glass = (w, h, dd) => {
@@ -2708,7 +2723,125 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     };
   } };
 
-  const HALL_ORDER = ["modern", "european", "rpg", "heist", "game", "space", "zen", "underwater", "cyber"];
+  // -- キューブを建造物の大きさで見せる世界(人は小さく、見上げて回る) --
+  const cloudTex = (seed) => cvTex(256, 256, (x, w, h, rr) => { for (let i = 0; i < 60; i++) { const cx = w / 2 + (rr() - 0.5) * w * 0.55, cy = h / 2 + (rr() - 0.5) * h * 0.3, rad = 24 + rr() * 60, gr = x.createRadialGradient(cx, cy, 0, cx, cy, rad); gr.addColorStop(0, "rgba(255,255,255,.35)"); gr.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = gr; x.fillRect(0, 0, w, h); } }, seed);
+
+  // 10. 摩天楼の街:キューブが超高層ビルとして街区に建つ。歩行者天国の大通りから見上げる
+  HALLS.city = { name: "摩天楼の街", tip: "キューブが超高層ビルの大きさで建つ街です。歩行者天国の大通りを歩いて見上げます。", pal: "tower", build({ n, g, r }) {
+    const S = 22, rows = Math.ceil(n / 2), BZ = 74, AV = 22, BX = 54, z0 = 40, zEnd = -(rows - 1) * BZ - 60, zc = (z0 + zEnd) / 2;
+    const ground = floorDecal(new THREE.PlaneGeometry(1400, 1400), std({ map: tex(512, TX.asphalt, [140, 140], 130), color: 0x8a8c90, roughness: 0.9 }), 0); ground.receiveShadow = true; g.add(ground);
+    const paveT = tex(256, (x, w, rr) => { noise(x, w, rr, "#c9c2b4", 0.12, 6000, 2); x.strokeStyle = "rgba(80,70,60,.4)"; x.lineWidth = 2; for (let k = 0; k <= 4; k++) { x.beginPath(); x.moveTo(0, (k * w) / 4); x.lineTo(w, (k * w) / 4); x.stroke(); x.beginPath(); x.moveTo((k * w) / 4 + ((k % 2) * w) / 8, 0); x.lineTo((k * w) / 4 + ((k % 2) * w) / 8, w); x.stroke(); } }, [AV / 2, (z0 - zEnd + 60) / 4], 131);
+    const ave = floorDecal(new THREE.PlaneGeometry(AV * 2, z0 - zEnd + 60), std({ map: paveT, roughness: 0.75 }), 0.03); ave.position.z = zc; ave.receiveShadow = true; g.add(ave);
+    const curbM = std({ color: 0x9a9690, roughness: 0.8 }); for (const s of [-1, 1]) put(g, box(0.4, 0.18, z0 - zEnd + 60, curbM), s * AV, 0.09, zc);
+    // 横の車道(横断歩道つき)
+    const laneT = tex(256, (x, w, rr) => { noise(x, w, rr, "#3a3b3e", 0.15, 9000, 2); x.fillStyle = "#e8e2c8"; for (let i = 0; i < w; i += 64) x.fillRect(i, w / 2 - 3, 36, 6); }, [60, 1], 132);
+    const streets = []; for (let k = 0; k <= rows; k++) streets.push(z0 - 20 - k * BZ + (k ? 0 : 0));
+    const zebra = basic({ color: 0xf2f0ea });
+    for (const z of streets) { const s = floorDecal(new THREE.PlaneGeometry(900, 16), std({ map: laneT, roughness: 0.6 }), 0.035); s.position.z = z; s.receiveShadow = true; g.add(s); for (let x = -AV + 2; x < AV - 1; x += 2.4) { const zb = floorDecal(new THREE.PlaneGeometry(1.2, 6), zebra, 0.05); zb.position.set(x, 0.05, z - 4.5); g.add(zb); const zb2 = zb.clone(); zb2.position.z = z + 4.5; g.add(zb2); } }
+    // 作品の敷地:御影石の基壇にビルとして建つ
+    const granite = std({ map: tex(256, TX.marble("#5a5c60", "#2a2a2c"), [6, 6], 133), roughness: 0.3, envMapIntensity: 1.1 }), spots = [], block = [];
+    for (let i = 0; i < n; i++) {
+      const k = Math.floor(i / 2), side = i % 2 ? 1 : -1, x = side * BX, z = z0 - 20 - BZ / 2 - k * BZ;
+      const pod = shade(put(g, box(56, 1.2, 56, granite), x, 0.6, z));
+      const sign = put(g, mesh(new THREE.PlaneGeometry(6, 1.5), basic({ map: plateTex(`No.${String(i + 1).padStart(2, "0")}`, "#f2efe8", "#2a2b2e") })), x - side * 28.05, 2.1, z, -side * Math.PI / 2);
+      put(g, box(6.4, 1.8, 0.3, granite), x - side * 27.85, 0.9, z, Math.PI / 2);
+      spots.push({ x, y: 1.2, z, face: side < 0 ? Math.PI / 2 : -Math.PI / 2, dist: 47, scale: S, r: 31, near: 80, lift: 0.4, hit: [pod, sign] });
+    }
+    // 大通りの並木・街灯・ベンチ
+    const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.26, 4, 7), std({ color: 0x5a4030, roughness: 0.9 }), 400), crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.2, 1), std({ color: 0x4f7a3a, roughness: 0.9, flatShading: true }), 400), M = new THREE.Matrix4(), Q = new THREE.Quaternion(); let nt = 0;
+    for (let z = z0 + 10; z > zEnd - 20; z -= 12) { if (streets.some((s) => Math.abs(s - z) < 11)) continue; for (const s of [-1, 1]) { const x = s * (AV - 3.5); trunk.setMatrixAt(nt, M.compose(V(x, 2, z), Q, V(1, 1, 1))); crown.setMatrixAt(nt, M.compose(V(x, 5.2, z), Q, V(1, 1.15, 1))); crown.setColorAt(nt++, new THREE.Color().setHSL(0.27 + r() * 0.06, 0.35, 0.3 + r() * 0.1)); block.push({ x, z, r: 0.8 }); } }
+    trunk.count = crown.count = nt; crown.instanceColor.needsUpdate = true; trunk.castShadow = crown.castShadow = true; g.add(trunk, crown);
+    const poleM = std({ color: 0x2b2d30, roughness: 0.4, metalness: 0.7 });
+    for (let z = z0 + 4; z > zEnd - 20; z -= 24) for (const s of [-1, 1]) { put(g, mesh(new THREE.CylinderGeometry(0.08, 0.1, 7, 8), poleM), s * (AV - 1.2), 3.5, z); put(g, box(1.4, 0.15, 0.4, poleM), s * (AV - 1.8), 7, z); }
+    for (let z = z0 - 2; z > zEnd; z -= 30) { put(g, box(2.4, 0.45, 0.7, std({ color: 0x6a4a2e, roughness: 0.7 })), 0, 0.45, z); block.push({ x: 0, z, r: 1.4 }); }
+    // まわりの摩天楼
+    const winT = tex(512, TX.windows, [2, 6], 134), towers = new THREE.InstancedMesh(unitBox, std({ map: winT, color: 0x9fb0c4, roughness: 0.25, metalness: 0.5 }), 700); let nb = 0;
+    for (let x = -520; x <= 520; x += 46) for (let z = zEnd - 400; z <= z0 + 300; z += 46) {
+      if (Math.abs(x) < BX + 40 && z > zEnd - 50 && z < z0 + 20) continue; if (r() < 0.25 || nb >= 700) continue;
+      const d = Math.hypot(x, z - zc), h = 18 + r() ** 2 * (d < 250 ? 170 : 90), w = 22 + r() * 14; towers.setMatrixAt(nb++, M.compose(V(x + (r() - 0.5) * 6, h / 2, z + (r() - 0.5) * 6), Q, V(w, h, 22 + r() * 14)));
+    }
+    towers.count = nb; towers.castShadow = towers.receiveShadow = true; g.add(towers);
+    // 車(横の車道を走る)
+    const cars = []; const carC = [0xd8d8d8, 0x2a2a2e, 0xb8322a, 0x2a5aa8, 0xe8c040, 0xf2f2f2];
+    for (const z of streets) for (let k = 0; k < 4; k++) { const c = new THREE.Group(), body = shade(box(4.4, 1.1, 1.9, std({ color: carC[(k + cars.length) % 6], roughness: 0.25, metalness: 0.6 }))); body.position.y = 0.75; c.add(body); put(c, box(2.4, 0.7, 1.8, std({ color: 0x1a2028, roughness: 0.1, metalness: 0.8 })), -0.2, 1.6, 0); const dir = k % 2 ? 1 : -1; c.position.set((r() - 0.5) * 800, 0, z + dir * 3.5); c.rotation.y = dir > 0 ? 0 : Math.PI; g.add(c); cars.push({ c, dir, sp: 9 + r() * 6 }); }
+    g.add(skyDome([[0, "#2f68bc"], [0.42, "#94bde8"], [0.5, "#e2ebf2"], [0.53, "#a9aeb4"], [1, "#6a6c70"]]));
+    for (let k = 0; k < 10; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex(140 + k), opacity: 0.9, transparent: true, depthWrite: false, fog: false })); s.position.set((r() - 0.5) * 1400, 260 + r() * 120, zc - 300 - r() * 500); s.scale.set(320, 140, 1); g.add(s); }
+    g.add(new THREE.HemisphereLight(0xdfefff, 0x6a6a64, 0.6));
+    sunLight(g, 0xfff2dc, 1.45, [140, 180, 80], [0, zc, Math.max(140, (z0 - zEnd) / 2 + 80)]);
+    return { spots, block, floors: [ground, ave], walk: [{ t: "rect", x0: -AV + 1.5, z0: zEnd - 10, x1: AV - 1.5, z1: z0 + 15 }, ...streets.map((z) => ({ t: "rect", x0: -BX - 30, z0: z - 7, x1: BX + 30, z1: z + 7 }))],
+      start: { x: 0, z: z0 + 10, yaw: 0, pitch: 0.14 }, speed: 7, fog: new THREE.Fog(0xc9d9e8, 160, 950), exposure: 1,
+      env: [[[0, "#3a74c8"], [0.48, "#dfe9f2"], [1, "#5a5c60"]], [[0xfff2dc, 6, 20, 25, 10, 6, 6]]],
+      mapBox: { x0: -BX - 34, x1: BX + 34, z0: zEnd - 10, z1: z0 + 18 },
+      itemTick(it, dt, t, near, hov) { it.model.rotation.y = 0; },
+      tick(t, dt, calm) { if (calm) return; for (const c of cars) { c.c.position.x += c.dir * c.sp * dt; if (c.c.position.x > 450) c.c.position.x = -450; if (c.c.position.x < -450) c.c.position.x = 450; } },
+    };
+  } };
+
+  // 11. 砂漠の巨大遺跡:夕暮れの砂丘。石畳の参道の両側に、キューブが巨大な石の遺跡として建つ
+  HALLS.ruins = { name: "砂漠の巨大遺跡", tip: "夕暮れの砂漠に、キューブが巨大な石の遺跡として建っています。石畳の参道を進みます。", pal: "stone", build({ n, g, r }) {
+    const S = 15, STEP = 60, sites = Array.from({ length: n }, (_, i) => ({ x: (i % 2 ? 1 : -1) * (36 + r() * 8), z: 10 - i * STEP })), zEnd = 10 - (n - 1) * STEP - 60;
+    const cl = (v) => Math.max(0, Math.min(1, v));
+    const ground = (x, z) => { let f = cl((Math.abs(x) - 9) / 45); for (const s of sites) f = Math.min(f, cl((Math.hypot(x - s.x, z - s.z) - 26) / 30)); return ((Math.sin(x * 0.035) + Math.cos(z * 0.03 + x * 0.012)) * 4 + Math.sin((x - z) * 0.07) * 1.6 + 5) * f; };
+    const sg = new THREE.PlaneGeometry(1000, 1000, 160, 160); sg.rotateX(-Math.PI / 2); const pa = sg.attributes.position; for (let i = 0; i < pa.count; i++) pa.setY(i, ground(pa.getX(i), pa.getZ(i) + (zEnd + 40) / 2)); sg.computeVertexNormals();
+    const sand = mesh(sg, std({ map: tex(512, TX.sand("#e2b27a"), [160, 160], 140), roughness: 1 })); sand.position.z = (zEnd + 40) / 2; sand.receiveShadow = true; g.add(sand);
+    const slabT = tex(256, (x, w, rr) => { noise(x, w, rr, "#cdb48c", 0.16, 6000, 2); x.strokeStyle = "rgba(70,50,30,.55)"; x.lineWidth = 3; for (let k = 0; k <= 2; k++) { x.beginPath(); x.moveTo(0, (k * w) / 2); x.lineTo(w, (k * w) / 2); x.stroke(); } for (let k = 0; k < 2; k++) for (let j = 0; j <= 2; j++) { x.beginPath(); x.moveTo((j * w) / 2 + (k % 2 ? w / 4 : 0), (k * w) / 2); x.lineTo((j * w) / 2 + (k % 2 ? w / 4 : 0), ((k + 1) * w) / 2); x.stroke(); } for (let k = 0; k < 6; k++) { x.strokeStyle = "rgba(60,40,20,.3)"; x.lineWidth = 1; x.beginPath(); let a = rr() * w, b = rr() * w; x.moveTo(a, b); for (let q = 0; q < 4; q++) x.lineTo(a += (rr() - 0.5) * 40, b += (rr() - 0.5) * 40); x.stroke(); } }, [3, (60 - zEnd) / 6], 141);
+    const road = floorDecal(new THREE.PlaneGeometry(14, 60 - zEnd), std({ map: slabT, roughness: 0.9 }), 0.06); road.position.z = (zEnd + 60) / 2; road.receiveShadow = true; g.add(road);
+    const stoneM = std({ map: tex(256, TX.concrete("#cfae80"), [2, 2], 142), roughness: 0.95 }), spots = [], block = [];
+    // 参道の列柱(ところどころ崩れている)
+    for (let z = 40; z > zEnd + 10; z -= 18) for (const s of [-1, 1]) { const h = r() < 0.25 ? 2 + r() * 3 : 10, c = shade(put(g, mesh(new THREE.CylinderGeometry(0.9, 1.0, h, 14), stoneM), s * 8.5, h / 2, z)); if (h === 10) shade(put(g, box(2.4, 0.7, 2.4, stoneM), s * 8.5, 10.35, z)); else shade(put(g, mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.4, 14), stoneM), s * 8.5 + 2, 0.5, z + 1)).rotation.z = Math.PI / 2; block.push({ x: s * 8.5, z, r: 1.4 }); }
+    // 遺跡の基壇(3段)と正面の大階段
+    sites.forEach((s, i) => {
+      [[46, 0], [40, 2], [34, 4]].forEach(([w, y]) => shade(put(g, box(w, 2, w, stoneM), s.x, y + 1, s.z)));
+      const side = Math.sign(s.x); for (let k = 0; k < 12; k++) shade(put(g, box(1, 0.5, 10, stoneM), s.x - side * (23 + 6 - k * 0.5 - 6), 0.25 + k * 0.5, s.z));
+      put(g, mesh(new THREE.PlaneGeometry(5, 1.25), basic({ map: plateTex(`No.${String(i + 1).padStart(2, "0")}`, "#3a2a14", "#e6cfa0") })), s.x - side * 23.05, 1.0, s.z + 7, -side * Math.PI / 2);
+      for (const dz of [-14, 14]) { shade(put(g, box(2.2, 7, 2.2, stoneM), s.x - side * 19, 9.5, s.z + dz)); put(g, glow(0xffb060, 3, 0.9), s.x - side * 19, 13.4, s.z + dz); put(g, new THREE.PointLight(0xffa850, 0.6, 30, 1.5), s.x - side * 19, 13.6, s.z + dz); }
+      spots.push({ x: s.x, y: 6, z: s.z, face: side < 0 ? Math.PI / 2 : -Math.PI / 2, dist: 40, scale: S, r: 25, near: 70, lift: 0.2 });
+    });
+    // オベリスクと遠くの台地
+    for (let k = 0; k < 8; k++) { const x = (r() < 0.5 ? -1 : 1) * (70 + r() * 120), z = 20 - r() * (60 - zEnd), h = 14 + r() * 16, o = put(g, new THREE.Group(), x, ground(x, z) - 1, z); shade(put(o, box(2.4, h, 2.4, stoneM), 0, h / 2, 0)); shade(put(o, mesh(new THREE.ConeGeometry(1.75, 2.4, 4), stoneM), 0, h + 1.2, 0)).rotation.y = Math.PI / 4; }
+    const mesaM = std({ color: 0xa8603a, roughness: 1, flatShading: true });
+    for (let k = 0; k < 14; k++) { const a = -Math.PI / 2 + (r() - 0.5) * 3.4, d = 420 + r() * 200, m = put(g, mesh(new THREE.CylinderGeometry(30 + r() * 50, 50 + r() * 60, 30 + r() * 60, 7), mesaM), Math.cos(a) * d, 10, Math.sin(a) * d + zEnd / 2); m.scale.x = 1.6; }
+    // 舞う砂
+    const dustB = [], dust = points(700, (i, p) => { const b = [(Math.random() - 0.5) * 80, Math.random() * 4, (Math.random() - 0.5) * 80, Math.random() * 6]; dustB.push(b); p.set(b.slice(0, 3), i * 3); }, { size: 0.06, color: 0xffe2b8, op: 0.55, add: false }); g.add(dust);
+    g.add(skyDome([[0, "#25335e"], [0.34, "#b8665a"], [0.46, "#f4ae6a"], [0.5, "#ffdca0"], [0.53, "#d89060"], [1, "#7a5030"]]));
+    put(g, glow(0xffc070, 160, 0.85), -300, 70, zEnd - 260).material.fog = false; put(g, glow(0xfff2d0, 36, 1), -300, 70, zEnd - 260).material.fog = false;
+    g.add(new THREE.HemisphereLight(0xffd9b0, 0x8a5a3a, 0.55));
+    sunLight(g, 0xffb878, 1.7, [-200, 70, -180], [0, (zEnd + 40) / 2, Math.max(120, (40 - zEnd) / 2 + 60)]);
+    return { spots, block, floors: [sand, road], ground, walk: [{ t: "rect", x0: -70, z0: zEnd - 10, x1: 70, z1: 50 }], start: { x: 0, z: 44, yaw: 0, pitch: 0.06 }, speed: 6,
+      fog: new THREE.Fog(0xe8b888, 140, 760), exposure: 1.05, mapBox: { x0: -74, x1: 74, z0: zEnd - 12, z1: 52 },
+      env: [[[0, "#3a4a7a"], [0.48, "#ffc890"], [1, "#7a5030"]], [[0xffc070, 5, -30, 8, -25, 8, 6]]],
+      itemTick(it) { it.model.rotation.y = 0; },
+      tick(t, dt, calm) { if (calm) return; const da = dust.geometry.attributes.position.array; dustB.forEach((b, i) => { b[0] += dt * (3 + b[3]); if (b[0] > 40) b[0] -= 80; da[i * 3] = MU.pos.x + b[0]; da[i * 3 + 1] = ground(MU.pos.x + b[0], MU.pos.z + b[2]) + b[1] + Math.sin(t * 2 + b[3]) * 0.2; da[i * 3 + 2] = MU.pos.z + b[2]; }); dust.geometry.attributes.position.needsUpdate = true; },
+    };
+  } };
+
+  // 12. 雲の上の巨塔:雲海から突き出た大理石の塔のあいだを飛ぶ
+  HALLS.skytower = { name: "雲の上の巨塔", tip: "雲海から突き出た巨大な塔のあいだを飛んで回れます。", pal: "marble", fly: true, build({ n, g, r }) {
+    const S = 18, spots = [], pillarM = std({ map: tex(256, TX.marble("#e9e6de", "#a39a8c"), [2, 8], 150), roughness: 0.4 }), goldM = std({ color: 0xd8b060, roughness: 0.3, metalness: 0.9 });
+    for (let i = 0; i < n; i++) {
+      const a = (i / Math.max(n, 1)) * Math.PI * 2 - Math.PI / 2, rr = 58 + (i % 2) * 26 + r() * 8, x = Math.cos(a) * rr, z = Math.sin(a) * rr, base = 30 + (i % 3) * 14;
+      shade(put(g, box(18, 160, 18, pillarM), x, base - 80, z)); shade(put(g, box(30, 2, 30, goldM), x, base - 1, z));
+      spots.push({ x, y: base, z, scale: S, r: 28, near: 85, dist: 58, lift: 0 });
+    }
+    // 雲海(重ねた雲の板と、もくもくした雲)
+    for (const [y, op, rep] of [[-2, 1, 30], [3, 0.35, 22], [7, 0.2, 16]]) { const t = cloudTex(151 + y); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); const p = floorDecal(new THREE.PlaneGeometry(2400, 2400), basic({ map: t, color: 0xffffff, transparent: true, opacity: op, depthWrite: false }), y); g.add(p); }
+    g.add(floorDecal(new THREE.PlaneGeometry(2400, 2400), basic({ color: 0xdfe8f4 }), -6));
+    const puffs = []; for (let k = 0; k < 160; k++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex(160 + (k % 6)), color: 0xffffff, opacity: 0.95, transparent: true, depthWrite: false })); const a = r() * 6.283, d = 40 + r() * 420; s.position.set(Math.cos(a) * d, -2 + r() * 8, Math.sin(a) * d); const sc = 40 + r() * 70; s.scale.set(sc, sc * 0.45, 1); g.add(s); puffs.push(s); }
+    // 鳥の群れ
+    const birdM = basic({ color: 0x3a3a44, side: THREE.DoubleSide }), flocks = [0, 1, 2].map((k) => { const f = put(g, new THREE.Group()); const birds = []; for (let q = 0; q < 7; q++) { const b = put(f, new THREE.Group(), (q % 2 ? 1 : -1) * Math.ceil(q / 2) * 2.2, 0, Math.ceil(q / 2) * 2.2); const wl = put(b, mesh(new THREE.PlaneGeometry(1.2, 0.3), birdM), -0.6, 0, 0), wr = put(b, mesh(new THREE.PlaneGeometry(1.2, 0.3), birdM), 0.6, 0, 0); wl.rotation.x = wr.rotation.x = -Math.PI / 2; birds.push([wl, wr, q]); } return { f, birds, rad: 90 + k * 50, y: 40 + k * 18, sp: 0.05 + k * 0.015, ph: k * 2 }; });
+    g.add(skyDome([[0, "#2c5aa8"], [0.38, "#86b4e6"], [0.49, "#ffe0b8"], [0.52, "#f4f0ea"], [1, "#dfe8f4"]]));
+    put(g, glow(0xffe2b0, 150, 0.9), 320, 90, -260).material.fog = false; put(g, glow(0xffffff, 34, 1), 320, 90, -260).material.fog = false;
+    g.add(new THREE.HemisphereLight(0xb8d0f0, 0xfff0e0, 0.45));
+    const sun = new THREE.DirectionalLight(0xffd8a8, 1.9); sun.position.set(320, 160, -260); g.add(sun, sun.target);
+    return { spots, fly: [20, 200], walk: [{ t: "circ", x: 0, z: 0, r: 300 }], start: { x: 0, y: 62, z: 170, yaw: 0, pitch: -0.08 }, speed: 12,
+      fog: new THREE.Fog(0xd8e2f0, 320, 1500), exposure: 0.85, mapBox: { x0: -150, x1: 150, z0: -150, z1: 200 },
+      env: [[[0, "#2c5aa8"], [0.5, "#ffe0b8"], [1, "#ffffff"]], [[0xffe2b0, 5, 30, 15, -25, 8, 8]]],
+      itemTick(it) { it.model.rotation.y = 0; },
+      tick(t, dt, calm) { if (calm) return; for (const s of puffs) { s.position.x += dt * 1.2; if (s.position.x > 440) s.position.x -= 880; } for (const fl of flocks) { const a = t * fl.sp + fl.ph; fl.f.position.set(Math.cos(a) * fl.rad, fl.y + Math.sin(t * 0.3 + fl.ph) * 3, Math.sin(a) * fl.rad); fl.f.rotation.y = -a; for (const [wl, wr, q] of fl.birds) { const fa = Math.sin(t * 6 + q) * 0.5; wl.rotation.z = fa; wr.rotation.z = -fa; } } },
+    };
+  } };
+
+  const HALL_ORDER = ["modern", "european", "rpg", "heist", "game", "space", "zen", "underwater", "cyber", "city", "ruins", "skytower"];
   const OLD_HALL = { classic: "european", forest: "rpg", night: "heist", japanese: "zen", seaside: "underwater", warehouse: "modern", future: "cyber" }; // 前の版の展示場の名前
 
   // -- 歩く・泳ぐ --
@@ -2759,15 +2892,15 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       let best = null, bd = Infinity; for (const sh of W.walk) { const q = nearestIn(p, sh), d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } if (!d) break; }
       if (best) { p.x = best[0]; p.z = best[1]; }
     }
-    p.y = W.fly ? Math.max(W.fly[0], Math.min(W.fly[1], p.y)) : W.eye || EYE; return p;
+    p.y = W.fly ? Math.max(W.fly[0], Math.min(W.fly[1], p.y)) : (W.ground ? W.ground(p.x, p.z) : 0) + (W.eye || EYE); return p;
   }
-  function muWalk(fwd, side) { const f = MU.world?.fly ? muDir() : muDir(MU.yaw, 0), s = V(Math.cos(MU.yaw), 0, -Math.sin(MU.yaw)); muGo(muClamp(MU.pos.clone().addScaledVector(f, fwd).addScaledVector(s, side)), MU.yaw, MU.pitch, 0.35); }
+  function muWalk(fwd, side) { const f = MU.world?.fly ? muDir() : muDir(MU.yaw, 0), s = V(Math.cos(MU.yaw), 0, -Math.sin(MU.yaw)); const k = MU.world?.speed || 1; muGo(muClamp(MU.pos.clone().addScaledVector(f, fwd * k).addScaledVector(s, side * k)), MU.yaw, MU.pitch, 0.35); }
   function muGo(pos, yaw, pitch, dur = 1.1) {
     let dy = yaw - MU.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); // 近い向きに回る
     MU.tween = { from: { p: MU.pos.clone(), yaw: MU.yaw, pitch: MU.pitch }, to: { p: pos, yaw: MU.yaw + dy, pitch }, t0: performance.now(), dur: still.matches ? 0.01 : dur * 1000 };
   }
   const yawTo = (from, to) => Math.atan2(-(to.x - from.x), -(to.z - from.z));
-  const travel = (p) => Math.min(2.6, 0.5 + p.distanceTo(MU.pos) * 0.09);
+  const travel = (p) => Math.min(2.6, 0.5 + (p.distanceTo(MU.pos) / (MU.world?.speed || 1)) * 0.09);
   function muGoItem(it) {
     const W = MU.world, s = it.spot, d = s.dist || 3.4, b = it.base; let p;
     if (W.fly) { const v = MU.pos.clone().sub(b); v.y *= 0.35; if (v.lengthSq() < 1e-4) v.set(0, 0, 1); p = b.clone().add(v.normalize().multiplyScalar(d)); p.y += 0.35; }
@@ -2775,8 +2908,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     muClamp(p);
     muGo(p, yawTo(p, b), Math.atan2(b.y - p.y, Math.hypot(b.x - p.x, b.z - p.z)) * 0.9, travel(p)); MU.cur = it.i;
   }
-  function muStart() { const s = MU.world.start; MU.pos.set(s.x, s.y ?? (MU.world.eye || EYE), s.z); MU.yaw = s.yaw || 0; MU.pitch = s.pitch ?? -0.06; }
-  const muEntrance = () => { const s = MU.world?.start; if (!s) return; const p = V(s.x, s.y ?? (MU.world.eye || EYE), s.z); muGo(p, s.yaw || 0, s.pitch ?? -0.06, travel(p)); MU.cur = -1; };
+  function muStart() { const s = MU.world.start; MU.pos.set(s.x, s.y ?? (MU.world.eye || EYE), s.z); muClamp(MU.pos); MU.yaw = s.yaw || 0; MU.pitch = s.pitch ?? -0.06; }
+  const muEntrance = () => { const s = MU.world?.start; if (!s) return; const p = muClamp(V(s.x, s.y ?? (MU.world.eye || EYE), s.z)); muGo(p, s.yaw || 0, s.pitch ?? -0.06, travel(p)); MU.cur = -1; };
   function muHit(e) {
     const r = MU.r.domElement.getBoundingClientRect();
     MU.ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), MU.cam);
@@ -2861,13 +2994,13 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const pr = MU.r.getPixelRatio(); if (cv.width !== Math.round(w * pr) || cv.height !== Math.round(h * pr)) { MU.r.setSize(w, h, false); MU.cam.aspect = w / h; MU.cam.fov = w / h < 0.8 ? 80 : 62; MU.cam.updateProjectionMatrix(); }
     _prev.copy(MU.pos);
     if (MU.keys.size) { // 歩く(キー)。宇宙と海の底は見ている向きへ泳ぐ
-      const k = MU.keys, sp = (W.fly ? 4.2 : 2.8) * dt; if (k.has("arrowleft")) MU.yaw += 1.6 * dt; if (k.has("arrowright")) MU.yaw -= 1.6 * dt;
+      const k = MU.keys, sp = (W.fly ? 4.2 : 2.8) * (W.speed || 1) * dt; if (k.has("arrowleft")) MU.yaw += 1.6 * dt; if (k.has("arrowright")) MU.yaw -= 1.6 * dt;
       const f = (k.has("arrowup") || k.has("w") ? 1 : 0) - (k.has("arrowdown") || k.has("s") ? 1 : 0), s = (k.has("d") ? 1 : 0) - (k.has("a") ? 1 : 0);
       if (f || s) { const fd = W.fly ? muDir() : muDir(MU.yaw, 0), sd = V(Math.cos(MU.yaw), 0, -Math.sin(MU.yaw)); muClamp(MU.pos.addScaledVector(fd, f * sp).addScaledVector(sd, s * sp)); }
     }
     if (MU.tween) {
       const k = Math.min(1, (now - MU.tween.t0) / MU.tween.dur), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2, a = MU.tween.from, b = MU.tween.to;
-      MU.pos.lerpVectors(a.p, b.p, e); if (!W.fly) MU.pos.y = (W.eye || EYE) + Math.sin(k * Math.PI) * 0.03; MU.yaw = a.yaw + (b.yaw - a.yaw) * e; MU.pitch = a.pitch + (b.pitch - a.pitch) * e;
+      MU.pos.lerpVectors(a.p, b.p, e); if (!W.fly) MU.pos.y = (W.ground ? W.ground(MU.pos.x, MU.pos.z) : 0) + (W.eye || EYE) + Math.sin(k * Math.PI) * 0.03; MU.yaw = a.yaw + (b.yaw - a.yaw) * e; MU.pitch = a.pitch + (b.pitch - a.pitch) * e;
       if (k >= 1) MU.tween = null;
     }
     if (W.moved && _prev.distanceToSquared(MU.pos) > 1e-8) W.moved(_prev, MU.pos);
