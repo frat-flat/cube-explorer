@@ -66,6 +66,7 @@ npm run local -- --reset   # 取り込んだデータを消して、サンプル
 | `DATABASE_URL` | 1-4 の接続文字列 |
 | `NEON_AUTH_BASE_URL` | 1-2 の Auth URL |
 | `ALLOWED_EMAILS` | ログインして見てよいメールアドレス(カンマ区切り) |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | (任意)スプシのリンクを読むサービスアカウントの鍵 JSON。読むスプシはその `client_email` に閲覧者として共有する |
 
 `NEON_AUTH_COOKIE_SECRET` は `npm run local` が自動で作ります。起動したら http://localhost:3000 を開き、メールアドレスを入れると届く6桁のコードでログインします。
 

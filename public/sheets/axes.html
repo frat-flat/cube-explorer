@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>軸の辞書と箱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ダッシュボード: 上にヘッダー、左にメニュー、右に選んだ画面。シートは右から出る引き出しで開く */
+:root{
+  --bg:#eef0f3; --panel:#ffffff; --ink:#1d2430; --muted:#5f6b7c; --line:#d5dae2;
+  --paper:#fbfbf8; --paperInk:#222a35; --paperLine:#c9ced6;
+  --accent:#2d5bd7; --hl:#f2a516; --hlSoft:#fde7b6; --ok:#23935a; --okSoft:#d7f0e2;
+  --box:#9a6b3c; --stack:#d6338a; --frame:#7d8899; --stage:#e3e7ed; --ax:#7a4fd0; --ay:#23935a; --az:#d6338a; --mine:#0e8a9a;
+  --sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141922; --panel:#1b222d; --ink:#e6eaf0; --muted:#98a3b3; --line:#2c3543;
+  --paper:#243042; --paperInk:#e6eaf0; --paperLine:#3a475a;
+  --accent:#7ea2ff; --hl:#ffb938; --hlSoft:#5a4316; --ok:#5fd393; --okSoft:#1d3a2a;
+  --box:#d39b62; --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; --ax:#b393ff; --ay:#5fd393; --az:#ff6fb5; --mine:#4fd0e0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141922; --panel:#1b222d; --ink:#e6eaf0; --muted:#98a3b3; --line:#2c3543;
+  --paper:#243042; --paperInk:#e6eaf0; --paperLine:#3a475a;
+  --accent:#7ea2ff; --hl:#ffb938; --hlSoft:#5a4316; --ok:#5fd393; --okSoft:#1d3a2a;
+  --box:#d39b62; --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; --ax:#b393ff; --ay:#5fd393; --az:#ff6fb5; --mine:#4fd0e0; color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;box-sizing:border-box}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.shell{display:grid;grid-template-columns:200px minmax(0,1fr);grid-template-rows:52px minmax(0,1fr);height:100vh}
+.top{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.top .sp{flex:1}
+.brand{display:flex;align-items:center;gap:8px;font-size:15px;white-space:nowrap}
+.logo{display:inline-flex;color:var(--accent)}
+.crumb{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb::before{content:"/";margin-right:10px;color:var(--line)}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.nv{display:flex;align-items:center;gap:10px;border:none;background:none;border-radius:7px;padding:8px 10px;text-align:left;color:var(--muted);font-size:13.5px;width:100%}
+.nv:hover{background:var(--bg);color:var(--ink)}
+.nv.on{background:var(--bg);color:var(--accent);font-weight:700}
+.nv .ic{width:18px;text-align:center;font-size:15px}
+.nv .lb{flex:1;white-space:nowrap}
+.nv .nb{font-size:11px;border-radius:99px;padding:0 7px;background:var(--hl);color:#000;font-weight:700}
+.content{overflow:auto;padding:18px 20px 28px;min-width:0}
+.view{display:flex;flex-direction:column;gap:14px;max-width:1400px;margin:0 auto}
+.vhead h1{font-size:20px;margin:0}
+.lead{color:var(--muted);font-size:12.5px;margin:2px 0 0;max-width:72ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.kpi:hover{border-color:var(--accent)}
+.kpi .k{font-size:12px;color:var(--muted)}
+.kpi .v{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1.2}
+.kpi .s{font-size:11.5px;color:var(--muted)}
+.home{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+.home .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.two.wide{grid-template-columns:minmax(0,1fr) 340px}
+.recent{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.recent .ri{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 6px}
+.recent .ri .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent .ri .at{grid-column:2;color:var(--muted);font-size:11.5px}
+.drawer{position:fixed;top:52px;right:0;bottom:0;width:min(760px,100vw);z-index:20;border-radius:0;border-width:0 0 0 1px;box-shadow:-12px 0 32px rgba(0,0,0,.18);overflow:auto}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+section h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:700;display:flex;gap:8px;align-items:center}
+section h2 .sp{flex:1}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+button,select,input,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.small{font-size:12px;padding:1px 7px}
+textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
+.muted{color:var(--muted);font-size:12.5px}
+.star{border:none;background:none;padding:0 2px;font-size:15px;font-family:var(--sans);color:var(--muted);line-height:1}
+.star.on{color:var(--hl)}
+.pill{font-size:11px;border-radius:99px;padding:0 7px;border:1px solid currentColor;white-space:nowrap}
+.pill.box{color:var(--box)} .pill.cube{color:var(--accent)} .pill.mine{color:var(--mine)} .pill.new{color:var(--ok)}
+/* 箱とキューブの木 */
+.tree{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.node{display:flex;gap:6px;align-items:center;padding:2px 4px;border-radius:5px;cursor:pointer}
+.node:hover{background:var(--bg)}
+.node.used{background:var(--hlSoft)}
+.node{flex-wrap:wrap}
+.node .ax{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.ind1{padding-left:18px}.ind2{padding-left:36px}
+/* 軸の辞書 */
+.axis{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 6px;align-items:center;padding:5px 6px;border:1px solid var(--line);border-radius:6px}
+.axis .nm{font-weight:700}
+.axis .al{grid-column:2/4;color:var(--muted);font-size:12px}
+.axis.mine{border-style:dashed;border-color:var(--mine)}
+/* 立体 */
+#stage{position:relative;height:clamp(360px,calc(100vh - 380px),720px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
+#pinBar{position:absolute;right:8px;top:8px;max-width:calc(100% - 16px);font-size:12px;color:var(--muted);pointer-events:none}
+#pinBar button{pointer-events:auto}
+#pinBar .hint{background:var(--stage);padding:1px 4px;border-radius:4px}
+#pinCtl{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px;font-size:13px}
+#pinCtl .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#pinCtl [hidden]{display:none}
+#pinCtl input{flex:1 1 220px;min-width:0}
+#cmdMsg{color:var(--muted);font-size:12px}
+.unit{white-space:nowrap;font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
+.node.sel{outline:2px solid var(--mine);outline-offset:-1px}
+button.pin{white-space:nowrap}
+button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#gizmo{position:absolute;left:-10px;top:-12px;width:96px;height:96px;overflow:visible}
+#gizmo .end{cursor:pointer}
+#gizmo text{font:700 13px var(--sans);text-anchor:middle;dominant-baseline:central;cursor:pointer}
+#gizmo .end:hover text{text-decoration:underline}
+#legend{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;pointer-events:none}
+#legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+/* 軸の読み取りと承認 */
+.match{border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:4px}
+.match .col{font-weight:700}
+.match .col code{font-family:var(--mono);font-size:12px;color:var(--muted);font-weight:400}
+.cand{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px;align-items:start;font-size:13px;padding:3px 4px;border-radius:5px}
+.cand:has(input:checked){background:var(--okSoft)}
+.cand .why{grid-column:2/4;color:var(--muted);font-size:12px}
+.score{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.bar{display:inline-block;height:6px;border-radius:3px;background:var(--ok);vertical-align:middle;margin-right:4px}
+/* まとめる */
+.gather{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gather label{display:flex;gap:4px;align-items:center;font-size:13px}
+.trail{font-size:12.5px;color:var(--muted)}
+.trail b{color:var(--ink);font-weight:500}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:left;white-space:nowrap}
+th{background:var(--bg);font-weight:700;font-size:12.5px;position:sticky;top:0}
+td.num{text-align:right;font-family:var(--mono)}
+td.edit{cursor:text}
+td.edit:hover{outline:1px dashed var(--accent)}
+td.sum{color:var(--muted)}
+td.flash{background:var(--hlSoft)}
+tfoot td{font-weight:700}
+.saved{display:flex;flex-direction:column;gap:4px}
+.sv{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px;align-items:center;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+.sv.cur{border-color:var(--accent)}
+.sv .nm{cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:11px;border-radius:99px;padding:0 7px;background:var(--hl);color:#000}
+.note{color:var(--ok);font-weight:600;font-size:13px}
+.dict{display:flex;flex-direction:column;gap:2px;font-size:12.5px;max-height:260px;overflow:auto}
+.de{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1.3fr) auto;gap:2px 6px;align-items:center;padding:3px 2px;border-bottom:1px dashed var(--line)}
+.de .rel{font-family:var(--mono);font-weight:700;color:var(--accent);text-align:center;min-width:1.6em}
+.de .rel.ap{color:var(--hl)}
+.de .sc{grid-column:1/5;color:var(--muted);font-size:11.5px}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:6px}
+.form input,.form select,.form button{width:100%;font-size:12.5px;padding:2px 4px}
+.tabs{display:flex;flex-direction:column;gap:6px}
+.tab{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;font-size:13px}
+.tab .d{grid-column:2;color:var(--muted);font-size:12.5px}
+.tab code,.gas code{font-family:var(--mono);font-size:12px}
+.ai{border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.ai b.h{color:var(--accent)}
+.gas{border:1px dashed var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+.grid td,.grid th{font-family:var(--mono);font-size:12.5px}
+.grid th.rn{color:var(--muted);text-align:center;width:2.6em}
+.grid td.cf{color:#d32f2f;font-weight:600}
+.grid td.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.fbar{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:var(--panel);min-height:1.9em}
+.hist{display:flex;flex-direction:column;gap:6px}
+.he{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+.he summary{cursor:pointer}
+.he ul{margin:4px 0 0;padding-left:18px;color:var(--muted)}
+.he .src{font-size:12px;color:var(--muted)}
+.ap{color:var(--hl);font-weight:700}
+.msg{margin:0;font-size:13px;border-radius:6px;padding:6px 8px;background:var(--bg)}
+.msg.err{background:var(--hlSoft)}
+.node[data-sh]{cursor:pointer}
+.relrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:2px 4px}
+#prefs select{max-width:100%}
+#pShade{width:100%}
+.relrow input{font-size:12.5px;padding:1px 6px;flex:1;min-width:8em}
+@media (max-width:1100px){.home,.two,.two.wide{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){.shell{grid-template-columns:minmax(0,1fr);grid-template-rows:52px auto minmax(0,1fr)}
+  .top{grid-column:1}.side{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px}.nv{width:auto;padding:6px 10px}
+  .content{padding:14px 16px 24px}#stage{height:320px}.drawer{top:0}.crumb,#addMonth{display:none}}
+</style>
+
+<div class="shell">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5 21 7v10l-9 4.5L3 17V7z"/><path d="M3 7l9 4.5L21 7M12 11.5v10"/></svg></span><b>軸の辞書と箱</b></div>
+  <span class="crumb" id="crumb">ホーム</span>
+  <span class="sp"></span>
+  <button class="small" id="addMonth" title="各シートに次の月の行が入ったことにする">次の月のデータが入った(試し)</button>
+</header>
+<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
+<div class="content">
+<div class="view" data-view="home">
+  <div class="vhead"><h1>ホーム</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を軸の辞書に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="home">
+    <section class="stagecard"><h2>立体(箱・キューブ・シート)</h2>
+  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
+    <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
+  <div id="pinCtl">
+    <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
+    <div class="row" id="showRow"></div>
+    <div class="row"><label class="muted"><input type="checkbox" id="advFaces"> ②④⑥(縦横を入れ替えた目)も選べるようにする(上級)</label></div>
+    <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
+    <div class="row"><span id="cmdMsg">立体の箱やキューブを押しても選べます。ふだん使う目は ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。②④⑥は縦横を入れ替えた目(上級)</span></div>
+  </div>
+    </section>
+    <div class="col">
+      <section><h2>箱とキューブ</h2><div class="tree" id="tree"></div></section>
+      <section><h2>最近の履歴<span class="sp"></span><button class="small" data-go="history">すべて見る</button></h2><div class="recent" id="recent"></div></section>
+    </div>
+  </div>
+</div>
+<div class="view" data-view="gather" hidden>
+  <div class="vhead"><h1>まとめる</h1><p class="lead">箱とキューブを渡り歩いて、条件に合う値を1枚のシートにします。保存したまとめは、データが入ると自動で更新されます。</p></div>
+  <div class="two wide">
+  <section><h2>まとめる(箱とキューブを渡り歩いてシートにする)</h2>
+    <div class="gather" id="gather"></div>
+    <div class="trail" id="trail"></div>
+    <div class="tablewrap"><table id="result"></table></div>
+    <div class="row"><input type="text" id="saveName" placeholder="まとめの名前" aria-label="まとめの名前"><select id="saveScope" aria-label="保存先"><option value="all">全体に保存</option><option value="mine">マイリストに保存</option></select><button id="save">このまとめを保存</button><span class="note" id="note"></span></div>
+  </section>
+  <section><h2>保存したまとめ(データが入ると自動で更新)</h2><div class="saved" id="saved"></div></section>
+  </div>
+</div>
+<div class="view" data-view="import" hidden>
+  <div class="vhead"><h1>シートを入れる</h1><p class="lead">スプシのリンクか、貼り付けたシートから列を読み取り、軸の候補を出します。最後に人が承認してから入ります。</p></div>
+  <div class="two">
+  <section><h2>スプシのリンクで登録</h2>
+    <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
+    <div class="row"><span class="muted">入れる先</span><select id="bookTarget" aria-label="入れる先"></select></div>
+    <button class="primary" id="bookRead">読み取る</button>
+    <p class="msg" id="bookMsg" hidden></p>
+    <p class="muted">スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
+  <section><h2>シートを入れる</h2>
+    <div class="row"><select id="preset" aria-label="例のシート"></select></div>
+    <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先のキューブ"></select></div>
+    <div class="row"><span class="muted">このシート全体の値</span><select id="tagAxis" aria-label="シート全体の軸"></select><input type="text" id="tagVal" size="9" aria-label="シート全体の値"></div>
+    <input type="text" id="newName" placeholder="シート名" aria-label="シート名">
+    <textarea id="newData" aria-label="シートの中身(1行目が列名、カンマかタブ区切り)"></textarea>
+    <button class="primary" id="read">軸を読み取って候補を出す</button>
+  </section>
+  </div>
+  <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
+    <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
+  <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
+</div>
+<div class="view" data-view="dict" hidden>
+  <div class="vhead"><h1>軸の辞書</h1><p class="lead">軸と、呼び名・値の言い換えを管理します。</p></div>
+  <div class="two">
+  <section><h2>軸の辞書<span class="sp"></span><label class="muted"><input type="checkbox" id="showMine" checked> マイリストも見る</label></h2><div id="axes" class="tree"></div>
+    <p class="muted">★ はお気に入り。点線はマイリスト(自分だけの一時的な軸で、全体のシートには反映しない)。</p></section>
+  <section><h2>登録辞書(呼び名と値の言い換え)</h2><div class="dict" id="dict"></div>
+    <details><summary class="muted">言い換えを足す</summary><div class="form">
+      <select id="dKind" aria-label="種類"><option value="col">列の呼び名</option><option value="val">値の呼び名</option></select>
+      <input id="dFrom" placeholder="呼び名(例: 楽天市場)" aria-label="呼び名">
+      <select id="dRel" aria-label="関係"><option value="=">＝ 同じ</option><option value="≒">≒ ほぼ同じ</option><option value="⊃">⊃ 含む</option><option value="⊂">⊂ 一部</option></select>
+      <select id="dAxis" aria-label="軸"></select>
+      <input id="dVal" placeholder="値(例: 楽天)" aria-label="値">
+      <select id="dScope" aria-label="使う範囲"></select>
+      <input id="dNote" placeholder="メモ(違いなど)" aria-label="メモ" style="grid-column:1/3">
+      <button id="dAdd" style="grid-column:1/3">登録する</button></div></details>
+    <p class="muted">＝は同じものとして扱います。≒(ほぼ同じ)・⊃(含む)・⊂(一部)は似ていても同じではない関係で、まとめるときは「≒・⊃も混ぜる」を選んだときだけ入ります。範囲を1枚のシートにすると、そのシートの中だけの呼び名になります。</p></section>
+  </div>
+</div>
+<div class="view" data-view="history" hidden>
+  <div class="vhead"><h1>履歴</h1><p class="lead">読み取りの議事録と、まとめた・分けたシートの元をたどれます。</p></div>
+  <section><h2>履歴(読み取りの議事録・まとめた/分けたシートの元)</h2><div class="hist" id="hist"></div></section>
+</div>
+<div class="view" data-view="settings" hidden>
+  <div class="vhead"><h1>設定</h1></div>
+  <section><h2>設定(初期値と自分の設定を分けて持つ)</h2><div id="prefs"></div>
+    <p class="muted">初期値はシステムで固定し、誰も書き換えません。変えた内容は「自分の設定」として初期値とは別に持ち、いつでも初期値に戻せます。変えた記録は履歴に残ります。</p></section>
+</div>
+</div>
+<section id="viewSec" class="drawer" hidden aria-label="シートを開く"><h2><span id="viewTitle">シート</span><span class="sp"></span><button class="small" id="viewClose">閉じる</button></h2>
+    <div class="trail" id="viewInfo"></div><div class="fbar" id="fbar">セルを押すと中身(関数があれば関数)が出ます。ダブルクリックで直せます</div>
+    <div class="tablewrap"><table class="grid" id="viewGrid"></table></div><div class="row" id="viewActs"></div></section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+// ---------- データ ----------
+// 軸:名前・言い換え(過去に同じ意味と承認した列名)・見たことのある値。kind=key は行の見出しになる軸、measure は値の列の意味(科目)
+// 箱:法人のような入れ物。軸は持たず「法人=法人A」のような自分の値だけを持つ
+// キューブ:3軸が固定された店舗など。自分の値(ショップ=S-01)と3軸(月×モール×科目)を持つ
+// シート:キューブに入る。列ごとに「どの軸か」を承認済みで持つ。シート全体の値(モール=楽天)も持てる
+const months = ['2026-07', '2026-08', '2026-09'];
+function rnd(seed) { let h = 2166136261; for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 13), 1597334677)) >>> 0) / 4294967296; }
+const fmt = n => Math.round(n).toLocaleString();
+const num = v => +String(v).replace(/[^\d.-]/g, '') || 0;
+function mallSheet(shop, mall, cols, ms, label = m => m) {
+  const r = rnd(shop + mall);
+  return ms.map(m => { const s = Math.round((mall === '楽天' ? 180000 : 90000) * (.6 + r()) / 10) * 10; return [label(m), fmt(s), fmt(Math.round(s * (mall === '楽天' ? .1 : .08) / 10) * 10)]; });
+}
+const SAMPLE = () => {
+  const axes = [
+    { id: 'corp', name: '法人', kind: 'key', values: [], fav: false, scope: 'all' },
+    { id: 'shop', name: 'ショップ', kind: 'key', values: [], fav: true, scope: 'all' },
+    { id: 'mall', name: 'モール', kind: 'key', values: [], fav: true, scope: 'all' },
+    { id: 'month', name: '月', kind: 'key', values: [], fav: true, scope: 'all' },
+    { id: 'item', name: '科目', kind: 'measure', values: ['売上', '手数料'], fav: false, scope: 'all' }
+  ];
+  // 登録辞書:列の呼び名・値の呼び名と、正式な軸(や値)との関係。＝は同じ、≒はほぼ同じ、⊃は含む、⊂は一部。範囲はシート1枚だけにもできる
+  let dn = 0;
+  const D = (kind, from, rel, axis, value, scope, note) => ({ id: 'd' + (dn++), kind, from, rel, axis, value: value ?? null, scope: scope || 'all', note: note || '', at: '2026-10-01' });
+  const dict = [
+    D('col', '法人名', '=', 'corp'), D('col', '店舗', '=', 'shop'), D('col', 'ショップID', '=', 'shop'), D('col', '店舗コード', '=', 'shop'),
+    D('col', 'モール名', '=', 'mall'), D('col', '出店先', '=', 'mall'), D('col', '年月', '=', 'month'), D('col', '対象月', '=', 'month'),
+    D('col', '売上金額', '=', 'item', '売上'), D('col', '売上高', '=', 'item', '売上'), D('col', '決済手数料', '=', 'item', '手数料'),
+    D('col', 'システム利用料', '≒', 'item', '手数料', null, '決済手数料のほかに月額の利用料も入るので、手数料と完全には同じではない'),
+    D('col', '税込売上', '⊃', 'item', '売上', null, '税込売上は売上(税抜)に消費税を足したもの'),
+    D('val', '楽天市場', '=', 'mall', '楽天'), D('val', 'Yahoo!ショッピング', '=', 'mall', 'Yahoo'), D('val', 'au PAYマーケット', '=', 'mall', 'au PAY'),
+    D('val', '7月', '=', 'month', '2026-07', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる'),
+    D('val', '8月', '=', 'month', '2026-08', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる'),
+    D('val', '9月', '=', 'month', '2026-09', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる')
+  ];
+  const boxes = [
+    { id: 'b1', kind: 'box', name: '法人A', own: { corp: '法人A' }, parent: null },
+    { id: 'b2', kind: 'box', name: '法人B', own: { corp: '法人B' }, parent: null },
+    { id: 'c1', kind: 'cube', name: 'S-01', own: { shop: 'S-01' }, axes: ['month', 'mall', 'item'], parent: 'b1' },
+    { id: 'c2', kind: 'cube', name: 'S-02', own: { shop: 'S-02' }, axes: ['month', 'mall', 'item'], parent: 'b1' },
+    { id: 'c3', kind: 'cube', name: 'S-03', own: { shop: 'S-03' }, axes: ['month', 'mall', 'item'], parent: 'b2' }
+  ];
+  const sheets = [];
+  const add = (cube, mall, cols, bind, label) => sheets.push({ id: 'sh' + sheets.length, cube, name: mall + 'の売上', tag: { mall }, cols, bind, rows: mallSheet(cube, mall, cols, months, label) });
+  // 楽天は「月・売上・手数料」、Yahoo は「年月・売上金額・決済手数料」と列名が違うが、同じ軸として承認済み
+  add('c1', '楽天', ['月', '売上', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
+  add('c1', 'Yahoo', ['年月', '売上金額', '決済手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
+  add('c2', '楽天', ['月', '売上', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
+  // S-03 の楽天シートは月を「9月」のように年なしで書いている。登録辞書(このシートだけの呼び名)で 2026-09 と読む
+  add('c3', '楽天', ['対象月', '売上高', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }], m => +m.slice(5) + '月');
+  add('c3', 'Yahoo', ['年月', '売上金額', '決済手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
+  const saved = [{ id: 'v1', name: '各店舗の楽天の9月の売上', q: { fix: { mall: '楽天', month: '2026-09', item: '売上' }, row: 'shop', col: 'item' }, fav: true, scope: 'all', seen: '' },
+    { id: 'v2', name: 'S-01 の月別売上(モールごと)', q: { fix: { shop: 'S-01', item: '売上' }, row: 'month', col: 'mall' }, fav: false, scope: 'all', seen: '' }];
+  const history = [{ id: 'h0', at: '2026-10-01', kind: '承認', title: 'S-03 の楽天の売上 を入れた', lines: ['対象月 → 月(＝)。値は「9月」のように年なしなので、このシートだけの呼び名として 7月・8月・9月 を 2026-07〜09 と登録', '売上高 → 科目=売上(＝)', '手数料 → 科目=手数料(＝)'], sources: [], results: ['sh3'] }];
+  return { axes, boxes, sheets, saved, dict, history, nextMonth: 10 };
+};
+const KEY = 'axis-boxes-v2';
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); if (!S || !S.axes || !S.boxes || !S.sheets || !S.saved || !S.dict || !S.history) S = SAMPLE(); } catch (e) { S = SAMPLE(); }
+S.prefs = S.prefs || {};
+// 箱とキューブには必ず番号(箱1・キューブ1…)を振る。指示で呼べるように一度振った番号は変えない
+const unitOf = b => (b.kind === 'box' ? '箱' : 'キューブ') + b.no;
+// 単位=段(法人単位・ショップ単位)。箱・キューブが持つ軸の名前で決まる
+const levelOf = b => { if (b.levelName) return b.levelName; const k = Object.keys(b.own || {})[0]; return k && ax(k) ? ax(k).name : (b.kind === 'box' ? '箱' : 'キューブ'); };
+function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, ...S.boxes.filter(b => b.kind === k && b.no).map(b => b.no)); S.boxes.filter(b => b.kind === k && !b.no).forEach(b => b.no = ++n); } }
+numberUnits();
+// 前の版の面の名前(front など)をサイコロの目に置き換える
+S.boxes.forEach(b => { if (b.pin && b.pin.face) b.pin.face = ({ front: 'd1', top: 'd2', right: 'd3', left: 'd4', bottom: 'd5', back: 'd6' })[b.pin.face] || b.pin.face; });
+// 固定はその場の見方なので、開き直したら外れた状態から始める(前に固定したまま保存された分もここで外す)
+S.boxes.forEach(b => { delete b.pin; });
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const ax = id => S.axes.find(a => a.id === id);
+const box = id => S.boxes.find(b => b.id === id);
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let showMine = true;
+// システムの初期値。画面からは変えられない(秩序のもと)。自分の設定は S.prefs に別で持つ
+const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']) });
+const SHADES = { view: '表示中の最大値で割る', global: 'その科目の全期間の最大値で割る(絞っても色が変わらない)', row: '行ごとの最大値で割る', share: '行の合計に占める割合' };
+const curPref = k => (S.prefs && S.prefs[k] != null ? S.prefs[k] : SYSTEM[k]);
+const today = () => new Date().toISOString().slice(0, 10);
+const REL = { '=': '同じ', '≒': 'ほぼ同じ', '⊃': '含む', '⊂': '一部' };
+const sheetById = id => S.sheets.find(x => x.id === id);
+const where = sh => pathOf(sh.cube).map(b => b.name).join(' › ') + ' › ' + sh.name;
+const inScope = (d, shId) => d.scope === 'all' || d.scope === shId;
+// 値の呼び名を正式な値に直す。＝のものだけ直し、≒などは別の値のままにする
+function normVal(axisId, v, shId) { const d = S.dict.find(d => d.kind === 'val' && d.axis === axisId && d.from === v && d.rel === '=' && inScope(d, shId)); return d ? d.value : v; }
+const colNames = (axisId, value) => S.dict.filter(d => d.kind === 'col' && d.axis === axisId && (value == null ? d.value == null : d.value === value) && d.scope === 'all');
+const visibleAxis = a => a.scope === 'all' || showMine;
+
+// ---------- 箱とキューブを渡り歩いて、セルを「軸の値の組 → 値」にする ----------
+// シートのセル1つ = 箱の値(法人)+キューブの値(ショップ)+シート全体の値(モール)+行の見出し(月)+列の意味(科目=売上)
+function pathOf(cubeId) { const out = []; let b = box(cubeId); while (b) { out.unshift(b); b = b.parent && box(b.parent); } return out; }
+function facts() {
+  const out = [];
+  for (const sh of S.sheets) {
+    const ctx = {}; pathOf(sh.cube).forEach(b => Object.assign(ctx, b.own)); Object.entries(sh.tag || {}).forEach(([a, v]) => { ctx[a] = normVal(a, v, sh.id); });
+    const keyCols = sh.bind.map((b, i) => [b, i]).filter(([b]) => b && !b.value && ax(b.axis) && ax(b.axis).kind === 'key');
+    const valCols = sh.bind.map((b, i) => [b, i]).filter(([b]) => b && b.value != null);
+    sh.rows.forEach((r, ri) => {
+      const base = { ...ctx }; let hidden = false;
+      keyCols.forEach(([b, i]) => { base[b.axis] = normVal(b.axis, r[i], sh.id); if (ax(b.axis).scope === 'mine' && !showMine) hidden = true; });
+      valCols.forEach(([b, i]) => { if (ax(b.axis).scope === 'mine' && !showMine) return; out.push({ k: { ...base, [b.axis]: b.value }, v: num(r[i]), src: { sh: sh.id, r: ri, c: i }, hidden, approx: b.rel && b.rel !== '=' ? b.rel : null }); });
+    });
+  }
+  return out.filter(f => !f.hidden);
+}
+function valuesOf(axisId, fs) { return [...new Set(fs.map(f => f.k[axisId]).filter(v => v != null))].sort(); }
+function runQuery(q) {
+  const hit = facts().filter(f => Object.entries(q.fix).every(([a, v]) => !v || f.k[a] === v));
+  // ≒・⊃・⊂ で登録した列は、混ぜると選んだときだけ入れる
+  const fs = hit.filter(f => q.approx || !f.approx), left = hit.filter(f => f.approx && !q.approx);
+  const rows = valuesOf(q.row, fs), cols = q.col ? valuesOf(q.col, fs) : ['値'];
+  const cell = new Map();
+  for (const f of fs) { const r = f.k[q.row], c = q.col ? f.k[q.col] : '値'; if (r == null || c == null) continue; const key = r + '\u0001' + c; if (!cell.has(key)) cell.set(key, []); cell.get(key).push(f); }
+  return { rows, cols, cell, fs, left };
+}
+
+// ---------- 左: 木と辞書 ----------
+let used = new Set();   // まとめに使ったシート
+function renderTree() {
+  const el = $('tree'); let h = '';
+  const kids = p => S.boxes.filter(b => b.parent === p);
+  const walk = (p, d) => kids(p).forEach(b => {
+    const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
+    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + (b.kind === 'box' ? '中は' : '') + faceOf(b.pin.face).name : '固定'}</button></div>`;
+    S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
+    walk(b.id, d + 1);
+    if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addbox="${b.id}">＋ 箱を足す</button></div>`;
+    if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
+  });
+  walk(null, 0);
+  el.innerHTML = h;
+  el.querySelectorAll('[data-pin]').forEach(n => n.onclick = e => { e.stopPropagation(); togglePin(n.dataset.pin); });
+  el.querySelectorAll('[data-unit]').forEach(n => n.onclick = () => select(n.dataset.unit));
+  el.querySelectorAll('[data-addcube]').forEach(n => n.onclick = () => addCube(n.dataset.addcube));
+  el.querySelectorAll('[data-addbox]').forEach(n => n.onclick = () => addBox(n.dataset.addbox));
+  el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollTop = 0; });
+}
+function renderAxes() {
+  const fsAll = facts();
+  const list = [...S.axes].filter(visibleAxis).sort((a, b) => (b.fav - a.fav));
+  $('axes').innerHTML = list.map(a => {
+    const vals = a.kind === 'measure' ? a.values : valuesOf(a.id, fsAll);
+    const nm = d => d.from + (d.rel === '=' ? '' : '(' + d.rel + ')');
+    const als = a.kind === 'measure' ? a.values.map(v => { const l = colNames(a.id, v); return l.length ? v + '←' + l.map(nm).join('/') : ''; }).filter(Boolean).join('、') : colNames(a.id).map(nm).join('、');
+    return `<div class="axis${a.scope === 'mine' ? ' mine' : ''}"><button class="star${a.fav ? ' on' : ''}" data-fav="${a.id}" aria-label="お気に入り">${a.fav ? '\u2605\uFE0E' : '\u2606'}</button><span class="nm">${esc(a.name)} ${a.scope === 'mine' ? '<span class="pill mine">マイリスト</span>' : ''}</span><span class="muted">${a.kind === 'measure' ? '値の列' : vals.length + '個の値'}</span>
+      <span class="al">${als ? '呼び名: ' + esc(als) : '言い換えなし'}${a.kind === 'measure' ? ' / ' + esc(vals.join('・')) : ''}</span></div>`;
+  }).join('');
+  $('axes').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const a = ax(b.dataset.fav); a.fav = !a.fav; save(); renderAxes(); renderGather(); });
+}
+
+// ---------- シートを入れる:軸の候補を全部出し、最後に承認 ----------
+const PRESETS = [
+  { name: 'au PAYの売上', target: 'c2', tag: ['mall', 'au PAY'], data: '出店月,売上金額,システム利用料\n2026-07,64200,5140\n2026-08,71800,5740\n2026-09,69350,5550' },
+  { name: '広告費', target: 'c1', tag: ['mall', '楽天'], data: '年月,広告媒体,広告費\n2026-07,RPP,12000\n2026-08,RPP,15500\n2026-09,クーポン,9800' },
+  { name: 'Yahooの売上(店舗コードつき)', target: 'c2', tag: ['mall', 'Yahoo'], data: '対象月,店舗コード,売上高,決済手数料\n2026-07,S-02,98400,7870\n2026-08,S-02,102300,8180\n2026-09,S-02,95100,7610' }
+];
+function fillPreset(i) {
+  const p = PRESETS[i]; $('newName').value = p.name; $('newData').value = p.data;
+  $('target').value = p.target; $('tagAxis').value = p.tag[0]; $('tagVal').value = p.tag[1];
+}
+function renderInputs() {
+  const keep = ['preset', 'target', 'tagAxis', 'bookTarget', 'dAxis', 'dScope'].map(id => [id, $(id).value]);
+  $('preset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('');
+  const tg = S.boxes.map(b => `<option value="${b.id}">${b.kind === 'box' ? '箱 ' : 'キューブ '}${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('');
+  $('target').innerHTML = tg; $('bookTarget').innerHTML = tg;
+  $('dAxis').innerHTML = S.axes.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  $('dScope').innerHTML = '<option value="all">全体で使う</option>' + S.sheets.map(s => `<option value="${s.id}">このシートだけ: ${esc(where(s))}</option>`).join('');
+  $('tagAxis').innerHTML = '<option value="">なし</option>' + S.axes.filter(a => a.kind === 'key').map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  keep.forEach(([id, v]) => { if (v && [...$(id).options].some(o => o.value === v)) $(id).value = v; });
+}
+// 文字の近さ(2文字ずつの重なり)。完全一致・含む は強め
+function sim(a, b) {
+  if (a === b) return 1; if (a.includes(b) || b.includes(a)) return .75;
+  const bg = s => { const o = []; for (let i = 0; i < s.length - 1; i++) o.push(s.slice(i, i + 2)); return o.length ? o : [s]; };
+  const x = bg(a), y = bg(b); let n = 0; const ys = [...y]; x.forEach(t => { const i = ys.indexOf(t); if (i >= 0) { n++; ys.splice(i, 1); } });
+  return 2 * n / (x.length + y.length);
+}
+const shapeOf = v => /^\d{4}-\d{2}$/.test(v) ? '年月' : /^[A-Z]-\d+$/.test(v) ? 'コード' : /^[\d,.-]+$/.test(v) ? '数値' : '文字';
+function candidates(col, vals) {
+  const fsAll = facts(), shape = shapeOf(vals[0] || ''), isNum = vals.every(v => shapeOf(v) === '数値');
+  const out = [];
+  for (const a of S.axes) {
+    if (a.kind === 'key') {
+      const names = [{ from: a.name, rel: '=' }, ...colNames(a.id)], best = names.reduce((p, n) => sim(col, n.from) > sim(col, p.from) ? n : p), ns = sim(col, best.from) * (best.rel === '=' ? 1 : .9);
+      const known = valuesOf(a.id, fsAll), overlap = vals.filter(v => known.includes(v) || normVal(a.id, v, '') !== v).length / (vals.length || 1);
+      const kshape = known.length ? shapeOf(known[0]) : '', shapeOk = kshape && kshape === shape;
+      const score = isNum ? ns * .3 : Math.min(1, ns * .55 + overlap * .35 + (shapeOk ? .2 : 0));
+      const why = [];
+      if (ns > .3) why.push(sim(col, best.from) === 1 ? `辞書の「${best.from}」と同じ名前` : `名前が「${best.from}」に近い`);
+      if (best.rel !== '=' && ns > .3) why.push(`辞書では「${best.from}」${best.rel}「${a.name}」(${REL[best.rel]})`);
+      if (shapeOk) why.push(`値の形が同じ(${shape})`);
+      if (overlap) why.push(`値の${Math.round(overlap * 100)}%が登録済みの値と同じ`);
+      if (isNum) why.push('値が数字なので見出しの軸には向かない');
+      if (score >= .15) out.push({ axis: a.id, label: `${a.name}(見出しの軸)`, score, rel: ns > .3 ? best.rel : '=', note: ns > .3 ? best.note || '' : '', why: why.join('・') || '弱い一致' });
+    } else {
+      for (const v of a.values) {
+        const names = [{ from: v, rel: '=' }, ...colNames(a.id, v)], best = names.reduce((p, n) => sim(col, n.from) > sim(col, p.from) ? n : p);
+        const ns = sim(col, best.from) * (best.rel === '=' ? 1 : .9), score = isNum ? Math.min(1, ns * .85 + .15) : ns * .3;
+        const why = (sim(col, best.from) === 1 ? `辞書の「${best.from}」と同じ名前` : `名前が「${best.from}」に近い`) + (best.rel !== '=' ? `・辞書では「${best.from}」${best.rel}「${v}」(${REL[best.rel]})` : '') + (isNum ? '・値が数字' : '');
+        if (score >= .2) out.push({ axis: a.id, value: v, label: `${a.name} = ${v}(値の列)`, score, rel: best.rel, note: best.note || '', why });
+      }
+    }
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+let pending = null, queue = [];
+function readSheet() {
+  const txt = $('newData').value.trim(); if (!txt) return;
+  const lines = txt.split(/\r?\n/).filter(x => x.trim()), sep = lines[0].includes('\t') ? '\t' : ',';
+  const grid = lines.map(x => x.split(sep).map(v => v.trim())), cols = grid[0], rows = grid.slice(1).map(r => cols.map((_, i) => r[i] ?? ''));
+  pending = { name: $('newName').value.trim() || 'シート', cube: $('target').value, tag: $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}, cols, rows,
+    picks: pickCols(cols, rows) };
+  renderMatches();
+}
+const pickCols = (cols, rows) => cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', rel: null, note: '', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; });
+function renderMatches() {
+  queueMicrotask(renderHome);
+  const sec = $('matchSec'); sec.hidden = !pending; if (!pending) return;
+  const p = pending;
+  $('matches').innerHTML = (p.origin ? `<p class="muted">元: ${esc(p.origin.text)}</p>` : '') + `<p class="muted">入れる先: ${esc(pathOf(p.cube).map(b => b.name).join(' › '))} ・ シート「${esc(p.name)}」${Object.entries(p.tag).map(([a, v]) => ' ・ ' + esc(ax(a).name) + '=' + esc(v)).join('')}。列ごとに、過去に登録した軸と同じ意味か別かを選んでください。候補はすべて並べています。</p>` +
+    p.cols.map((c, i) => { const m = p.picks[i], ex = p.rows.slice(0, 3).map(r => r[i]).join(', ');
+      const opt = (val, label, why, extra = '') => `<label class="cand"><input type="radio" name="m${i}" value="${val}"${String(m.pick) === String(val) ? ' checked' : ''}><span>${label}${extra}</span><span class="why">${why}</span></label>`;
+      return `<div class="match"><div class="col">${esc(c)} <code>例: ${esc(ex)}</code> <span class="muted">候補 ${m.cands.length}件</span></div>` +
+        m.cands.map((cd, k) => opt(k, esc(cd.label), esc(cd.why), ` <span class="score"><span class="bar" style="width:${Math.round(cd.score * 40)}px"></span>${Math.round(cd.score * 100)}%</span>`)).join('') +
+        opt('new', `<span class="pill new">新しい軸</span> 「${esc(c)}」を${m.isNum ? '科目の新しい値' : '新しい軸'}として全体に登録`, '過去のどの軸とも別のものとして扱う') +
+        opt('mine', `<span class="pill mine">マイリスト</span> 「${esc(c)}」を自分だけの一時的な軸にする`, '全体の軸の辞書やほかの人のまとめには反映しない') +
+        opt('skip', '使わない', 'この列は読み込まない') +
+        (typeof m.pick === 'number' ? `<div class="relrow">関係: <select data-rel="${i}" aria-label="関係">${Object.entries(REL).map(([k, t]) => `<option value="${k}"${(m.rel || m.cands[m.pick].rel) === k ? ' selected' : ''}>${k} ${t}</option>`).join('')}</select><input data-note="${i}" placeholder="違いのメモ(≒・⊃・⊂のとき)" value="${esc(m.note || m.cands[m.pick].note || '')}" aria-label="違いのメモ"></div>` : '') + '</div>'; }).join('');
+  $('matches').querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { const i = +r.name.slice(1); p.picks[i].pick = isNaN(+r.value) ? r.value : +r.value; p.picks[i].rel = null; p.picks[i].note = ''; renderMatches(); });
+  $('matches').querySelectorAll('[data-rel]').forEach(x => x.onchange = () => { p.picks[+x.dataset.rel].rel = x.value; });
+  $('matches').querySelectorAll('[data-note]').forEach(x => x.oninput = () => { p.picks[+x.dataset.note].note = x.value; });
+  $('queueInfo').textContent = queue.length ? `このあと ${queue.length} 枚の承認が続きます` : '';
+}
+function approve() {
+  const p = pending; if (!p) return;
+  const lines = [];
+  const bind = p.cols.map((c, i) => {
+    const m = p.picks[i];
+    if (m.pick === 'skip') { lines.push(`${c} → 使わない`); return null; }
+    if (m.pick === 'new' || m.pick === 'mine') {
+      const scope = m.pick === 'mine' ? 'mine' : 'all';
+      lines.push(`${c} → ${scope === 'mine' ? 'マイリストの' : ''}新しい${m.isNum && scope === 'all' ? '科目の値' : '軸'}として登録`);
+      if (m.isNum && scope === 'all') { const it = ax('item'); if (!it.values.includes(c)) it.values.push(c); return { axis: 'item', value: c, rel: '=' }; }
+      const id = 'a' + Date.now().toString(36) + i;
+      if (m.isNum) { S.axes.push({ id, name: c, kind: 'measure', values: [c], fav: false, scope }); return { axis: id, value: c, rel: '=' }; }
+      S.axes.push({ id, name: c, kind: 'key', values: [], fav: false, scope }); return { axis: id, rel: '=' };
+    }
+    const cd = m.cands[m.pick], a = ax(cd.axis), rel = m.rel || cd.rel || '=', nt = m.note || cd.note || '';
+    const target = cd.value != null ? cd.value : a.name;
+    lines.push(`${c} → ${a.name}${cd.value != null ? '=' + cd.value : ''}(${rel} ${REL[rel]}${nt ? '・' + nt : ''})`);
+    // 承認した呼び名は登録辞書に入れる(次から候補の名前一致になる)。関係(＝/≒/⊃/⊂)とメモも一緒に残す
+    if (c !== target && !S.dict.some(d => d.kind === 'col' && d.from === c && d.axis === a.id && d.value === (cd.value ?? null)))
+      S.dict.push({ id: 'd' + Date.now().toString(36) + i, kind: 'col', from: c, rel, axis: a.id, value: cd.value ?? null, scope: 'all', note: nt, at: today() });
+    return { axis: a.id, value: cd.value, rel };
+  });
+  const id = 'sh' + Date.now().toString(36);
+  S.sheets.push({ id, cube: p.cube, name: p.name, tag: p.tag, cols: p.cols, rows: p.rows, bind, origin: p.origin ? { text: p.origin.text, short: p.origin.short } : null, cf: p.cf || [], dv: p.dv || [], formulas: p.formulas || {} });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: p.origin ? '取り込み' : '承認', title: `${where({ cube: p.cube, name: p.name })} を入れた`,
+    lines: [...(p.origin ? p.origin.minutes : []), ...lines], sources: p.origin ? p.origin.sources : [], results: [id] });
+  pending = queue.shift() || null; save(); note('シート「' + p.name + '」を入れました。保存したまとめは自動で更新されます');
+  renderAll();
+}
+
+// ---------- まとめる ----------
+let q = JSON.parse(JSON.stringify(S.saved[0] ? S.saved[0].q : { fix: {}, row: 'shop', col: 'item' }));
+let curSaved = S.saved[0] ? S.saved[0].id : null;
+let flash = new Set();
+function renderGather() {
+  const fsAll = facts(), keyAxes = S.axes.filter(a => visibleAxis(a)).sort((a, b) => b.fav - a.fav);
+  let h = '';
+  for (const a of keyAxes) {
+    if (a.id === q.row || a.id === q.col) continue;
+    const vals = valuesOf(a.id, fsAll); if (!vals.length) continue;
+    h += `<label>${a.fav ? '\u2605\uFE0E' : ''}${esc(a.name)}<select data-fix="${a.id}"><option value="">すべて</option>${vals.map(v => `<option${q.fix[a.id] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`;
+  }
+  const axOpt = (cur, none) => (none ? '<option value="">なし</option>' : '') + keyAxes.filter(a => valuesOf(a.id, fsAll).length).map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  h += `<label>行に並べる<select id="qRow">${axOpt(q.row)}</select></label><label>列に並べる<select id="qCol">${axOpt(q.col, true)}</select></label>`;
+  h += `<button class="small" id="qSwap"${q.col ? '' : ' disabled'}>⇄ 縦横を入れ替える</button>`;
+  h += `<label><input type="checkbox" id="qApprox"${q.approx ? ' checked' : ''}> ≒・⊃も混ぜる</label>`;
+  $('gather').innerHTML = h;
+  $('qSwap').onclick = () => { [q.row, q.col] = [q.col, q.row]; curSaved = null; renderGather(); renderSaved(); };
+  $('qApprox').onchange = e => { q.approx = e.target.checked; curSaved = null; renderResult(); renderSaved(); };
+  $('gather').querySelectorAll('[data-fix]').forEach(s => s.onchange = () => { q.fix[s.dataset.fix] = s.value || undefined; curSaved = null; renderResult(); renderSaved(); });
+  $('qRow').onchange = e => { q.row = e.target.value; delete q.fix[q.row]; if (q.col === q.row) q.col = ''; curSaved = null; renderGather(); renderResult(); renderSaved(); };
+  $('qCol').onchange = e => { q.col = e.target.value; delete q.fix[q.col]; curSaved = null; renderGather(); renderResult(); renderSaved(); };
+  renderResult();
+}
+function renderResult() {
+  const R = runQuery(q), t = $('result');
+  used = new Set(R.fs.map(f => f.src.sh));
+  const fixTxt = Object.entries(q.fix).filter(([, v]) => v).map(([a, v]) => ax(a).name + '=' + v).join('・') || '絞りなし';
+  const paths = [...used].map(id => { const s = S.sheets.find(x => x.id === id); return pathOf(s.cube).map(b => b.name).join(' › ') + ' › ' + s.name; });
+  const leftSh = [...new Set(R.left.map(f => { const s = sheetById(f.src.sh); return s.name + 'の「' + s.cols[f.src.c] + '」(' + f.approx + ')'; }))];
+  $('trail').innerHTML = `<b>${esc(fixTxt)}</b> を、${R.rows.length ? `<b>${esc(ax(q.row).name)}</b>ごとに` : ''}${used.size}枚のシートから集めました: ` + esc(paths.join(' / ') || 'なし') +
+    (leftSh.length ? `<br><span class="ap">≒</span> 似ているが同じではない列 ${R.left.length} 件は入れていません: ${esc(leftSh.join('、'))}(「≒・⊃も混ぜる」で入ります)` : '');
+  if (!R.rows.length) { t.innerHTML = '<tbody><tr><td>条件に合う値がありません</td></tr></tbody>'; renderTree(); paint(); return; }
+  const tot = R.cols.map(() => 0);
+  const body = R.rows.map(r => `<tr><th>${esc(r)}</th>${R.cols.map((c, ci) => {
+    const fs = R.cell.get(r + '\u0001' + c) || [], v = fs.reduce((a, f) => a + f.v, 0); tot[ci] += v;
+    if (!fs.length) return '<td class="num sum">—</td>';
+    const src = fs.map(f => { const s = S.sheets.find(x => x.id === f.src.sh); return pathOf(s.cube).map(b => b.name).join(' › ') + ' › ' + s.name + ' › ' + s.rows[f.src.r][0] + ' の「' + s.cols[f.src.c] + '」'; }).join('\n');
+    const one = fs.length === 1, key = one ? fs[0].src.sh + ':' + fs[0].src.r + ':' + fs[0].src.c : '';
+    const apx = fs.filter(f => f.approx).map(f => f.approx);
+    const t = shadeOf(R, r, c, v), bg = `background:color-mix(in srgb, var(--accent) ${Math.round(6 + t * 40)}%, var(--panel))`;
+    return `<td style="${flash.has(key) ? '' : bg}" class="num${one ? ' edit' : ' sum'}${flash.has(key) ? ' flash' : ''}" title="${esc(src)}${apx.length ? '\n(' + apx.join('') + ' の列を含む)' : ''}${one ? '\n(押して直すと元のシートに反映)' : '\n(' + fs.length + '件の合計なので直せません)'}"${one ? ` data-src="${key}"` : ''}>${apx.length ? `<span class="ap">${apx[0]}</span> ` : ''}${fmt(v)}</td>`;
+  }).join('')}</tr>`).join('');
+  t.innerHTML = `<thead><tr><th>${esc(ax(q.row).name)}</th>${R.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${body}</tbody><tfoot><tr><td>合計</td>${tot.map(x => `<td class="num">${fmt(x)}</td>`).join('')}</tr></tfoot>`;
+  t.querySelectorAll('td[data-src]').forEach(td => td.onclick = () => editCell(td));
+  flash = new Set();
+  const cs = S.saved.find(x => x.id === curSaved); if (cs) { cs.seen = sig(cs); save(); }   // 開いているまとめは見たことにする
+  renderTree(); paint();
+}
+// まとめた表から直すと、元のシートのセルを直す。ほかのまとめも同じセルを見ているので全部に反映される
+function editCell(td) {
+  const [sid, r, c] = td.dataset.src.split(':'), sh = S.sheets.find(x => x.id === sid);
+  const v = prompt(`${pathOf(sh.cube).map(b => b.name).join(' › ')} › ${sh.name} › ${sh.rows[r][0]} の「${sh.cols[c]}」を直す`, sh.rows[r][c]);
+  if (v == null || v.trim() === '') return;
+  sh.rows[r][c] = fmt(num(v)); flash.add(td.dataset.src); save();
+  note('元のシート「' + sh.name + '」を直しました。同じセルを使うまとめはすべて更新されます');
+  renderAll();
+}
+function sig(sv) { const R = runQuery(sv.q); return JSON.stringify([R.rows, R.cols, [...R.cell].map(([k, fs]) => [k, fs.reduce((a, f) => a + f.v, 0)])]); }
+function renderSaved() {
+  queueMicrotask(renderHome);
+  const list = S.saved.filter(s => s.scope === 'all' || showMine).sort((a, b) => b.fav - a.fav);
+  $('saved').innerHTML = list.length ? list.map(s => { const changed = s.seen && s.seen !== sig(s);
+    return `<div class="sv${s.id === curSaved ? ' cur' : ''}"><button class="star${s.fav ? ' on' : ''}" data-sfav="${s.id}" aria-label="お気に入り">${s.fav ? '\u2605\uFE0E' : '\u2606'}</button><span class="nm" data-open="${s.id}">${esc(s.name)} ${s.scope === 'mine' ? '<span class="pill mine">マイリスト</span>' : ''}</span>${changed ? '<span class="badge">更新あり</span>' : '<span></span>'}<button class="x small" data-del="${s.id}" aria-label="消す">×</button></div>`; }).join('')
+    : '<span class="muted">まだありません</span>';
+  $('saved').querySelectorAll('[data-open]').forEach(b => b.onclick = () => { const s = S.saved.find(x => x.id === b.dataset.open); q = JSON.parse(JSON.stringify(s.q)); curSaved = s.id; s.seen = sig(s); save(); renderGather(); renderSaved(); });
+  $('saved').querySelectorAll('[data-sfav]').forEach(b => b.onclick = () => { const s = S.saved.find(x => x.id === b.dataset.sfav); s.fav = !s.fav; save(); renderSaved(); });
+  $('saved').querySelectorAll('[data-del]').forEach(b => b.onclick = () => { S.saved = S.saved.filter(x => x.id !== b.dataset.del); save(); renderSaved(); });
+}
+function saveQuery() {
+  const fixTxt = Object.entries(q.fix).filter(([, v]) => v).map(([, v]) => v).join('・');
+  const name = $('saveName').value.trim() || (fixTxt + '(' + ax(q.row).name + 'ごと)');
+  const s = { id: 'v' + Date.now().toString(36), name, q: JSON.parse(JSON.stringify(q)), fav: false, scope: $('saveScope').value, seen: '' };
+  s.seen = sig(s); S.saved.push(s); curSaved = s.id; save(); $('saveName').value = ''; note('「' + name + '」を保存しました'); renderSaved();
+}
+// 試し:各シートに次の月の行が入る
+function addMonth() {
+  const m = '2026-' + String(S.nextMonth).padStart(2, '0'); S.nextMonth++;
+  for (const sh of S.sheets) {
+    const mi = sh.bind.findIndex(b => b && b.axis === 'month'); if (mi < 0 || sh.rows.some(r => r[mi] === m)) continue;
+    const r = rnd(sh.id + m), last = sh.rows[sh.rows.length - 1];
+    sh.rows.push(last.map((v, i) => i === mi ? m : sh.bind[i] && sh.bind[i].value != null ? fmt(Math.round(num(v) * (.85 + r() * .3) / 10) * 10) : v));
+  }
+  save(); note(m + ' の行が各シートに入りました。保存したまとめは自動で更新されます(「更新あり」)'); renderAll();
+}
+let noteT;
+function note(t) { $('note').textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { $('note').textContent = ''; }, 6000); }
+
+
+
+// ---------- 設定(初期値と自分の設定) ----------
+function renderPrefs() {
+  const sh = curPref('shade'), ca = curPref('cubeAxes'), own = k => S.prefs[k] != null;
+  const axOpts = cur => S.axes.filter(a => a.scope === 'all').map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  $('prefs').innerHTML = `<div class="relrow"><b>濃淡の基準</b> <span class="pill ${own('shade') ? 'mine' : 'cube'}">${own('shade') ? '自分の設定' : '初期値'}</span></div>
+    <select id="pShade" aria-label="濃淡の基準">${Object.entries(SHADES).map(([k, t]) => `<option value="${k}"${sh === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    <div class="muted">初期値: ${SHADES[SYSTEM.shade]} ${own('shade') ? '<button class="small" data-reset="shade">初期値に戻す</button>' : ''}</div>
+    <div class="relrow"><b>新しいキューブの3軸</b> <span class="pill ${own('cubeAxes') ? 'mine' : 'cube'}">${own('cubeAxes') ? '自分の設定' : '初期値'}</span></div>
+    <div class="row">${[0, 1, 2].map(i => `<select data-ca="${i}" aria-label="${'XYZ'[i]}軸">${axOpts(ca[i])}</select>`).join('×')}</div>
+    <div class="muted">初期値: ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')} ${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">初期値に戻す</button>' : ''}</div>`;
+  const log = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '設定', title: t, lines: l, sources: [], results: [] });
+  $('pShade').onchange = e => { const v = e.target.value; if (v === SYSTEM.shade) delete S.prefs.shade; else S.prefs.shade = v; log('濃淡の基準を変えた', [`${SHADES[v]}(初期値は ${SHADES[SYSTEM.shade]})`]); save(); renderAll(); };
+  $('prefs').querySelectorAll('[data-ca]').forEach(x => x.onchange = () => { const v = [...$('prefs').querySelectorAll('[data-ca]')].map(y => y.value);
+    if (new Set(v).size < 3) { note('3つの軸は別々のものを選んでください'); renderPrefs(); return; }
+    if (v.join() === SYSTEM.cubeAxes.join()) delete S.prefs.cubeAxes; else S.prefs.cubeAxes = v;
+    log('新しいキューブの3軸を変えた', [`${v.map(a => ax(a).name).join('×')}(初期値は ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')}。今あるキューブの軸は変えない)`]); save(); renderAll(); });
+  $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を初期値に戻した', [b.dataset.reset === 'shade' ? '濃淡の基準' : '新しいキューブの3軸']); save(); renderAll(); });
+}
+// 箱の中に箱を足す(法人の中のグループなど)。単位は「グループ」
+function addBox(boxId) {
+  const n = S.boxes.filter(b => b.kind === 'box' && b.levelName === 'グループ').length + 1, name = 'グループ' + n;
+  S.boxes.push({ id: 'g' + Date.now().toString(36), kind: 'box', name, own: {}, levelName: 'グループ', parent: boxId });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${box(boxId).name} に箱 ${name} を足した`, lines: ['中にキューブを足すと、箱の中の箱として表示します'], sources: [], results: [] });
+  numberUnits(); save(); renderAll(); paint();
+}
+function addCube(boxId) {
+  const n = S.boxes.filter(b => b.kind === 'cube').length + 1, name = 'S-' + String(n).padStart(2, '0'), axes = [...curPref('cubeAxes')];
+  S.boxes.push({ id: 'c' + Date.now().toString(36), kind: 'cube', name, own: { shop: name }, axes, parent: boxId });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${box(boxId).name} にキューブ ${name} を足した`, lines: [`3軸: ${axes.map(a => ax(a).name).join('×')}(${S.prefs.cubeAxes ? '自分の設定' : '初期値'}から)`], sources: [], results: [] });
+  numberUnits(); save(); renderAll();
+}
+// まとめた表の濃淡。基準は設定で選ぶ
+function shadeOf(R, r, c, v) {
+  const mode = curPref('shade'), sumOf = (rr, cc) => (R.cell.get(rr + '\u0001' + cc) || []).reduce((a, f) => a + f.v, 0);
+  let base = 0;
+  if (mode === 'view') R.rows.forEach(rr => R.cols.forEach(cc => { base = Math.max(base, sumOf(rr, cc)); }));
+  else if (mode === 'row') R.cols.forEach(cc => { base = Math.max(base, sumOf(r, cc)); });
+  else if (mode === 'share') R.cols.forEach(cc => { base += sumOf(r, cc); });
+  else { const it = q.col === 'item' ? c : q.row === 'item' ? r : q.fix.item; facts().forEach(f => { if (!it || f.k.item === it) base = Math.max(base, f.v); }); }
+  return base ? Math.max(0, Math.min(1, v / base)) : 0;
+}
+
+// ---------- 登録辞書 ----------
+function renderDict() {
+  const nameOf = d => { const a = ax(d.axis); return a ? a.name + (d.value != null ? ' = ' + d.value : '') : '?'; };
+  const list = [...S.dict].sort((a, b) => (a.kind > b.kind ? 1 : a.kind < b.kind ? -1 : 0));
+  $('dict').innerHTML = list.map(d => `<div class="de"><span>${d.kind === 'col' ? '列' : '値'}「${esc(d.from)}」</span><span class="rel${d.rel === '=' ? '' : ' ap'}" title="${REL[d.rel]}">${d.rel}</span><span>${esc(nameOf(d))}</span><button class="x small" data-dd="${d.id}" aria-label="消す">×</button>
+    <span class="sc">${d.scope === 'all' ? '全体' : 'このシートだけ: ' + esc(sheetById(d.scope) ? where(sheetById(d.scope)) : '(消えたシート)')}${d.note ? '・' + esc(d.note) : ''}・${esc(d.at)}</span></div>`).join('');
+  $('dict').querySelectorAll('[data-dd]').forEach(b => b.onclick = () => { const d = S.dict.find(x => x.id === b.dataset.dd); S.dict = S.dict.filter(x => x !== d);
+    S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: `登録辞書から「${d.from}」を消した`, lines: [`${d.from} ${d.rel} ${nameOf(d)} を消した`], sources: [], results: [] }); save(); renderAll(); });
+}
+function addDict() {
+  const from = $('dFrom').value.trim(); if (!from) return;
+  const kind = $('dKind').value, axis = $('dAxis').value, a = ax(axis), val = $('dVal').value.trim() || null;
+  if (kind === 'val' && !val) { note('値の呼び名には、正式な値も入れてください'); return; }
+  const d = { id: 'd' + Date.now().toString(36), kind, from, rel: $('dRel').value, axis, value: a.kind === 'measure' || kind === 'val' ? val : null, scope: $('dScope').value, note: $('dNote').value.trim(), at: today() };
+  S.dict.push(d);
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: `登録辞書に「${from}」を足した`, lines: [`${from} ${d.rel} ${a.name}${d.value != null ? '=' + d.value : ''}(${REL[d.rel]})${d.scope === 'all' ? '' : '・' + sheetById(d.scope).name + ' だけ'}${d.note ? '・' + d.note : ''}`], sources: [], results: [] });
+  $('dFrom').value = ''; $('dVal').value = ''; $('dNote').value = ''; save(); note('登録辞書に「' + from + '」を足しました。まとめは自動で更新されます'); renderAll();
+}
+
+// ---------- スプシのリンクで登録(試作:読み取り結果は決まった例) ----------
+let book = null;
+function mockBook(url) {
+  const name = (decodeURIComponent(url).split('/').find(x => /月次|売上|管理/.test(x)) || '売上管理').replace(/\?.*/, '');
+  const r = rnd(url), ms = ['2026-07', '2026-08', '2026-09'], shops = ['S-01', 'S-02'];
+  const tabs = ms.map(m => ({ name: 'auPAY_' + m, use: true, kind: 'data', month: m, cols: ['店舗コード', '売上金額', '決済手数料'],
+    rows: shops.map(s => { const v = Math.round((120000 + r() * 90000) / 10) * 10; return [s, String(v), String(Math.round(v * .1 / 10) * 10)]; }),
+    size: { rows: 38000 + Math.round(r() * 8000), cols: 14 },
+    cf: [{ col: 1, op: '<', v: 150000, text: '売上金額が 150,000 未満なら赤字' }],
+    dv: [{ col: 0, text: '店舗コードは S-01 / S-02 から選ぶ(プルダウン)' }],
+    formulas: { C: { f: '=ROUND(B{r}*0.1,-1)', text: '決済手数料 = 売上金額の10%(10円単位)' } } }));
+  tabs.push({ name: '集計', use: true, kind: 'calc', cols: ['店舗コード', '9月売上'], rows: [], size: { rows: 40, cols: 6 }, cf: [], dv: [],
+    formulas: { B: { f: "=SUMIFS('auPAY_2026-09'!B:B,'auPAY_2026-09'!A:A,A{r})", text: 'auPAY_2026-09 から店舗ごとの売上を合計' } },
+    q: { fix: { mall: 'au PAY', month: '2026-09', item: '売上' }, row: 'shop', col: 'item' } });
+  tabs.push({ name: '設定', use: false, kind: 'misc', cols: ['モール', '手数料率'], rows: [['au PAYマーケット', '8%']], size: { rows: 12, cols: 3 }, cf: [], dv: [], formulas: {} });
+  return { url, name, tabs, merge: true, gas: [
+    { fn: 'copyMonthlyTab', trig: '毎月1日 6時', text: '前の月のタブを複製して次の月のタブ(auPAY_YYYY-MM)を作り、数字を消す', plan: '月ごとにタブを増やす代わりに、まとめたシートへ次の月の行を足す' },
+    { fn: 'onEdit', trig: '編集したとき', text: '店舗コードを入れて売上金額が空のままなら、その行を黄色にする', plan: '入力のルール(空欄の注意)としてシートに持つ' }] };
+}
+// スプシのリンクを読む。アプリの中ならサーバー(/api/sheets/read)がシステム用アカウントで本物を読む。
+// サーバーがない所(アーティファクトなど)では例のデータ(mockBook)で流れだけ見せる。読めなかった理由はそのまま出す
+const bookMsg = (t, err) => { const m = $('bookMsg'); m.hidden = !t; m.textContent = t || ''; m.classList.toggle('err', !!err); };
+async function readBook() {
+  const url = $('bookUrl').value.trim(); if (!url) { bookMsg('スプシのリンクを入れてください', true); return; }
+  bookMsg('読み取っています…'); $('bookRead').disabled = true;
+  let j = null;
+  try { const r = await fetch('/api/sheets/read?url=' + encodeURIComponent(url), { credentials: 'same-origin' }); if ((r.headers.get('content-type') || '').includes('json')) j = await r.json(); } catch (e) {}
+  $('bookRead').disabled = false;
+  if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')';
+  if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。使うタブを選んで取り込んでください`); }
+  else if (j && j.error) { book = null; renderBook(); bookMsg(j.error, true); return; }
+  else { book = mockBook(url); bookMsg('ここからはリンク先を読めないため、例のデータで流れを見せています。本物はアプリの画面で読めます', true); }
+  renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
+function renderBook() {
+  const sec = $('bookSec'); sec.hidden = !book; if (!book) return;
+  const data = book.tabs.filter(t => t.kind === 'data'), tot = data.reduce((a, t) => a + t.size.rows * t.size.cols, 0);
+  let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・${book.real ? 'GAS は読めません' : 'GAS ' + book.gas.length + ' 個'}</p><div class="tabs">`;
+  h += book.tabs.map((t, i) => `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : t.kind === 'misc' ? 'その他' : 'データのタブ'}</span></b>
+    <span class="d">実物: 約${t.size.rows.toLocaleString()}行×${t.size.cols}列(${cellsTxt(t)}セル)・列: ${esc(t.cols.join(' / ') || 'なし')}${book.real ? `・読んだ行 ${t.rows.length}${t.truncated ? '(先頭だけ)' : ''}` : ''}</span>
+    ${Object.entries(t.formulas).map(([c, f]) => `<span class="d">関数 ${c}列: <code>${esc(f.f.replace('{r}', '2'))}</code> … ${esc(f.text)}${t.q ? ' → 「まとめる」の条件として再現' : ' → 同じ計算をシートに持つ'}</span>`).join('')}
+    ${t.cf.map(c => `<span class="d">条件付き書式: ${esc(c.text)} → 同じ表示ルールを再現</span>`).join('')}
+    ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}</label>`).join('');
+  h += '</div>';
+  h += book.gas.map(g => `<div class="gas"><b>GAS <code>${esc(g.fn)}</code></b> <span class="muted">(${esc(g.trig)})</span><br>AIの読み取り: ${esc(g.text)}<br>置き換え案: ${esc(g.plan)} <span class="muted">(GAS 自体は自動では動かしません)</span></div>`).join('');
+  if (book.real && book.merge) h += `<div class="ai"><b class="h">まとめる提案(列とタブ名から判定)</b>
+    <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、タブ名に年月があります。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
+    <label><input type="radio" name="merge" value="1" checked> 1枚にまとめる(おすすめ)</label>
+    <label><input type="radio" name="merge" value="0"> 分けたまま、タブごとにシートにする</label></div>`;
+  else if (!book.real && data.length > 1) h += `<div class="ai"><b class="h">AIの提案(試作では決まった例文)</b>
+    <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、月ごとにタブを分けています。1タブ約4万行、${data.length}タブで約${Math.round(tot / 10000)}万セルあり、スプシの上限(1ファイル1,000万セル)や読み込みの重さを避けるために分けたと推定します。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
+    <label><input type="radio" name="merge" value="1"${book.merge ? ' checked' : ''}> 1枚にまとめる(おすすめ)</label>
+    <label><input type="radio" name="merge" value="0"${!book.merge ? ' checked' : ''}> 分けたまま、タブごとにシートにする</label></div>`;
+  h += `<div class="row"><button class="primary" id="bookGo">この内容で取り込む(このあと列ごとに承認)</button><button id="bookCancel">やめる</button></div>`;
+  $('book').innerHTML = h;
+  $('book').querySelectorAll('[data-use]').forEach(c => c.onchange = () => { book.tabs[+c.dataset.use].use = c.checked; });
+  $('book').querySelectorAll('input[name=merge]').forEach(r => r.onchange = () => { book.merge = r.value === '1'; });
+  $('bookGo').onclick = importBook; $('bookCancel').onclick = () => { book = null; renderBook(); };
+}
+function importBook() {
+  const b = book, target = $('bookTarget').value, data = b.tabs.filter(t => t.kind === 'data' && t.use), calc = b.tabs.filter(t => t.kind === 'calc' && t.use);
+  const skip = b.tabs.filter(t => !t.use).map(t => t.name);
+  const head = [`「${b.name}」を読み取った(${b.url})`, ...data.map(t => `${t.name}: 1行目を列名と判断(${t.cols.join(' / ')})。A2:${colL(t.cols.length - 1)}${t.rows.length + 1} の ${t.rows.length} 行を読み取り`),
+    ...data.slice(0, 1).flatMap(t => [...Object.entries(t.formulas).map(([c, f]) => `${c}列の関数 ${f.f.replace('{r}', 'n')} は「${f.text}」と読み取った`), ...t.cf.map(c => `条件付き書式「${c.text}」を表示ルールとして写した`), ...t.dv.map(c => `入力規則「${c.text}」を写した`)]),
+    ...b.gas.map(g => `GAS ${g.fn}(${g.trig}): ${g.text}。自動では動かさず「${g.plan}」とする案`), ...(skip.length ? [`使わないタブ: ${skip.join('・')}`] : [])];
+  const fx = t => Object.fromEntries(Object.entries(t.formulas).map(([c, f]) => [c, f]));
+  const mk = (name, cols, rows, tag, t, srcTabs, extra) => ({ name, cube: target, tag, cols, rows, picks: pickCols(cols, rows), cf: t.cf.map(c => ({ ...c, col: c.col + (extra || 0) })), dv: t.dv.map(c => ({ ...c, col: c.col + (extra || 0) })), formulas: fx(t),
+    origin: { text: b.name + ' › ' + srcTabs.map(x => x.name).join(' / '), short: srcTabs.length > 1 ? srcTabs.length + 'タブをまとめた' : 'スプシから', minutes: head, sources: srcTabs.map(x => ({ book: b.name, tab: x.name, range: 'A1:' + colL(x.cols.length - 1) + (x.rows.length + 1) })) } });
+  const items = [];
+  if (b.real) {   // 本物のスプシ: シート名はスプシとタブの名前、タブ名に年月があれば「月」の値にする
+    if (data.length && b.merge) { const p = mk(b.name, ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), {}, data[0], data, 1); p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(提案を承認)`]; items.push(p); }
+    else data.forEach(t => { const p = mk(data.length > 1 ? b.name + ' › ' + t.name : b.name, t.cols, t.rows.map(r => [...r]), t.month ? { month: t.month } : {}, t, [t], 0); p.origin.minutes = [...head, `${t.name} をタブのまま1枚のシートにした${t.month ? `。月はタブ名から「月=${t.month}」とした` : ''}`]; items.push(p); });
+  } else if (data.length && b.merge) {
+    const p = mk('au PAYの売上(' + b.name + ')', ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), { mall: 'au PAYマーケット' }, data[0], data, 1);
+    p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(AIの提案を承認)`];
+    items.push(p);
+  } else data.forEach(t => { const p = mk('au PAYの売上 ' + t.month, t.cols, t.rows.map(r => [...r]), { mall: 'au PAYマーケット', month: t.month }, t, [t], 0); p.origin.minutes = [...head, `${t.name} はタブのまま1枚のシートにした。月はタブ名から「月=${t.month}」としてシート全体の値にした`]; items.push(p); });
+  calc.forEach(t => { if (!t.q) return; const sv = { id: 'v' + Date.now().toString(36) + t.name.length, name: t.name + '(スプシの関数から)', q: JSON.parse(JSON.stringify(t.q)), fav: false, scope: 'all', seen: '' };
+    S.saved.push(sv);
+    S.history.push({ id: 'h' + Date.now().toString(36) + 'c', at: today(), kind: '取り込み', title: `${b.name} › ${t.name} の関数を「まとめる」に置き換えた`, lines: Object.values(t.formulas).map(f => `${f.f.replace('{r}', 'n')} → モール=au PAY・月=2026-09・科目=売上 を ショップごとに`), sources: [{ book: b.name, tab: t.name, range: 'B2:B' }], results: [] }); });
+  book = null; queue = items.slice(1); pending = items[0] || null; save(); renderAll();
+  if (pending) go('import'), $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---------- シート(スプシを模した表) ----------
+let viewId = null, viewCell = null;
+const colL = i => String.fromCharCode(65 + i);
+function renderView() {
+  const sec = $('viewSec'), sh = viewId && sheetById(viewId); sec.hidden = !sh; if (!sh) return;
+  $('viewTitle').textContent = 'シート: ' + where(sh);
+  const bindTxt = sh.cols.map((c, i) => { const b = sh.bind[i]; if (!b) return `${colL(i)} ${c}: 使わない`; const a = ax(b.axis); return `${colL(i)} ${c}: ${a ? a.name : '?'}${b.value != null ? '=' + b.value : ''}${b.rel && b.rel !== '=' ? '(' + b.rel + ')' : ''}`; });
+  $('viewInfo').innerHTML = (sh.origin ? `元: ${esc(sh.origin.text)}<br>` : '') + '列と軸: ' + esc(bindTxt.join(' ・ ')) + (sh.cf && sh.cf.length ? '<br>表示ルール: ' + esc(sh.cf.map(c => c.text).join('・')) : '') + (sh.dv && sh.dv.length ? '<br>入力規則: ' + esc(sh.dv.map(c => c.text).join('・')) : '');
+  const fcol = c => (sh.formulas || {})[colL(c)];
+  const cfHit = (c, v) => (sh.cf || []).some(r => r.col === c && r.op === '<' && num(v) < r.v);
+  $('viewGrid').innerHTML = `<thead><tr><th class="rn"></th>${sh.cols.map((_, i) => `<th>${colL(i)}</th>`).join('')}</tr></thead><tbody>
+    <tr><th class="rn">1</th>${sh.cols.map((c, i) => `<td><b>${esc(c)}</b>${(sh.dv || []).some(d => d.col === i) ? ' ▾' : ''}</td>`).join('')}</tr>
+    ${sh.rows.map((r, ri) => `<tr><th class="rn">${ri + 2}</th>${r.map((v, ci) => `<td class="${/^[\d,.-]+$/.test(v) ? 'num' : ''}${cfHit(ci, v) ? ' cf' : ''}${viewCell && viewCell[0] === ri && viewCell[1] === ci ? ' sel' : ''}" data-r="${ri}" data-c="${ci}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('viewGrid').querySelectorAll('td[data-r]').forEach(td => {
+    td.onclick = () => { viewCell = [+td.dataset.r, +td.dataset.c]; const f = fcol(viewCell[1]); $('fbar').textContent = `${colL(viewCell[1])}${viewCell[0] + 2}: ` + (f ? f.f.replace('{r}', viewCell[0] + 2) + '  (' + f.text + ')' : sh.rows[viewCell[0]][viewCell[1]]); renderView(); };
+    td.ondblclick = () => { const r = +td.dataset.r, c = +td.dataset.c, v = prompt(`${where(sh)} の ${colL(c)}${r + 2} を直す`, sh.rows[r][c]); if (v == null) return; sh.rows[r][c] = v.trim(); save(); note('シートを直しました。まとめは自動で更新されます'); renderAll(); };
+  });
+  // 分ける・まとめる(元がどれかは履歴に残す)
+  const mi = sh.bind.findIndex(b => b && b.axis === 'month' && b.value == null), ms = mi >= 0 ? [...new Set(sh.rows.map(r => r[mi]))] : [];
+  const sib = S.sheets.filter(x => x !== sh && x.cube === sh.cube && x.cols.join('|') === sh.cols.join('|') && JSON.stringify(x.tag) === JSON.stringify(sh.tag));
+  $('viewActs').innerHTML = (ms.length > 1 ? `<button id="vSplit">月ごとに${ms.length}枚に分ける</button>` : '') + (sib.length ? `<button id="vMerge">同じ列の${sib.length}枚とまとめる</button>` : '') + '<span class="muted">分けたり、まとめたりした元は履歴に残ります</span>';
+  if ($('vSplit')) $('vSplit').onclick = () => splitSheet(sh, mi, ms);
+  if ($('vMerge')) $('vMerge').onclick = () => mergeSheets([sh, ...sib]);
+}
+function splitSheet(sh, mi, ms) {
+  const made = ms.map((m, k) => ({ ...JSON.parse(JSON.stringify(sh)), id: 'sh' + Date.now().toString(36) + k, name: sh.name + '(' + m + ')', rows: sh.rows.filter(r => r[mi] === m), origin: { text: where(sh) + ' を月で分けた ' + m + ' の分', short: '分けた' } }));
+  S.sheets = S.sheets.flatMap(x => x === sh ? made : [x]);
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '分ける', title: `${where(sh)} を月ごとに ${made.length} 枚に分けた`, lines: made.map(x => `${x.name}: ${x.rows.length}行(元の ${sh.name} の 月=${x.rows[0][mi]} の行)`), sources: [{ book: '', tab: where(sh), range: '全体' }], results: made.map(x => x.id) });
+  viewId = made[0].id; save(); renderAll();
+}
+function mergeSheets(list) {
+  const base = list[0], id = 'sh' + Date.now().toString(36);
+  const name = base.name.replace(/\(.*\)$/, '') + '(まとめ)';
+  S.sheets = S.sheets.filter(x => !list.includes(x));
+  S.sheets.push({ ...JSON.parse(JSON.stringify(base)), id, name, rows: list.flatMap(x => x.rows.map(r => [...r])), origin: { text: list.map(x => x.name).join(' + ') + ' をまとめた', short: list.length + '枚をまとめた' } });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: 'まとめる', title: `${list.length} 枚を ${name} にまとめた`, lines: list.map(x => `${x.name}: ${x.rows.length}行 → ${name}`), sources: list.map(x => ({ book: '', tab: where(x), range: '全体' })), results: [id] });
+  viewId = id; save(); renderAll();
+}
+
+// ---------- 履歴(議事録) ----------
+function renderHist() {
+  queueMicrotask(renderHome);
+  $('hist').innerHTML = [...S.history].reverse().map(h => `<details class="he"><summary><span class="pill cube">${esc(h.kind)}</span> ${esc(h.at)} ${esc(h.title)}${h.results.length ? ' → ' + h.results.map(id => sheetById(id) ? esc(sheetById(id).name) : '(今はないシート)').join('・') : ''}</summary>
+    ${h.sources.length ? `<div class="src">元: ${h.sources.map(s => esc([s.book, s.tab, s.range].filter(Boolean).join(' › '))).join(' / ')}</div>` : ''}<ul>${h.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></details>`).join('');
+}
+
+// ---------- 立体:箱の中にキューブ、キューブの中にシート ----------
+const stage = $('stage'), css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); stage.prepend(renderer.domElement);
+const scene = new THREE.Scene(), persp = new THREE.PerspectiveCamera(40, 1, .1, 200);
+// 箱を固定している間は、ドラッグしても箱の角度(視点)を変えない
+const camera = persp;
+// 見る中心。ふだんは全体の真ん中。選んだ箱・キューブがあればそこを中心にズームする。左上の小さな3軸で X・Y・Z に動かせる
+const tgt = new THREE.Vector3(), tgtGoal = new THREE.Vector3(), invQ2 = new THREE.Quaternion(), gv = new THREE.Vector3();
+let focused = null;
+function focusSel() {
+  if (sel === focused) return; focused = sel;
+  const ids = selUnits().map(b => b.id), gs = groups.filter(x => ids.includes(x.u.id));
+  if (!gs.length) return;
+  const c = new THREE.Vector3(), v = new THREE.Vector3(); gs.forEach(x => c.add(x.g.getWorldPosition(v))); tgtGoal.copy(c.divideScalar(gs.length));
+  const one = gs.length === 1 && gs[0].u.kind === 'cube'; cam.dist = Math.min(cam.dist, one ? 7 : gs.length === 1 ? sizeOfUnit(gs[0].u) * 1.6 + 3 : cam.dist);
+}
+let sizeOfUnit = () => 10;
+const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
+scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
+let world = new THREE.Group(); scene.add(world);
+let hits = [], groups = [], sel = null, fitted = 0;
+const ROLL = Math.PI / 2, LABEL_ROLL = -Math.PI / 2;
+// 固定: 固定した箱・キューブは画面(カメラ)に対して同じ向きを保つ。同じ目を正面にそろえれば X軸どうしが横に並ぶ
+// 面はサイコロの目で呼ぶ: ①正面 ②上 ③右 ④左 ⑤下 ⑥背面(向かい合う目の和は7)。h=横の軸、v=縦の軸(キューブの軸 0=X,1=Y,2=Z)
+// ①③⑤ はふだん使う目: ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。
+// ②④⑥ は向かいの面を90度寝かせた「縦横を入れ替えた目」: ②横Z・縦X ④横Y・縦Z ⑥横Y・縦X。上級者向けで、ふだんは選べない
+const FACES = [
+  { id: 'naname', name: '斜め', pips: 0, yaw: -.45, pitch: .34, roll: 0 },
+  { id: 'd1', name: '①', pips: 1, yaw: 0, pitch: 0, roll: 0, h: 0, v: 1, n: [0, 0, 1], rot: [0, 0], dims: 'WH' },
+  { id: 'd2', name: '②', pips: 2, yaw: 0, pitch: Math.PI / 2, roll: ROLL, h: 2, v: 0, n: [0, 1, 0], rot: [-Math.PI / 2, 0], dims: 'WD', adv: true },
+  { id: 'd3', name: '③', pips: 3, yaw: -Math.PI / 2, pitch: 0, roll: 0, h: 2, v: 1, n: [1, 0, 0], rot: [0, Math.PI / 2], dims: 'DH' },
+  { id: 'd4', name: '④', pips: 4, yaw: Math.PI / 2, pitch: 0, roll: ROLL, h: 1, v: 2, n: [-1, 0, 0], rot: [0, -Math.PI / 2], dims: 'DH', adv: true },
+  { id: 'd5', name: '⑤', pips: 5, yaw: 0, pitch: -Math.PI / 2, roll: 0, h: 0, v: 2, n: [0, -1, 0], rot: [Math.PI / 2, 0], dims: 'WD' },
+  { id: 'd6', name: '⑥', pips: 6, yaw: Math.PI, pitch: 0, roll: ROLL, h: 1, v: 0, n: [0, 0, -1], rot: [0, Math.PI], dims: 'WH', adv: true },
+];
+const PIN0 = { yaw: 0, pitch: 0, roll: 0, face: 'd1' };
+const advOn = () => !!S.advFaces;
+const faceUsable = f => !f.adv || advOn();
+const faceOf = id => FACES.find(f => f.id === id) || FACES[0];
+const faceAxes = (f, c) => f.h == null || c.kind !== 'cube' ? '' : `横${ax(c.axes[f.h]).name}・縦${ax(c.axes[f.v]).name}`;
+const faceOpt = (f, c) => f.name + (faceAxes(f, c) ? '(' + faceAxes(f, c) + ')' : '');
+const pinTo = id => { const f = faceOf(id); return { yaw: f.yaw, pitch: f.pitch, roll: f.roll, face: f.id }; };
+const pinQ = new THREE.Quaternion(), pinE = new THREE.Euler(), invQ = new THREE.Quaternion(), boxV = new THREE.Vector3();
+const units = () => S.boxes.filter(b => b.kind === 'box' || b.kind === 'cube');
+const levels = () => [...new Set(units().map(levelOf))];
+// sel は箱・キューブの id か、段ごとまとめて選ぶときの 'lv:法人'
+const selUnits = () => !sel ? [] : sel.startsWith('lv:') ? units().filter(b => levelOf(b) === sel.slice(3)) : [box(sel)].filter(Boolean);
+function refreshPins() { save(); renderTree(); paint(); renderPinBar(); }
+// 箱の固定: 箱は置き場所を変えず、正面をこちらに向けたまま(中のキューブが画面の横に並んだまま)にする。
+// 箱に選んだ目は中のキューブに効かせ、キューブはその場で回る。こうすると「法人単位で③」で各キューブの③が横に並ぶ
+const kidsOf = b => descCubes(b);   // 箱に選んだ目は中の箱の中のキューブにも効かせる
+function applyPin(b, face) {
+  if (b.kind !== 'box') { b.pin = pinTo(face || (b.pin && b.pin.face) || 'd1'); return; }
+  const f = face || (b.pin && b.pin.face) || 'd1';
+  b.pin = { yaw: 0, pitch: 0, roll: 0, face: f };
+  kidsOf(b).forEach(c => { if (!c.pin || c.pin.byBox) c.pin = { ...pinTo(f), byBox: true }; });
+}
+function unpin(b) { delete b.pin; if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin && c.pin.byBox) delete c.pin; }); }
+function setFace(id, face) { const b = box(id); if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, face); refreshPins(); }
+function togglePin(id) { const c = box(id); if (c.pin) unpin(c); else applyPin(c); sel = id; refreshPins(); }
+function select(id) { sel = id; renderTree(); paint(); renderPinBar(); focusSel(); }
+function renderShowRow() {
+  const Ls = [...new Set(S.boxes.filter(b => b.kind === 'box').map(levelOf))];
+  $('showRow').innerHTML = '<b>箱の中に見せるもの</b>' + Ls.map(L => `<label>${esc(L)}単位の箱<select data-show="${esc(L)}">${SHOW.map(([v, t]) => `<option value="${v}"${showOf(L) === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`).join('');
+  $('showRow').querySelectorAll('[data-show]').forEach(el => el.onchange = () => { S.boxShow = { ...(S.boxShow || {}), [el.dataset.show]: el.value }; save(); paint(); });
+}
+function renderPinBar() {
+  renderShowRow();
+  const n = units().filter(b => b.pin).length;
+  $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: 箱は正面を向けたまま止まり、ドラッグしても角度は変わりません(ズームはできます)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
+  $('pinHint').hidden = !n; $('unpinAll').hidden = !n;
+  $('selUnit').innerHTML = '<option value="">(固定するものを選ぶ)</option>'
+    + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
+    + '<optgroup label="1つずつ">' + units().map(b => `<option value="${b.id}">${unitOf(b)} ${esc(b.name)}(${esc(levelOf(b))}単位)${b.pin ? '(固定中)' : ''}</option>`).join('') + '</optgroup>';
+  $('selUnit').value = sel || '';
+  const us = selUnits(), u = us[0];
+  $('selPin').hidden = !u; $('selFaceWrap').hidden = !u; $('faceSheet').hidden = true;
+  if (!u) return;
+  const allPinned = us.every(b => b.pin);
+  $('selPin').textContent = allPinned ? '固定を外す' : us.length > 1 ? `${us.length}個とも固定する` : '固定する'; $('selPin').classList.toggle('on', allPinned);
+  $('selFace').innerHTML = (allPinned ? '' : '<option value="">(目を選ぶと固定)</option>') + FACES.filter(f => (faceUsable(f) || (u.pin && u.pin.face === f.id))).map(f => `<option value="${f.id}">${esc(us.length > 1 ? f.name : faceOpt(f, u))}</option>`).join('');
+  $('advFaces').checked = advOn();
+  $('selFacePre').textContent = us.some(b => b.kind === 'box') ? '中のキューブの' : 'サイコロの';
+  const pf = u.pin && faceOf(u.pin.face); $('faceSheet').hidden = !(us.length === 1 && u.kind === 'cube' && pf && pf.h != null);
+  $('selFace').value = allPinned ? u.pin.face || 'd1' : '';
+}
+// 指示を読む: 「箱1を固定して②を正面」「法人Aは③」「全部①にそろえる」「キューブ2を外す」
+function runCmd(text) {
+  const t = text.trim(); if (!t) return '指示を入れてください';
+  const z = t.replace(/[０-９]/g, d => String.fromCharCode(d.charCodeAt(0) - 0xFEE0));
+  const all = /全部|すべて|全て|ぜんぶ/.test(z);
+  let targets = [];
+  if (all) targets = units().filter(b => /箱/.test(z) && !/キューブ/.test(z) ? b.kind === 'box' : /キューブ/.test(z) && !/箱/.test(z) ? b.kind === 'cube' : true);
+  // 「法人単位」「ショップ単位」はその段の箱・キューブを全部
+  let lv = levels().find(L => z.includes(L + '単位'));
+  if (!all && lv) targets = units().filter(b => levelOf(b) === lv);
+  else if (!all) {
+    for (const b of units()) if (new RegExp(unitOf(b) + '(?![0-9])').test(z) || z.includes(b.name)) targets.push(b);
+    // 「法人A」のように箱の持ち主の値でも呼べる
+    if (!targets.length) for (const b of units()) if (b.kind === 'box' && Object.values(b.own).some(v => z.includes(v))) targets.push(b);
+    if (!targets.length && sel) targets = selUnits();
+  }
+  if (!targets.length) return '対象が分かりませんでした。「箱1」「キューブ2」のように番号か名前で書いてください';
+  const circled = '①②③④⑤⑥'.split('');
+  let face = null, m;
+  for (let i = 0; i < 6; i++) if (z.includes(circled[i])) face = 'd' + (i + 1);
+  if (!face && (m = z.match(/([1-6])\s*(?:の目|を正面|が正面|面|にそろえ)/))) face = 'd' + m[1];
+  if (!face && /斜め/.test(z)) face = 'naname';
+  if (face && !faceUsable(faceOf(face))) return `${faceOf(face).name}は縦横を入れ替えた目です。①③⑤のどれかを正面にして「この面をシートにする」から「縦横を入れ替える」を使うか、「②④⑥も選べるようにする(上級)」をオンにしてください`;
+  const named = all || !!lv || units().some(b => targets.includes(b) && (z.includes(unitOf(b)) || z.includes(b.name) || b.kind === 'box' && Object.values(b.own).some(v => z.includes(v))));
+  if (!face && !named && !/固定|外す|解除|はずす|やめ/.test(z)) return '分かりませんでした。「箱1を固定して②を正面」のように、番号か名前と目(①〜⑥)を書いてください';
+  if (/外す|解除|はずす|やめ/.test(z)) { targets.forEach(unpin); refreshPins(); return `${lv ? lv + '単位(' : ''}${targets.map(unitOf).join('・')}${lv ? ')' : ''} の固定を外しました`; }
+  targets.forEach(b => { if (b.kind === 'box' && face) kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); if (face || !b.pin) applyPin(b, face); });
+  if (targets.length === 1) sel = targets[0].id; else if (lv) sel = 'lv:' + lv;
+  refreshPins();
+  const isBox = targets.every(b => b.kind === 'box');
+  return `${lv ? lv + '単位の ' : ''}${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${isBox ? '中のキューブの' : ''}${faceOf(targets[0].pin.face).name}を正面にしました${isBox ? '(箱は置き場所も向きもそのまま)' : ''}`;
+}
+const cam = { th: .45, ph: .34, dist: 24 };   // 最初は X・Y・Z のプラス側が見える向き
+function textSprite(t, color, h) {
+  const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 44px ' + css('--sans');
+  const w = Math.ceil(x.measureText(t).width) + 16; c.width = w; c.height = 60; x.font = '700 44px ' + css('--sans'); x.fillStyle = color; x.textBaseline = 'middle'; x.fillText(t, 8, 32);
+  const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthTest: false, transparent: true })); s.scale.set(h * w / 60, h, 1); s.renderOrder = 5; return s;
+}
+function edges(w, h, d, color, dashed, op = 1) {
+  const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
+  const m = dashed ? new THREE.LineDashedMaterial({ color, dashSize: .35, gapSize: .2, transparent: true, opacity: op }) : new THREE.LineBasicMaterial({ color, transparent: true, opacity: op });
+  const l = new THREE.LineSegments(g, m); if (dashed) l.computeLineDistances(); return l;
+}
+// サイコロの目の札。白い四角に目(①だけ赤)、横に軸名
+function faceTex(f, label, on) {
+  const H = 64, c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 40px ' + css('--sans');
+  const tw = label ? Math.ceil(x.measureText(label).width) + 16 : 0; c.width = H + 8 + tw; c.height = H;
+  const rr = (X, Y, W, Hh, r) => { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + W, Y, X + W, Y + Hh, r); x.arcTo(X + W, Y + Hh, X, Y + Hh, r); x.arcTo(X, Y + Hh, X, Y, r); x.arcTo(X, Y, X + W, Y, r); x.closePath(); };
+  if (label) { x.fillStyle = on ? css('--hl') : css('--accent'); x.globalAlpha = on ? .95 : .75; rr(H / 2, 6, c.width - H / 2, H - 12, 10); x.fill(); x.globalAlpha = 1; x.fillStyle = '#fff'; x.font = '700 40px ' + css('--sans'); x.textBaseline = 'middle'; x.fillText(label, H + 8, H / 2 + 1); }
+  x.fillStyle = '#fff'; rr(2, 2, H - 4, H - 4, 12); x.fill(); x.lineWidth = on ? 5 : 3; x.strokeStyle = on ? css('--hl') : '#555'; x.stroke();
+  const P = { tl: [.27, .27], tr: [.73, .27], ml: [.27, .5], mr: [.73, .5], c: [.5, .5], bl: [.27, .73], br: [.73, .73] };
+  const L = [[], ['c'], ['tl', 'br'], ['tl', 'c', 'br'], ['tl', 'tr', 'bl', 'br'], ['tl', 'tr', 'c', 'bl', 'br'], ['tl', 'tr', 'ml', 'mr', 'bl', 'br']][f.pips];
+  L.forEach(k => { x.beginPath(); x.arc(P[k][0] * H, P[k][1] * H, f.pips === 1 ? 11 : 6.5, 0, 7); x.fillStyle = f.pips === 1 ? '#d22' : '#222'; x.fill(); });
+  const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter; return tx;
+}
+// 箱・キューブの6面にサイコロの目を貼る(外から見たときだけ読める。上の端に寄せる)
+function addDice(g, u, W, H, D) {
+  FACES.filter(f => f.n).forEach(f => {
+    const t = faceTex(f, faceAxes(f, u), u.pin && u.pin.face === f.id), ratio = t.image.width / t.image.height;
+    const [nx, ny, nz] = f.n, len = { W, H, D }, lx = len[f.dims[0]], ly = len[f.dims[1]];
+    const [aw, ah] = f.roll ? [ly, lx] : [lx, ly], pw = Math.min(aw * .92, .62 * ratio);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, pw / ratio), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: f.adv && !advOn() ? .45 : 1 }));
+    m.position.set(nx * (W / 2 + .01), ny * (H / 2 + .01), nz * (D / 2 + .01)); m.rotation.set(f.rot[0], f.rot[1], 0);
+    // 縦横を入れ替えた目は札も90度寝かせ、その目を正面にしたときに読めるようにする
+    if (f.roll) m.rotateZ(LABEL_ROLL);
+    m.translateY(ah / 2 - .4);
+    // 箱の札は左上の角に寄せ、中のキューブの札と重ねない
+    if (u.kind === 'box') m.translateX(-(aw / 2 - pw / 2 - .15)), m.translateY(.15);
+    g.add(m);
+  });
+}
+function sheetTex(sh, on) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 200; const x = c.getContext('2d');
+  x.fillStyle = on ? css('--hlSoft') : css('--paper'); x.fillRect(0, 0, 256, 200); x.strokeStyle = on ? css('--hl') : css('--paperLine'); x.lineWidth = on ? 8 : 3; x.strokeRect(2, 2, 252, 196);
+  x.fillStyle = css('--paperInk'); x.font = '700 24px ' + css('--sans'); x.fillText(sh.name, 12, 34);
+  x.font = '16px ' + css('--mono'); sh.rows.slice(0, 6).forEach((r, i) => x.fillText(r.slice(0, 3).join('  '), 12, 64 + i * 22));
+  const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; return t;
+}
+// キューブの面にはその面の軸で並べたデータの表を貼る(横の軸=列、縦の軸=行)。
+// 奥行きの軸は、その面に近い側の1枚(表の面①③②は最初の値、裏の面④⑤⑥は最後の値)。表の面の値は「この面をシートにする」と同じ
+const short = v => Math.abs(v) >= 10000 ? (v / 10000).toFixed(1) + '万' : fmt(v);
+function faceData(c, f, fs) {
+  const mine = fs.filter(x => Object.entries(c.own).every(([a, v]) => x.k[a] === v));
+  const ha = c.axes[f.h], va = c.axes[f.v], da = c.axes.find((a, i) => i !== f.h && i !== f.v);
+  const hv = valuesOf(ha, mine), vv = valuesOf(va, mine), dv = valuesOf(da, mine);
+  const d = ['d4', 'd5', 'd6'].includes(f.id) ? dv[dv.length - 1] : dv[0];
+  const cell = (h, v) => mine.filter(x => x.k[ha] === h && x.k[va] === v && x.k[da] === d).reduce((a, x) => a + x.v, 0);
+  return { ha, va, da, hv, vv, d, cell };
+}
+function tableTex(c, f, fs, on) {
+  const D = faceData(c, f, fs), W = 512, H = 400, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  x.fillStyle = on ? css('--hlSoft') : css('--paper'); x.fillRect(0, 0, W, H);
+  x.strokeStyle = on ? css('--hl') : css('--paperLine'); x.lineWidth = on ? 10 : 4; x.strokeRect(2, 2, W - 4, H - 4);
+  x.fillStyle = css('--muted'); x.font = '26px ' + css('--sans'); x.textBaseline = 'middle';
+  x.fillText(`${ax(D.da).name}=${D.d ?? '-'}`, 16, 28);
+  const cols = D.hv.length, rows = D.vv.length; if (!cols || !rows) { x.fillText('データなし', 16, H / 2); }
+  else {
+    const top = 56, left = 120, cw = (W - left - 12) / cols, rh = (H - top - 12) / (rows + 1), ink = css('--paperInk');
+    x.font = '700 24px ' + css('--sans'); x.fillStyle = css('--ax');
+    D.hv.forEach((h, i) => { x.textAlign = 'center'; x.fillText(String(h).slice(-7), left + cw * (i + .5), top + rh / 2); });
+    D.vv.forEach((v, j) => { x.textAlign = 'left'; x.fillStyle = css('--ay'); x.fillText(String(v).slice(0, 6), 14, top + rh * (j + 1.5)); });
+    x.font = '26px ' + css('--mono'); x.fillStyle = ink; x.textAlign = 'right';
+    D.vv.forEach((v, j) => D.hv.forEach((h, i) => { const val = D.cell(h, v); x.fillText(val ? short(val) : '—', left + cw * (i + 1) - 10, top + rh * (j + 1.5)); }));
+    x.strokeStyle = css('--paperLine'); x.lineWidth = 2; x.beginPath(); x.moveTo(left, top + rh); x.lineTo(W - 12, top + rh); x.moveTo(left - 6, top); x.lineTo(left - 6, H - 12); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(cv); t.minFilter = THREE.LinearFilter; return t;
+}
+function addTables(g, c, s, fs) {
+  FACES.filter(f => f.n).forEach(f => {
+    const [nx, ny, nz] = f.n, m = new THREE.Mesh(new THREE.PlaneGeometry(s * .94, s * .7), new THREE.MeshBasicMaterial({ map: tableTex(c, f, fs, c.pin && c.pin.face === f.id), side: THREE.FrontSide, transparent: true, opacity: f.adv && !advOn() ? .55 : .97 }));
+    m.position.set(nx * (s / 2 + .005), ny * (s / 2 + .005), nz * (s / 2 + .005)); m.rotation.set(f.rot[0], f.rot[1], 0);
+    if (f.roll) m.rotateZ(LABEL_ROLL);
+    m.translateY(-s * .1);   // 上の端はサイコロの札
+    g.add(m);
+  });
+}
+// 箱の中に見せるもの(箱の段ごとに選ぶ)
+const SHOW = [['all', 'すべて(中の箱とキューブ。キューブの面に軸で並べたデータ)'], ['box', '中の箱だけ(この箱の中に)'], ['cube', 'キューブだけ(この箱の中に。中の箱のキューブも並べる)'], ['sheet', 'シートだけ(キューブの中の元のシート。箱の枠は出さない)'], ['count', '名前と数だけ']];
+const showOf = L => (S.boxShow || {})[L] || 'all';
+const cubeW = 2.2, cubeSlot = cubeW * Math.sqrt(3) + .1;   // 1マスはキューブがどの向きに回ってもはみ出ない広さ
+const childBoxes = b => S.boxes.filter(x => x.parent === b.id && x.kind === 'box');
+const descCubes = b => S.boxes.filter(x => x.parent === b.id).flatMap(x => x.kind === 'cube' ? [x] : descCubes(x));
+// 箱の中身(マス目に並べるもの)
+// 見せるものはプルダウンと必ず一致させる: キューブだけ=シートを入れずにキューブだけ、シートだけ=中のキューブのシートも出す(キューブの枠は出さない)
+function contentsOf(b, mode = showOf(levelOf(b))) {
+  const own = S.sheets.filter(x => x.cube === b.id);
+  const cubes = S.boxes.filter(x => x.parent === b.id && x.kind === 'cube'), boxes = childBoxes(b);
+  if (mode === 'count') return [];
+  if (mode === 'cube') return descCubes(b).map(u => ({ u }));
+  if (mode === 'box') return boxes.map(u => ({ u }));
+  if (mode === 'sheet') return [...(own.length ? [{ sheets: own }] : []), ...descCubes(b).filter(c => S.sheets.some(x => x.cube === c.id)).map(u => ({ u }))];
+  return [...boxes.map(u => ({ u })), ...cubes.map(u => ({ u })), ...(own.length ? [{ sheets: own }] : [])];
+}
+// 同じ単位の箱は同じ大きさ(その段でいちばん大きい箱に合わせる)
+function paint() {
+  scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = [];
+  const memo = {}, allFacts = facts();
+  const natural = (b, mode) => {
+    // 中身は 手前・上・左の角から X のプラス → Y のマイナス(下) → Z のマイナス(奥) の順に並べる
+    const items = contentsOf(b, mode), n = Math.max(1, items.length), k = Math.max(1, Math.ceil(Math.cbrt(n) - 1e-9));
+    const slot = Math.max(cubeSlot, ...items.filter(it => it.u && it.u.kind === 'box').map(it => sizeOf(it.u) + .5));
+    return { items, k, slot, size: k * slot + .3 };
+  };
+  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) memo[L] = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); return memo[L]; };
+  sizeOfUnit = sizeOf;
+  const drawBox = (b, parent, pos, top) => {
+    const W = sizeOf(b), lay = natural(b);
+    // 「○○だけ」はひとつ上の段と一緒に見せる。シートだけ=シートとそのキューブ(箱の枠は出さない)、キューブだけ・中の箱だけ=その外側のこの箱
+    const frame = showOf(levelOf(b)) !== 'sheet';
+    const bg = new THREE.Group(); bg.position.set(...pos); parent.add(bg);
+    const fill = new THREE.Mesh(new THREE.BoxGeometry(W, W, W), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: frame ? .05 : 0, depthWrite: false })); bg.add(fill);
+    fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, box: true, home: bg.position.clone() });
+    if (selUnits().includes(b)) bg.add(edges(W + .3, W + .3, W + .3, new THREE.Color(css('--mine')), false, 1));
+    if (frame) {
+      bg.add(edges(W, W, W, new THREE.Color(css('--box')), true));
+      const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
+    }
+    if (showOf(levelOf(b)) === 'count') {
+      const nb = childBoxes(b).length, nc = descCubes(b).length, ns = S.sheets.filter(x => x.cube === b.id || descCubes(b).some(c => c.id === x.cube)).length;
+      const t = textSprite([nb ? `箱 ${nb}` : '', `キューブ ${nc}`, `シート ${ns}`].filter(Boolean).join('・'), css('--muted'), .6); bg.add(t);
+      return;
+    }
+    if (!lay.items.length) { const NONE = { box: '中に箱はありません', cube: '中にキューブはありません', sheet: '中にシートはありません' }[showOf(levelOf(b))] || '空です'; bg.add(textSprite(NONE, css('--muted'), .5)); }
+    lay.items.forEach((it, k) => {
+      const K = lay.k, h = (K - 1) / 2, ix = k % K, iy = Math.floor(k / K) % K, iz = Math.floor(k / (K * K)), p = [(ix - h) * lay.slot, (h - iy) * lay.slot, (h - iz) * lay.slot];
+      if (it.sheets) it.sheets.forEach((sh, i) => {   // 箱にじかに入れたシート(店舗をまたぐシートなど)
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
+        m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); bg.add(m);
+      });
+      else if (it.u.kind === 'box') drawBox(it.u, bg, p, false);
+      else drawCube(it.u, bg, p, showOf(levelOf(b)) === 'sheet');
+    });
+  };
+  const drawCube = (c, bg, pos, showSheets) => {
+      const cg = new THREE.Group(); cg.position.set(...pos); bg.add(cg);
+      const s = cubeW;
+      // 触る判定用の見えない箱。固定したキューブはここをドラッグするとそれだけ回る
+      const hitM = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); hitM.userData.unit = c.id; cg.add(hitM); hits.push(hitM);
+      groups.push({ g: cg, u: c, parentG: bg, home: cg.position.clone() });
+      if (selUnits().includes(c)) cg.add(edges(s + .3, s + .3, s + .3, new THREE.Color(css('--mine')), false, 1));
+      // キューブの辺は3軸の色(X=紫、Y=緑、Z=桃)で、固定の3軸を持つことを示す
+      cg.add(edges(s, s, s, new THREE.Color(css('--accent')), false, .9));
+      const axLine = (from, to, col) => { const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]); cg.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(css(col)) }))); };
+      const h = s / 2 + .02; axLine([-h, -h, h], [h, -h, h], '--ax'); axLine([-h, -h, h], [-h, h, h], '--ay'); axLine([-h, -h, h], [-h, -h, -h], '--az');
+      const names = c.axes.map(a => ax(a).name);
+      const t1 = textSprite(names[0], css('--ax'), .26); t1.position.set(0, -h - .25, h); cg.add(t1);
+      const t2 = textSprite(names[1], css('--ay'), .26); t2.position.set(-h - .1 - t2.scale.x / 2, 0, h); cg.add(t2);
+      const t3 = textSprite(names[2], css('--az'), .26); t3.position.set(-h - .1, -h - .25, 0); cg.add(t3);
+      if (!showSheets) addTables(cg, c, s, allFacts);
+      addDice(cg, c, s, s, s);
+      const cl = textSprite(unitOf(c) + ' ' + c.name + (c.pin ? '(固定 ' + faceOf(c.pin.face).name + ')' : ''), css(c.pin ? '--hl' : '--accent'), .32); cl.position.set(0, h + .3, 0); cg.add(cl);
+      // シートは「シートだけ」のときだけキューブの中に出す。ふだんはキューブの面に軸で並べたデータを出す
+      const shs = showSheets ? S.sheets.filter(x => x.cube === c.id) : [];
+      shs.forEach((sh, i) => {
+        const on = used.has(sh.id);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(s * .78, s * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, on), side: THREE.DoubleSide }));
+        m.position.set(0, 0, (shs.length - 1) / 2 * .55 - i * .55); cg.add(m);
+      });
+  };
+  const tops = S.boxes.filter(b => !b.parent && b.kind === 'box'), gap = 1.2;
+  const total = tops.reduce((a, b) => a + sizeOf(b), 0) + gap * (tops.length - 1);
+  let x0 = -total / 2;
+  for (const b of tops) { const W = sizeOf(b); drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
+  // 全体の大きさが変わったときだけ、全体が入る距離に引く(ふだんのズームは触らない)
+  const span = Math.max(total, ...tops.map(sizeOf));
+  if (fitted !== span) { fitted = span; cam.dist = Math.max(12, Math.min(120, span * 1.25 + 6)); }
+}
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
+let drag = null;
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+// 押した所の箱・キューブ。キューブを優先する
+function unitAt(e) {
+  const r = renderer.domElement.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ndc, camera); const hs = ray.intersectObjects(hits).map(h => box(h.object.userData.unit));
+  return hs.find(u => u.kind === 'cube') || hs[0] || null;
+}
+renderer.domElement.addEventListener('pointerdown', e => { const u = unitAt(e); drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, u, rot: u && u.pin && u.kind === 'cube' ? u : null }; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!drag) { const u = unitAt(e); renderer.domElement.style.cursor = u ? (u.pin && u.kind === 'cube' ? 'move' : 'pointer') : ''; return; }
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+  if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
+  if (drag.rot) { drag.rot.pin.yaw += dx * .01; drag.rot.pin.pitch = Math.max(-1.58, Math.min(1.58, drag.rot.pin.pitch + dy * .01)); return; }
+  if (boxLocked()) return;   // 箱を固定している間は視点を動かさない(ズームはできる)
+  cam.th -= dx * .006; cam.ph = Math.max(-1.35, Math.min(1.35, cam.ph + dy * .005));   // 下からも回り込める(⑤の面を見るため)
+});
+renderer.domElement.addEventListener('pointerup', () => {
+  if (drag && drag.moved && drag.rot) save();
+  else if (drag && !drag.moved && drag.u && drag.u.id !== sel) select(drag.u.id);
+  drag = null;
+});
+renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
+function loop() {
+  // 固定するときは必ずどこかの面を正面にする。箱は必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
+  // 遠近はそのままなので、箱の奥行き(中の壁)とキューブの立体感は残る。キューブは選んだ目を正面に向ける
+  const th = boxLocked() ? 0 : cam.th, ph = boxLocked() ? 0 : cam.ph;
+  tgt.lerp(tgtGoal, .2);   // 見る中心(選んだ箱・キューブか、操作キーで動かした位置)へなめらかに寄る
+  camera.position.set(tgt.x + cam.dist * Math.cos(ph) * Math.sin(th), tgt.y + cam.dist * Math.sin(ph), tgt.z + cam.dist * Math.cos(ph) * Math.cos(th));
+  camera.lookAt(tgt);
+  // 左上の小さな3軸は、今の向きで X・Y・Z が画面のどちらを向いているかを示す
+  invQ2.copy(camera.quaternion).invert();
+  const GZ = ['x', 'y', 'z'].map(k => { gv.set(k === 'x' ? 1 : 0, k === 'y' ? -1 : 0, k === 'z' ? -1 : 0).applyQuaternion(invQ2); return [k, gv.x * 36, -gv.y * 36]; });
+  GZ.forEach(([k, x, y]) => {
+      // 原点から X はプラス、Y・Z はマイナス(中身を並べる下と奥の向き)にだけ線を引き、先に軸と同じ色の文字を置く
+      // 文字は線の延長に置くと線とつながって見えるので、線の先から少し斜め(約30度)にずらす。ずらす向きはほかの軸の線から離れる側
+      $('gl' + k).setAttribute('x1', 0); $('gl' + k).setAttribute('y1', 0); $('gl' + k).setAttribute('x2', x * .8); $('gl' + k).setAttribute('y2', y * .8);
+      const L = Math.hypot(x, y) || 1, rot = a => [(x * Math.cos(a) - y * Math.sin(a)) / L, (x * Math.sin(a) + y * Math.cos(a)) / L];
+      const gap = ([ux, uy]) => Math.min(...GZ.filter(o => o[0] !== k).map(([, ox, oy]) => { const m = Math.hypot(ox, oy) || 1; return Math.acos(Math.max(-1, Math.min(1, (ux * ox + uy * oy) / m))); }));
+      const [ux, uy] = [rot(.5), rot(-.5)].sort((p, q) => gap(q) - gap(p))[0], r = Math.max(L * 1.05, 16), tx = ux * r, ty = uy * r;
+      $('gt' + k).setAttribute('x', tx); $('gt' + k).setAttribute('y', ty);
+    });
+  // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
+  // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
+  // 中のキューブは箱の中の自分のマスから動かず、固定したキューブ(箱で固定した中身も)はその場で選んだ目をこちらに向ける
+  for (const { g, u, box: isBox, parentG, home } of groups) {
+    g.position.copy(home);
+    if (isBox || !u.pin) { g.quaternion.identity(); continue; }
+    pinQ.setFromEuler(pinE.set(u.pin.pitch, u.pin.yaw, u.pin.roll || 0, 'ZXY'));
+    parentG.getWorldQuaternion(invQ); g.quaternion.copy(invQ.invert()).multiply(camera.quaternion).multiply(pinQ);
+  }
+  renderer.render(scene, camera); requestAnimationFrame(loop);
+}
+new ResizeObserver(resize).observe(stage);
+
+// ---------- つなぐ ----------
+function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
+$('read').onclick = readSheet;
+$('approve').onclick = approve;
+$('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
+$('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
+$('bookRead').onclick = readBook;
+fetch('/api/sheets/read', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')'; }).catch(() => {});
+$('viewClose').onclick = () => { viewId = null; renderView(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && viewId) $('viewClose').click(); });
+
+// ---------- ダッシュボードの画面切り替え ----------
+// 左のメニュー(と data-go を持つボタン)で画面を1つだけ見せる。開いていた画面は次に開いたときも同じ(ブラウザに覚える)
+const VIEWS = { home: 'ホーム', gather: 'まとめる', import: 'シートを入れる', dict: '軸の辞書', history: '履歴', settings: '設定' };
+function go(v) {
+  if (!VIEWS[v]) v = 'home';
+  document.querySelectorAll('.view').forEach(e => e.hidden = e.dataset.view !== v);
+  document.querySelectorAll('.nv').forEach(b => { b.classList.toggle('on', b.dataset.go === v); b.toggleAttribute('aria-current', b.dataset.go === v); });
+  $('crumb').textContent = VIEWS[v]; document.querySelector('.content').scrollTop = 0;
+  try { localStorage.setItem(KEY + ':view', v); } catch (e) {}
+  if (v === 'home') requestAnimationFrame(resize);
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+// ホームの数字(押すとその画面へ)・最近の履歴・メニューの印(承認待ち・更新ありのまとめ)
+function renderHome() {
+  const nb = S.boxes.filter(b => b.kind === 'box').length, nc = S.boxes.filter(b => b.kind === 'cube').length;
+  const wait = (pending ? 1 : 0) + queue.length, upd = S.saved.filter(x => x.seen && x.seen !== sig(x)).length;
+  const K = [['home', '箱', nb, '法人などの入れ物'], ['home', 'キューブ', nc, '3軸が決まったもの'], ['home', 'シート', S.sheets.length, 'キューブに入っている'],
+    ['dict', '軸', S.axes.filter(visibleAxis).length, '辞書の言い換え ' + S.dict.length + ' 件'], ['gather', '保存したまとめ', S.saved.length, upd ? '更新あり ' + upd + ' 件' : 'すべて見た'], ['import', '承認待ち', wait, wait ? '押して承認へ' : 'ありません']];
+  $('kpis').innerHTML = K.map(([v, k, n, sub]) => `<button class="kpi" data-go="${v}"><span class="k">${k}</span><span class="v">${n}</span><span class="s">${esc(sub)}</span></button>`).join('');
+  $('recent').innerHTML = S.history.length ? [...S.history].reverse().slice(0, 4).map(h => `<div class="ri"><span class="pill cube">${esc(h.kind)}</span><span class="t" title="${esc(h.title)}">${esc(h.title)}</span><span class="at">${esc(h.at)}</span></div>`).join('') : '<span class="muted">まだありません</span>';
+  [['import', wait], ['gather', upd]].forEach(([v, n]) => { const e = $('nb-' + v); e.hidden = !n; e.textContent = n; });
+}
+
+$('save').onclick = saveQuery;
+// ここで選んだら、その場で固定する(法人単位を選ぶ=法人の箱を全部固定して視点を正面で止める)
+$('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); focusSel(); };
+document.querySelectorAll('#gizmo [data-mv]').forEach(b => b.onclick = () => {
+  const k = b.dataset.mv, step = Math.max(.6, cam.dist * .12);
+  if (k === 'home') { tgtGoal.set(0, 0, 0); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
+  if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(120, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
+  tgtGoal[k[0]] += step * +k.slice(1);
+});
+$('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
+$('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
+$('selFace').onchange = e => { if (!e.target.value) return; selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
+$('advFaces').onchange = e => { S.advFaces = e.target.checked; save(); paint(); renderPinBar(); };
+// 固定した面をそのままシートにする: 縦の軸を行、横の軸を列に、奥行きの軸は手前の1枚(最初の値)、そのキューブの持ち主で絞る
+$('faceSheet').onclick = () => {
+  const u = selUnits()[0], f = faceOf(u.pin.face), depth = u.axes.find((a, i) => i !== f.h && i !== f.v);
+  q = { fix: { ...u.own }, row: u.axes[f.v], col: u.axes[f.h], approx: q.approx };
+  const dv = valuesOf(depth, facts()); if (dv.length) q.fix[depth] = dv[0];
+  curSaved = null; renderGather(); renderSaved();
+  $('cmdMsg').textContent = `${unitOf(u)} の${f.name}をシートにしました(行=${ax(q.row).name}、列=${ax(q.col).name}、${ax(depth).name}=${q.fix[depth] || 'すべて'})。下の「縦横を入れ替える」で行と列を入れ替えられます`;
+  go('gather'); $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+$('cmdGo').onclick = () => { $('cmdMsg').textContent = runCmd($('cmd').value); };
+$('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) $('cmdGo').click(); };
+$('addMonth').onclick = addMonth;
+$('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
+$('preset').onchange = e => fillPreset(+e.target.value);
+S.saved.forEach(s => { if (!s.seen) s.seen = sig(s); });
+renderAll(); fillPreset(0); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
+})();
+</script>
