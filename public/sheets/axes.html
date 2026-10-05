@@ -99,6 +99,36 @@ tfoot td{font-weight:700}
 .sv .nm{cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge{font-size:11px;border-radius:99px;padding:0 7px;background:var(--hl);color:#000}
 .note{color:var(--ok);font-weight:600;font-size:13px}
+.dict{display:flex;flex-direction:column;gap:2px;font-size:12.5px;max-height:260px;overflow:auto}
+.de{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1.3fr) auto;gap:2px 6px;align-items:center;padding:3px 2px;border-bottom:1px dashed var(--line)}
+.de .rel{font-family:var(--mono);font-weight:700;color:var(--accent);text-align:center;min-width:1.6em}
+.de .rel.ap{color:var(--hl)}
+.de .sc{grid-column:1/5;color:var(--muted);font-size:11.5px}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:6px}
+.form input,.form select,.form button{width:100%;font-size:12.5px;padding:2px 4px}
+.tabs{display:flex;flex-direction:column;gap:6px}
+.tab{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;font-size:13px}
+.tab .d{grid-column:2;color:var(--muted);font-size:12.5px}
+.tab code,.gas code{font-family:var(--mono);font-size:12px}
+.ai{border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.ai b.h{color:var(--accent)}
+.gas{border:1px dashed var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+.grid td,.grid th{font-family:var(--mono);font-size:12.5px}
+.grid th.rn{color:var(--muted);text-align:center;width:2.6em}
+.grid td.cf{color:#d32f2f;font-weight:600}
+.grid td.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.fbar{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);border-radius:6px;padding:3px 8px;background:var(--panel);min-height:1.9em}
+.hist{display:flex;flex-direction:column;gap:6px}
+.he{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
+.he summary{cursor:pointer}
+.he ul{margin:4px 0 0;padding-left:18px;color:var(--muted)}
+.he .src{font-size:12px;color:var(--muted)}
+.ap{color:var(--hl);font-weight:700}
+.node[data-sh]{cursor:pointer}
+.relrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:2px 4px}
+#prefs select{max-width:100%}
+#pShade{width:100%}
+.relrow input{font-size:12.5px;padding:1px 6px;flex:1;min-width:8em}
 @media (max-width:860px){.app{grid-template-columns:minmax(0,1fr)}#stage{height:300px}}
 </style>
 
@@ -108,6 +138,24 @@ tfoot td{font-weight:700}
   <section><h2>箱とキューブ<span class="sp"></span><button class="small" id="addMonth" title="各シートに次の月の行が入ったことにする">次の月のデータが入った(試し)</button></h2><div class="tree" id="tree"></div></section>
   <section><h2>軸の辞書<span class="sp"></span><label class="muted"><input type="checkbox" id="showMine" checked> マイリストも見る</label></h2><div id="axes" class="tree"></div>
     <p class="muted">★ はお気に入り。点線はマイリスト(自分だけの一時的な軸で、全体のシートには反映しない)。</p></section>
+  <section><h2>登録辞書(呼び名と値の言い換え)</h2><div class="dict" id="dict"></div>
+    <details><summary class="muted">言い換えを足す</summary><div class="form">
+      <select id="dKind" aria-label="種類"><option value="col">列の呼び名</option><option value="val">値の呼び名</option></select>
+      <input id="dFrom" placeholder="呼び名(例: 楽天市場)" aria-label="呼び名">
+      <select id="dRel" aria-label="関係"><option value="=">＝ 同じ</option><option value="≒">≒ ほぼ同じ</option><option value="⊃">⊃ 含む</option><option value="⊂">⊂ 一部</option></select>
+      <select id="dAxis" aria-label="軸"></select>
+      <input id="dVal" placeholder="値(例: 楽天)" aria-label="値">
+      <select id="dScope" aria-label="使う範囲"></select>
+      <input id="dNote" placeholder="メモ(違いなど)" aria-label="メモ" style="grid-column:1/3">
+      <button id="dAdd" style="grid-column:1/3">登録する</button></div></details>
+    <p class="muted">＝は同じものとして扱います。≒(ほぼ同じ)・⊃(含む)・⊂(一部)は似ていても同じではない関係で、まとめるときは「≒・⊃も混ぜる」を選んだときだけ入ります。範囲を1枚のシートにすると、そのシートの中だけの呼び名になります。</p></section>
+  <section><h2>設定(初期値と自分の設定を分けて持つ)</h2><div id="prefs"></div>
+    <p class="muted">初期値はシステムで固定し、誰も書き換えません。変えた内容は「自分の設定」として初期値とは別に持ち、いつでも初期値に戻せます。変えた記録は履歴に残ります。</p></section>
+  <section><h2>スプシのリンクで登録</h2>
+    <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
+    <div class="row"><span class="muted">入れる先</span><select id="bookTarget" aria-label="入れる先"></select></div>
+    <button class="primary" id="bookRead">読み取る(試し)</button>
+    <p class="muted">本番では、システム用のアカウントにスプシの閲覧か編集の権限を渡すと、タブ・関数・条件付き書式・入力規則・GAS を読み取ります。試作では読み取った結果の見え方だけを作っています(AIの文は決まった例文です)。</p></section>
   <section><h2>シートを入れる</h2>
     <div class="row"><select id="preset" aria-label="例のシート"></select></div>
     <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先のキューブ"></select></div>
@@ -120,7 +168,8 @@ tfoot td{font-weight:700}
 <main>
   <div id="stage"><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
-    <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button></div></section>
+    <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
+  <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
   <section><h2>まとめる(箱とキューブを渡り歩いてシートにする)</h2>
     <div class="gather" id="gather"></div>
     <div class="trail" id="trail"></div>
@@ -128,6 +177,10 @@ tfoot td{font-weight:700}
     <div class="row"><input type="text" id="saveName" placeholder="まとめの名前" aria-label="まとめの名前"><select id="saveScope" aria-label="保存先"><option value="all">全体に保存</option><option value="mine">マイリストに保存</option></select><button id="save">このまとめを保存</button><span class="note" id="note"></span></div>
   </section>
   <section><h2>保存したまとめ(データが入ると自動で更新)</h2><div class="saved" id="saved"></div></section>
+  <section id="viewSec" hidden><h2><span id="viewTitle">シート</span><span class="sp"></span><button class="small" id="viewClose">閉じる</button></h2>
+    <div class="trail" id="viewInfo"></div><div class="fbar" id="fbar">セルを押すと中身(関数があれば関数)が出ます。ダブルクリックで直せます</div>
+    <div class="tablewrap"><table class="grid" id="viewGrid"></table></div><div class="row" id="viewActs"></div></section>
+  <section><h2>履歴(読み取りの議事録・まとめた/分けたシートの元)</h2><div class="hist" id="hist"></div></section>
 </main>
 </div>
 
@@ -143,17 +196,31 @@ const months = ['2026-07', '2026-08', '2026-09'];
 function rnd(seed) { let h = 2166136261; for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 13), 1597334677)) >>> 0) / 4294967296; }
 const fmt = n => Math.round(n).toLocaleString();
 const num = v => +String(v).replace(/[^\d.-]/g, '') || 0;
-function mallSheet(shop, mall, cols, ms) {
+function mallSheet(shop, mall, cols, ms, label = m => m) {
   const r = rnd(shop + mall);
-  return ms.map(m => { const s = Math.round((mall === '楽天' ? 180000 : 90000) * (.6 + r()) / 10) * 10; return [m, fmt(s), fmt(Math.round(s * (mall === '楽天' ? .1 : .08) / 10) * 10)]; });
+  return ms.map(m => { const s = Math.round((mall === '楽天' ? 180000 : 90000) * (.6 + r()) / 10) * 10; return [label(m), fmt(s), fmt(Math.round(s * (mall === '楽天' ? .1 : .08) / 10) * 10)]; });
 }
 const SAMPLE = () => {
   const axes = [
-    { id: 'corp', name: '法人', kind: 'key', aliases: ['法人名'], values: [], fav: false, scope: 'all' },
-    { id: 'shop', name: 'ショップ', kind: 'key', aliases: ['店舗', 'ショップID'], values: [], fav: true, scope: 'all' },
-    { id: 'mall', name: 'モール', kind: 'key', aliases: ['モール名', '出店先'], values: [], fav: true, scope: 'all' },
-    { id: 'month', name: '月', kind: 'key', aliases: ['年月', '対象月'], values: [], fav: true, scope: 'all' },
-    { id: 'item', name: '科目', kind: 'measure', aliases: [], values: ['売上', '手数料'], fav: false, scope: 'all', valueAliases: { '売上': ['売上金額', '売上高'], '手数料': ['決済手数料', 'システム利用料'] } }
+    { id: 'corp', name: '法人', kind: 'key', values: [], fav: false, scope: 'all' },
+    { id: 'shop', name: 'ショップ', kind: 'key', values: [], fav: true, scope: 'all' },
+    { id: 'mall', name: 'モール', kind: 'key', values: [], fav: true, scope: 'all' },
+    { id: 'month', name: '月', kind: 'key', values: [], fav: true, scope: 'all' },
+    { id: 'item', name: '科目', kind: 'measure', values: ['売上', '手数料'], fav: false, scope: 'all' }
+  ];
+  // 登録辞書:列の呼び名・値の呼び名と、正式な軸(や値)との関係。＝は同じ、≒はほぼ同じ、⊃は含む、⊂は一部。範囲はシート1枚だけにもできる
+  let dn = 0;
+  const D = (kind, from, rel, axis, value, scope, note) => ({ id: 'd' + (dn++), kind, from, rel, axis, value: value ?? null, scope: scope || 'all', note: note || '', at: '2026-10-01' });
+  const dict = [
+    D('col', '法人名', '=', 'corp'), D('col', '店舗', '=', 'shop'), D('col', 'ショップID', '=', 'shop'), D('col', '店舗コード', '=', 'shop'),
+    D('col', 'モール名', '=', 'mall'), D('col', '出店先', '=', 'mall'), D('col', '年月', '=', 'month'), D('col', '対象月', '=', 'month'),
+    D('col', '売上金額', '=', 'item', '売上'), D('col', '売上高', '=', 'item', '売上'), D('col', '決済手数料', '=', 'item', '手数料'),
+    D('col', 'システム利用料', '≒', 'item', '手数料', null, '決済手数料のほかに月額の利用料も入るので、手数料と完全には同じではない'),
+    D('col', '税込売上', '⊃', 'item', '売上', null, '税込売上は売上(税抜)に消費税を足したもの'),
+    D('val', '楽天市場', '=', 'mall', '楽天'), D('val', 'Yahoo!ショッピング', '=', 'mall', 'Yahoo'), D('val', 'au PAYマーケット', '=', 'mall', 'au PAY'),
+    D('val', '7月', '=', 'month', '2026-07', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる'),
+    D('val', '8月', '=', 'month', '2026-08', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる'),
+    D('val', '9月', '=', 'month', '2026-09', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる')
   ];
   const boxes = [
     { id: 'b1', kind: 'box', name: '法人A', own: { corp: '法人A' }, parent: null },
@@ -163,26 +230,41 @@ const SAMPLE = () => {
     { id: 'c3', kind: 'cube', name: 'S-03', own: { shop: 'S-03' }, axes: ['month', 'mall', 'item'], parent: 'b2' }
   ];
   const sheets = [];
-  const add = (cube, mall, cols, bind) => sheets.push({ id: 'sh' + sheets.length, cube, name: mall + 'の売上', tag: { mall }, cols, bind, rows: mallSheet(cube, mall, cols, months) });
+  const add = (cube, mall, cols, bind, label) => sheets.push({ id: 'sh' + sheets.length, cube, name: mall + 'の売上', tag: { mall }, cols, bind, rows: mallSheet(cube, mall, cols, months, label) });
   // 楽天は「月・売上・手数料」、Yahoo は「年月・売上金額・決済手数料」と列名が違うが、同じ軸として承認済み
   add('c1', '楽天', ['月', '売上', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
   add('c1', 'Yahoo', ['年月', '売上金額', '決済手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
   add('c2', '楽天', ['月', '売上', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
-  add('c3', '楽天', ['対象月', '売上高', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
+  // S-03 の楽天シートは月を「9月」のように年なしで書いている。登録辞書(このシートだけの呼び名)で 2026-09 と読む
+  add('c3', '楽天', ['対象月', '売上高', '手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }], m => +m.slice(5) + '月');
   add('c3', 'Yahoo', ['年月', '売上金額', '決済手数料'], [{ axis: 'month' }, { axis: 'item', value: '売上' }, { axis: 'item', value: '手数料' }]);
   const saved = [{ id: 'v1', name: '各店舗の楽天の9月の売上', q: { fix: { mall: '楽天', month: '2026-09', item: '売上' }, row: 'shop', col: 'item' }, fav: true, scope: 'all', seen: '' },
     { id: 'v2', name: 'S-01 の月別売上(モールごと)', q: { fix: { shop: 'S-01', item: '売上' }, row: 'month', col: 'mall' }, fav: false, scope: 'all', seen: '' }];
-  return { axes, boxes, sheets, saved, nextMonth: 10 };
+  const history = [{ id: 'h0', at: '2026-10-01', kind: '承認', title: 'S-03 の楽天の売上 を入れた', lines: ['対象月 → 月(＝)。値は「9月」のように年なしなので、このシートだけの呼び名として 7月・8月・9月 を 2026-07〜09 と登録', '売上高 → 科目=売上(＝)', '手数料 → 科目=手数料(＝)'], sources: [], results: ['sh3'] }];
+  return { axes, boxes, sheets, saved, dict, history, nextMonth: 10 };
 };
-const KEY = 'axis-boxes-v1';
+const KEY = 'axis-boxes-v2';
 let S;
-try { S = JSON.parse(localStorage.getItem(KEY)); if (!S || !S.axes || !S.boxes || !S.sheets || !S.saved) S = SAMPLE(); } catch (e) { S = SAMPLE(); }
+try { S = JSON.parse(localStorage.getItem(KEY)); if (!S || !S.axes || !S.boxes || !S.sheets || !S.saved || !S.dict || !S.history) S = SAMPLE(); } catch (e) { S = SAMPLE(); }
+S.prefs = S.prefs || {};
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const ax = id => S.axes.find(a => a.id === id);
 const box = id => S.boxes.find(b => b.id === id);
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let showMine = true;
+// システムの初期値。画面からは変えられない(秩序のもと)。自分の設定は S.prefs に別で持つ
+const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']) });
+const SHADES = { view: '表示中の最大値で割る', global: 'その科目の全期間の最大値で割る(絞っても色が変わらない)', row: '行ごとの最大値で割る', share: '行の合計に占める割合' };
+const curPref = k => (S.prefs && S.prefs[k] != null ? S.prefs[k] : SYSTEM[k]);
+const today = () => new Date().toISOString().slice(0, 10);
+const REL = { '=': '同じ', '≒': 'ほぼ同じ', '⊃': '含む', '⊂': '一部' };
+const sheetById = id => S.sheets.find(x => x.id === id);
+const where = sh => pathOf(sh.cube).map(b => b.name).join(' › ') + ' › ' + sh.name;
+const inScope = (d, shId) => d.scope === 'all' || d.scope === shId;
+// 値の呼び名を正式な値に直す。＝のものだけ直し、≒などは別の値のままにする
+function normVal(axisId, v, shId) { const d = S.dict.find(d => d.kind === 'val' && d.axis === axisId && d.from === v && d.rel === '=' && inScope(d, shId)); return d ? d.value : v; }
+const colNames = (axisId, value) => S.dict.filter(d => d.kind === 'col' && d.axis === axisId && (value == null ? d.value == null : d.value === value) && d.scope === 'all');
 const visibleAxis = a => a.scope === 'all' || showMine;
 
 // ---------- 箱とキューブを渡り歩いて、セルを「軸の値の組 → 値」にする ----------
@@ -191,24 +273,26 @@ function pathOf(cubeId) { const out = []; let b = box(cubeId); while (b) { out.u
 function facts() {
   const out = [];
   for (const sh of S.sheets) {
-    const ctx = {}; pathOf(sh.cube).forEach(b => Object.assign(ctx, b.own)); Object.assign(ctx, sh.tag || {});
+    const ctx = {}; pathOf(sh.cube).forEach(b => Object.assign(ctx, b.own)); Object.entries(sh.tag || {}).forEach(([a, v]) => { ctx[a] = normVal(a, v, sh.id); });
     const keyCols = sh.bind.map((b, i) => [b, i]).filter(([b]) => b && !b.value && ax(b.axis) && ax(b.axis).kind === 'key');
     const valCols = sh.bind.map((b, i) => [b, i]).filter(([b]) => b && b.value != null);
     sh.rows.forEach((r, ri) => {
       const base = { ...ctx }; let hidden = false;
-      keyCols.forEach(([b, i]) => { base[b.axis] = r[i]; if (ax(b.axis).scope === 'mine' && !showMine) hidden = true; });
-      valCols.forEach(([b, i]) => { if (ax(b.axis).scope === 'mine' && !showMine) return; out.push({ k: { ...base, [b.axis]: b.value }, v: num(r[i]), src: { sh: sh.id, r: ri, c: i }, hidden }); });
+      keyCols.forEach(([b, i]) => { base[b.axis] = normVal(b.axis, r[i], sh.id); if (ax(b.axis).scope === 'mine' && !showMine) hidden = true; });
+      valCols.forEach(([b, i]) => { if (ax(b.axis).scope === 'mine' && !showMine) return; out.push({ k: { ...base, [b.axis]: b.value }, v: num(r[i]), src: { sh: sh.id, r: ri, c: i }, hidden, approx: b.rel && b.rel !== '=' ? b.rel : null }); });
     });
   }
   return out.filter(f => !f.hidden);
 }
 function valuesOf(axisId, fs) { return [...new Set(fs.map(f => f.k[axisId]).filter(v => v != null))].sort(); }
 function runQuery(q) {
-  const fs = facts().filter(f => Object.entries(q.fix).every(([a, v]) => !v || f.k[a] === v));
+  const hit = facts().filter(f => Object.entries(q.fix).every(([a, v]) => !v || f.k[a] === v));
+  // ≒・⊃・⊂ で登録した列は、混ぜると選んだときだけ入れる
+  const fs = hit.filter(f => q.approx || !f.approx), left = hit.filter(f => f.approx && !q.approx);
   const rows = valuesOf(q.row, fs), cols = q.col ? valuesOf(q.col, fs) : ['値'];
   const cell = new Map();
   for (const f of fs) { const r = f.k[q.row], c = q.col ? f.k[q.col] : '値'; if (r == null || c == null) continue; const key = r + '\u0001' + c; if (!cell.has(key)) cell.set(key, []); cell.get(key).push(f); }
-  return { rows, cols, cell, fs };
+  return { rows, cols, cell, fs, left };
 }
 
 // ---------- 左: 木と辞書 ----------
@@ -219,20 +303,24 @@ function renderTree() {
   const walk = (p, d) => kids(p).forEach(b => {
     const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
     h += `<div class="node ind${d}${isUsed ? ' used' : ''}"><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}</div>`;
+    S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
-    if (b.kind === 'cube') S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行</span></div>`);
+    if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
   });
   walk(null, 0);
   el.innerHTML = h;
+  el.querySelectorAll('[data-addcube]').forEach(n => n.onclick = () => addCube(n.dataset.addcube));
+  el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
 }
 function renderAxes() {
   const fsAll = facts();
   const list = [...S.axes].filter(visibleAxis).sort((a, b) => (b.fav - a.fav));
   $('axes').innerHTML = list.map(a => {
     const vals = a.kind === 'measure' ? a.values : valuesOf(a.id, fsAll);
-    const als = a.kind === 'measure' ? Object.entries(a.valueAliases || {}).map(([v, l]) => v + '←' + l.join('/')).join('、') : a.aliases.join('、');
+    const nm = d => d.from + (d.rel === '=' ? '' : '(' + d.rel + ')');
+    const als = a.kind === 'measure' ? a.values.map(v => { const l = colNames(a.id, v); return l.length ? v + '←' + l.map(nm).join('/') : ''; }).filter(Boolean).join('、') : colNames(a.id).map(nm).join('、');
     return `<div class="axis${a.scope === 'mine' ? ' mine' : ''}"><button class="star${a.fav ? ' on' : ''}" data-fav="${a.id}" aria-label="お気に入り">${a.fav ? '\u2605\uFE0E' : '\u2606'}</button><span class="nm">${esc(a.name)} ${a.scope === 'mine' ? '<span class="pill mine">マイリスト</span>' : ''}</span><span class="muted">${a.kind === 'measure' ? '値の列' : vals.length + '個の値'}</span>
-      <span class="al">${als ? '同じ意味: ' + esc(als) : '言い換えなし'}${a.kind === 'measure' ? ' / ' + esc(vals.join('・')) : ''}</span></div>`;
+      <span class="al">${als ? '呼び名: ' + esc(als) : '言い換えなし'}${a.kind === 'measure' ? ' / ' + esc(vals.join('・')) : ''}</span></div>`;
   }).join('');
   $('axes').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const a = ax(b.dataset.fav); a.fav = !a.fav; save(); renderAxes(); renderGather(); });
 }
@@ -248,9 +336,12 @@ function fillPreset(i) {
   $('target').value = p.target; $('tagAxis').value = p.tag[0]; $('tagVal').value = p.tag[1];
 }
 function renderInputs() {
-  const keep = ['preset', 'target', 'tagAxis'].map(id => [id, $(id).value]);
+  const keep = ['preset', 'target', 'tagAxis', 'bookTarget', 'dAxis', 'dScope'].map(id => [id, $(id).value]);
   $('preset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('');
-  $('target').innerHTML = S.boxes.filter(b => b.kind === 'cube').map(b => `<option value="${b.id}">${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('');
+  const tg = S.boxes.map(b => `<option value="${b.id}">${b.kind === 'box' ? '箱 ' : 'キューブ '}${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('');
+  $('target').innerHTML = tg; $('bookTarget').innerHTML = tg;
+  $('dAxis').innerHTML = S.axes.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  $('dScope').innerHTML = '<option value="all">全体で使う</option>' + S.sheets.map(s => `<option value="${s.id}">このシートだけ: ${esc(where(s))}</option>`).join('');
   $('tagAxis').innerHTML = '<option value="">なし</option>' + S.axes.filter(a => a.kind === 'key').map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
   keep.forEach(([id, v]) => { if (v && [...$(id).options].some(o => o.value === v)) $(id).value = v; });
 }
@@ -267,69 +358,82 @@ function candidates(col, vals) {
   const out = [];
   for (const a of S.axes) {
     if (a.kind === 'key') {
-      const names = [a.name, ...a.aliases], ns = Math.max(...names.map(n => sim(col, n)));
-      const known = valuesOf(a.id, fsAll), overlap = vals.filter(v => known.includes(v)).length / (vals.length || 1);
+      const names = [{ from: a.name, rel: '=' }, ...colNames(a.id)], best = names.reduce((p, n) => sim(col, n.from) > sim(col, p.from) ? n : p), ns = sim(col, best.from) * (best.rel === '=' ? 1 : .9);
+      const known = valuesOf(a.id, fsAll), overlap = vals.filter(v => known.includes(v) || normVal(a.id, v, '') !== v).length / (vals.length || 1);
       const kshape = known.length ? shapeOf(known[0]) : '', shapeOk = kshape && kshape === shape;
       const score = isNum ? ns * .3 : Math.min(1, ns * .55 + overlap * .35 + (shapeOk ? .2 : 0));
       const why = [];
-      if (ns > .3) why.push(ns === 1 ? `「${names.find(n => n === col)}」と同じ名前` : `名前が「${names.reduce((p, n) => sim(col, n) > sim(col, p) ? n : p)}」に近い`);
+      if (ns > .3) why.push(sim(col, best.from) === 1 ? `辞書の「${best.from}」と同じ名前` : `名前が「${best.from}」に近い`);
+      if (best.rel !== '=' && ns > .3) why.push(`辞書では「${best.from}」${best.rel}「${a.name}」(${REL[best.rel]})`);
       if (shapeOk) why.push(`値の形が同じ(${shape})`);
       if (overlap) why.push(`値の${Math.round(overlap * 100)}%が登録済みの値と同じ`);
       if (isNum) why.push('値が数字なので見出しの軸には向かない');
-      if (score >= .15) out.push({ axis: a.id, label: `${a.name}(見出しの軸)`, score, why: why.join('・') || '弱い一致' });
+      if (score >= .15) out.push({ axis: a.id, label: `${a.name}(見出しの軸)`, score, rel: ns > .3 ? best.rel : '=', note: ns > .3 ? best.note || '' : '', why: why.join('・') || '弱い一致' });
     } else {
       for (const v of a.values) {
-        const names = [v, ...((a.valueAliases || {})[v] || [])], ns = Math.max(...names.map(n => sim(col, n)));
-        const score = isNum ? Math.min(1, ns * .85 + .15) : ns * .3;
-        const best = names.reduce((p, n) => sim(col, n) > sim(col, p) ? n : p);
-        if (score >= .2) out.push({ axis: a.id, value: v, label: `${a.name} = ${v}(値の列)`, score, why: (ns === 1 ? `「${best}」と同じ名前` : `名前が「${best}」に近い`) + (isNum ? '・値が数字' : '') });
+        const names = [{ from: v, rel: '=' }, ...colNames(a.id, v)], best = names.reduce((p, n) => sim(col, n.from) > sim(col, p.from) ? n : p);
+        const ns = sim(col, best.from) * (best.rel === '=' ? 1 : .9), score = isNum ? Math.min(1, ns * .85 + .15) : ns * .3;
+        const why = (sim(col, best.from) === 1 ? `辞書の「${best.from}」と同じ名前` : `名前が「${best.from}」に近い`) + (best.rel !== '=' ? `・辞書では「${best.from}」${best.rel}「${v}」(${REL[best.rel]})` : '') + (isNum ? '・値が数字' : '');
+        if (score >= .2) out.push({ axis: a.id, value: v, label: `${a.name} = ${v}(値の列)`, score, rel: best.rel, note: best.note || '', why });
       }
     }
   }
   return out.sort((a, b) => b.score - a.score);
 }
-let pending = null;
+let pending = null, queue = [];
 function readSheet() {
   const txt = $('newData').value.trim(); if (!txt) return;
   const lines = txt.split(/\r?\n/).filter(x => x.trim()), sep = lines[0].includes('\t') ? '\t' : ',';
   const grid = lines.map(x => x.split(sep).map(v => v.trim())), cols = grid[0], rows = grid.slice(1).map(r => cols.map((_, i) => r[i] ?? ''));
   pending = { name: $('newName').value.trim() || 'シート', cube: $('target').value, tag: $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}, cols, rows,
-    picks: cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; }) };
+    picks: pickCols(cols, rows) };
   renderMatches();
 }
+const pickCols = (cols, rows) => cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', rel: null, note: '', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; });
 function renderMatches() {
   const sec = $('matchSec'); sec.hidden = !pending; if (!pending) return;
   const p = pending;
-  $('matches').innerHTML = `<p class="muted">入れる先: ${esc(pathOf(p.cube).map(b => b.name).join(' › '))} ・ シート「${esc(p.name)}」${Object.entries(p.tag).map(([a, v]) => ' ・ ' + esc(ax(a).name) + '=' + esc(v)).join('')}。列ごとに、過去に登録した軸と同じ意味か別かを選んでください。候補はすべて並べています。</p>` +
+  $('matches').innerHTML = (p.origin ? `<p class="muted">元: ${esc(p.origin.text)}</p>` : '') + `<p class="muted">入れる先: ${esc(pathOf(p.cube).map(b => b.name).join(' › '))} ・ シート「${esc(p.name)}」${Object.entries(p.tag).map(([a, v]) => ' ・ ' + esc(ax(a).name) + '=' + esc(v)).join('')}。列ごとに、過去に登録した軸と同じ意味か別かを選んでください。候補はすべて並べています。</p>` +
     p.cols.map((c, i) => { const m = p.picks[i], ex = p.rows.slice(0, 3).map(r => r[i]).join(', ');
       const opt = (val, label, why, extra = '') => `<label class="cand"><input type="radio" name="m${i}" value="${val}"${String(m.pick) === String(val) ? ' checked' : ''}><span>${label}${extra}</span><span class="why">${why}</span></label>`;
       return `<div class="match"><div class="col">${esc(c)} <code>例: ${esc(ex)}</code> <span class="muted">候補 ${m.cands.length}件</span></div>` +
         m.cands.map((cd, k) => opt(k, esc(cd.label), esc(cd.why), ` <span class="score"><span class="bar" style="width:${Math.round(cd.score * 40)}px"></span>${Math.round(cd.score * 100)}%</span>`)).join('') +
         opt('new', `<span class="pill new">新しい軸</span> 「${esc(c)}」を${m.isNum ? '科目の新しい値' : '新しい軸'}として全体に登録`, '過去のどの軸とも別のものとして扱う') +
         opt('mine', `<span class="pill mine">マイリスト</span> 「${esc(c)}」を自分だけの一時的な軸にする`, '全体の軸の辞書やほかの人のまとめには反映しない') +
-        opt('skip', '使わない', 'この列は読み込まない') + '</div>'; }).join('');
-  $('matches').querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { const i = +r.name.slice(1); p.picks[i].pick = isNaN(+r.value) ? r.value : +r.value; });
+        opt('skip', '使わない', 'この列は読み込まない') +
+        (typeof m.pick === 'number' ? `<div class="relrow">関係: <select data-rel="${i}" aria-label="関係">${Object.entries(REL).map(([k, t]) => `<option value="${k}"${(m.rel || m.cands[m.pick].rel) === k ? ' selected' : ''}>${k} ${t}</option>`).join('')}</select><input data-note="${i}" placeholder="違いのメモ(≒・⊃・⊂のとき)" value="${esc(m.note || m.cands[m.pick].note || '')}" aria-label="違いのメモ"></div>` : '') + '</div>'; }).join('');
+  $('matches').querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { const i = +r.name.slice(1); p.picks[i].pick = isNaN(+r.value) ? r.value : +r.value; p.picks[i].rel = null; p.picks[i].note = ''; renderMatches(); });
+  $('matches').querySelectorAll('[data-rel]').forEach(x => x.onchange = () => { p.picks[+x.dataset.rel].rel = x.value; });
+  $('matches').querySelectorAll('[data-note]').forEach(x => x.oninput = () => { p.picks[+x.dataset.note].note = x.value; });
+  $('queueInfo').textContent = queue.length ? `このあと ${queue.length} 枚の承認が続きます` : '';
 }
 function approve() {
   const p = pending; if (!p) return;
+  const lines = [];
   const bind = p.cols.map((c, i) => {
     const m = p.picks[i];
-    if (m.pick === 'skip') return null;
+    if (m.pick === 'skip') { lines.push(`${c} → 使わない`); return null; }
     if (m.pick === 'new' || m.pick === 'mine') {
       const scope = m.pick === 'mine' ? 'mine' : 'all';
-      if (m.isNum && scope === 'all') { const it = ax('item'); if (!it.values.includes(c)) it.values.push(c); return { axis: 'item', value: c }; }
+      lines.push(`${c} → ${scope === 'mine' ? 'マイリストの' : ''}新しい${m.isNum && scope === 'all' ? '科目の値' : '軸'}として登録`);
+      if (m.isNum && scope === 'all') { const it = ax('item'); if (!it.values.includes(c)) it.values.push(c); return { axis: 'item', value: c, rel: '=' }; }
       const id = 'a' + Date.now().toString(36) + i;
-      if (m.isNum) { S.axes.push({ id, name: c, kind: 'measure', aliases: [], values: [c], fav: false, scope }); return { axis: id, value: c }; }
-      S.axes.push({ id, name: c, kind: 'key', aliases: [], values: [], fav: false, scope }); return { axis: id };
+      if (m.isNum) { S.axes.push({ id, name: c, kind: 'measure', values: [c], fav: false, scope }); return { axis: id, value: c, rel: '=' }; }
+      S.axes.push({ id, name: c, kind: 'key', values: [], fav: false, scope }); return { axis: id, rel: '=' };
     }
-    const cd = m.cands[m.pick], a = ax(cd.axis);
-    // 同じ意味と承認した列名は、軸の言い換えとして覚える(次から候補の名前一致になる)
-    if (cd.value != null) { a.valueAliases = a.valueAliases || {}; const l = a.valueAliases[cd.value] = a.valueAliases[cd.value] || []; if (c !== cd.value && !l.includes(c)) l.push(c); return { axis: a.id, value: cd.value }; }
-    if (c !== a.name && !a.aliases.includes(c)) a.aliases.push(c);
-    return { axis: a.id };
+    const cd = m.cands[m.pick], a = ax(cd.axis), rel = m.rel || cd.rel || '=', nt = m.note || cd.note || '';
+    const target = cd.value != null ? cd.value : a.name;
+    lines.push(`${c} → ${a.name}${cd.value != null ? '=' + cd.value : ''}(${rel} ${REL[rel]}${nt ? '・' + nt : ''})`);
+    // 承認した呼び名は登録辞書に入れる(次から候補の名前一致になる)。関係(＝/≒/⊃/⊂)とメモも一緒に残す
+    if (c !== target && !S.dict.some(d => d.kind === 'col' && d.from === c && d.axis === a.id && d.value === (cd.value ?? null)))
+      S.dict.push({ id: 'd' + Date.now().toString(36) + i, kind: 'col', from: c, rel, axis: a.id, value: cd.value ?? null, scope: 'all', note: nt, at: today() });
+    return { axis: a.id, value: cd.value, rel };
   });
-  S.sheets.push({ id: 'sh' + Date.now().toString(36), cube: p.cube, name: p.name, tag: p.tag, cols: p.cols, rows: p.rows, bind });
-  pending = null; save(); note('シート「' + p.name + '」を入れました。保存したまとめは自動で更新されます');
+  const id = 'sh' + Date.now().toString(36);
+  S.sheets.push({ id, cube: p.cube, name: p.name, tag: p.tag, cols: p.cols, rows: p.rows, bind, origin: p.origin ? { text: p.origin.text, short: p.origin.short } : null, cf: p.cf || [], dv: p.dv || [], formulas: p.formulas || {} });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: p.origin ? '取り込み' : '承認', title: `${where({ cube: p.cube, name: p.name })} を入れた`,
+    lines: [...(p.origin ? p.origin.minutes : []), ...lines], sources: p.origin ? p.origin.sources : [], results: [id] });
+  pending = queue.shift() || null; save(); note('シート「' + p.name + '」を入れました。保存したまとめは自動で更新されます');
   renderAll();
 }
 
@@ -347,7 +451,9 @@ function renderGather() {
   }
   const axOpt = (cur, none) => (none ? '<option value="">なし</option>' : '') + keyAxes.filter(a => valuesOf(a.id, fsAll).length).map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
   h += `<label>行に並べる<select id="qRow">${axOpt(q.row)}</select></label><label>列に並べる<select id="qCol">${axOpt(q.col, true)}</select></label>`;
+  h += `<label><input type="checkbox" id="qApprox"${q.approx ? ' checked' : ''}> ≒・⊃も混ぜる</label>`;
   $('gather').innerHTML = h;
+  $('qApprox').onchange = e => { q.approx = e.target.checked; curSaved = null; renderResult(); renderSaved(); };
   $('gather').querySelectorAll('[data-fix]').forEach(s => s.onchange = () => { q.fix[s.dataset.fix] = s.value || undefined; curSaved = null; renderResult(); renderSaved(); });
   $('qRow').onchange = e => { q.row = e.target.value; delete q.fix[q.row]; if (q.col === q.row) q.col = ''; curSaved = null; renderGather(); renderResult(); renderSaved(); };
   $('qCol').onchange = e => { q.col = e.target.value; delete q.fix[q.col]; curSaved = null; renderGather(); renderResult(); renderSaved(); };
@@ -358,7 +464,9 @@ function renderResult() {
   used = new Set(R.fs.map(f => f.src.sh));
   const fixTxt = Object.entries(q.fix).filter(([, v]) => v).map(([a, v]) => ax(a).name + '=' + v).join('・') || '絞りなし';
   const paths = [...used].map(id => { const s = S.sheets.find(x => x.id === id); return pathOf(s.cube).map(b => b.name).join(' › ') + ' › ' + s.name; });
-  $('trail').innerHTML = `<b>${esc(fixTxt)}</b> を、${R.rows.length ? `<b>${esc(ax(q.row).name)}</b>ごとに` : ''}${used.size}枚のシートから集めました: ` + esc(paths.join(' / ') || 'なし');
+  const leftSh = [...new Set(R.left.map(f => { const s = sheetById(f.src.sh); return s.name + 'の「' + s.cols[f.src.c] + '」(' + f.approx + ')'; }))];
+  $('trail').innerHTML = `<b>${esc(fixTxt)}</b> を、${R.rows.length ? `<b>${esc(ax(q.row).name)}</b>ごとに` : ''}${used.size}枚のシートから集めました: ` + esc(paths.join(' / ') || 'なし') +
+    (leftSh.length ? `<br><span class="ap">≒</span> 似ているが同じではない列 ${R.left.length} 件は入れていません: ${esc(leftSh.join('、'))}(「≒・⊃も混ぜる」で入ります)` : '');
   if (!R.rows.length) { t.innerHTML = '<tbody><tr><td>条件に合う値がありません</td></tr></tbody>'; renderTree(); paint(); return; }
   const tot = R.cols.map(() => 0);
   const body = R.rows.map(r => `<tr><th>${esc(r)}</th>${R.cols.map((c, ci) => {
@@ -366,7 +474,9 @@ function renderResult() {
     if (!fs.length) return '<td class="num sum">—</td>';
     const src = fs.map(f => { const s = S.sheets.find(x => x.id === f.src.sh); return pathOf(s.cube).map(b => b.name).join(' › ') + ' › ' + s.name + ' › ' + s.rows[f.src.r][0] + ' の「' + s.cols[f.src.c] + '」'; }).join('\n');
     const one = fs.length === 1, key = one ? fs[0].src.sh + ':' + fs[0].src.r + ':' + fs[0].src.c : '';
-    return `<td class="num${one ? ' edit' : ' sum'}${flash.has(key) ? ' flash' : ''}" title="${esc(src)}${one ? '\n(押して直すと元のシートに反映)' : '\n(' + fs.length + '件の合計なので直せません)'}"${one ? ` data-src="${key}"` : ''}>${fmt(v)}</td>`;
+    const apx = fs.filter(f => f.approx).map(f => f.approx);
+    const t = shadeOf(R, r, c, v), bg = `background:color-mix(in srgb, var(--accent) ${Math.round(6 + t * 40)}%, var(--panel))`;
+    return `<td style="${flash.has(key) ? '' : bg}" class="num${one ? ' edit' : ' sum'}${flash.has(key) ? ' flash' : ''}" title="${esc(src)}${apx.length ? '\n(' + apx.join('') + ' の列を含む)' : ''}${one ? '\n(押して直すと元のシートに反映)' : '\n(' + fs.length + '件の合計なので直せません)'}"${one ? ` data-src="${key}"` : ''}>${apx.length ? `<span class="ap">${apx[0]}</span> ` : ''}${fmt(v)}</td>`;
   }).join('')}</tr>`).join('');
   t.innerHTML = `<thead><tr><th>${esc(ax(q.row).name)}</th>${R.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${body}</tbody><tfoot><tr><td>合計</td>${tot.map(x => `<td class="num">${fmt(x)}</td>`).join('')}</tr></tfoot>`;
   t.querySelectorAll('td[data-src]').forEach(td => td.onclick = () => editCell(td));
@@ -412,13 +522,178 @@ function addMonth() {
 let noteT;
 function note(t) { $('note').textContent = t; clearTimeout(noteT); noteT = setTimeout(() => { $('note').textContent = ''; }, 6000); }
 
+
+
+// ---------- 設定(初期値と自分の設定) ----------
+function renderPrefs() {
+  const sh = curPref('shade'), ca = curPref('cubeAxes'), own = k => S.prefs[k] != null;
+  const axOpts = cur => S.axes.filter(a => a.scope === 'all').map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  $('prefs').innerHTML = `<div class="relrow"><b>濃淡の基準</b> <span class="pill ${own('shade') ? 'mine' : 'cube'}">${own('shade') ? '自分の設定' : '初期値'}</span></div>
+    <select id="pShade" aria-label="濃淡の基準">${Object.entries(SHADES).map(([k, t]) => `<option value="${k}"${sh === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    <div class="muted">初期値: ${SHADES[SYSTEM.shade]} ${own('shade') ? '<button class="small" data-reset="shade">初期値に戻す</button>' : ''}</div>
+    <div class="relrow"><b>新しいキューブの3軸</b> <span class="pill ${own('cubeAxes') ? 'mine' : 'cube'}">${own('cubeAxes') ? '自分の設定' : '初期値'}</span></div>
+    <div class="row">${[0, 1, 2].map(i => `<select data-ca="${i}" aria-label="${'XYZ'[i]}軸">${axOpts(ca[i])}</select>`).join('×')}</div>
+    <div class="muted">初期値: ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')} ${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">初期値に戻す</button>' : ''}</div>`;
+  const log = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '設定', title: t, lines: l, sources: [], results: [] });
+  $('pShade').onchange = e => { const v = e.target.value; if (v === SYSTEM.shade) delete S.prefs.shade; else S.prefs.shade = v; log('濃淡の基準を変えた', [`${SHADES[v]}(初期値は ${SHADES[SYSTEM.shade]})`]); save(); renderAll(); };
+  $('prefs').querySelectorAll('[data-ca]').forEach(x => x.onchange = () => { const v = [...$('prefs').querySelectorAll('[data-ca]')].map(y => y.value);
+    if (new Set(v).size < 3) { note('3つの軸は別々のものを選んでください'); renderPrefs(); return; }
+    if (v.join() === SYSTEM.cubeAxes.join()) delete S.prefs.cubeAxes; else S.prefs.cubeAxes = v;
+    log('新しいキューブの3軸を変えた', [`${v.map(a => ax(a).name).join('×')}(初期値は ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')}。今あるキューブの軸は変えない)`]); save(); renderAll(); });
+  $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を初期値に戻した', [b.dataset.reset === 'shade' ? '濃淡の基準' : '新しいキューブの3軸']); save(); renderAll(); });
+}
+function addCube(boxId) {
+  const n = S.boxes.filter(b => b.kind === 'cube').length + 1, name = 'S-' + String(n).padStart(2, '0'), axes = [...curPref('cubeAxes')];
+  S.boxes.push({ id: 'c' + Date.now().toString(36), kind: 'cube', name, own: { shop: name }, axes, parent: boxId });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${box(boxId).name} にキューブ ${name} を足した`, lines: [`3軸: ${axes.map(a => ax(a).name).join('×')}(${S.prefs.cubeAxes ? '自分の設定' : '初期値'}から)`], sources: [], results: [] });
+  save(); renderAll();
+}
+// まとめた表の濃淡。基準は設定で選ぶ
+function shadeOf(R, r, c, v) {
+  const mode = curPref('shade'), sumOf = (rr, cc) => (R.cell.get(rr + '\u0001' + cc) || []).reduce((a, f) => a + f.v, 0);
+  let base = 0;
+  if (mode === 'view') R.rows.forEach(rr => R.cols.forEach(cc => { base = Math.max(base, sumOf(rr, cc)); }));
+  else if (mode === 'row') R.cols.forEach(cc => { base = Math.max(base, sumOf(r, cc)); });
+  else if (mode === 'share') R.cols.forEach(cc => { base += sumOf(r, cc); });
+  else { const it = q.col === 'item' ? c : q.row === 'item' ? r : q.fix.item; facts().forEach(f => { if (!it || f.k.item === it) base = Math.max(base, f.v); }); }
+  return base ? Math.max(0, Math.min(1, v / base)) : 0;
+}
+
+// ---------- 登録辞書 ----------
+function renderDict() {
+  const nameOf = d => { const a = ax(d.axis); return a ? a.name + (d.value != null ? ' = ' + d.value : '') : '?'; };
+  const list = [...S.dict].sort((a, b) => (a.kind > b.kind ? 1 : a.kind < b.kind ? -1 : 0));
+  $('dict').innerHTML = list.map(d => `<div class="de"><span>${d.kind === 'col' ? '列' : '値'}「${esc(d.from)}」</span><span class="rel${d.rel === '=' ? '' : ' ap'}" title="${REL[d.rel]}">${d.rel}</span><span>${esc(nameOf(d))}</span><button class="x small" data-dd="${d.id}" aria-label="消す">×</button>
+    <span class="sc">${d.scope === 'all' ? '全体' : 'このシートだけ: ' + esc(sheetById(d.scope) ? where(sheetById(d.scope)) : '(消えたシート)')}${d.note ? '・' + esc(d.note) : ''}・${esc(d.at)}</span></div>`).join('');
+  $('dict').querySelectorAll('[data-dd]').forEach(b => b.onclick = () => { const d = S.dict.find(x => x.id === b.dataset.dd); S.dict = S.dict.filter(x => x !== d);
+    S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: `登録辞書から「${d.from}」を消した`, lines: [`${d.from} ${d.rel} ${nameOf(d)} を消した`], sources: [], results: [] }); save(); renderAll(); });
+}
+function addDict() {
+  const from = $('dFrom').value.trim(); if (!from) return;
+  const kind = $('dKind').value, axis = $('dAxis').value, a = ax(axis), val = $('dVal').value.trim() || null;
+  if (kind === 'val' && !val) { note('値の呼び名には、正式な値も入れてください'); return; }
+  const d = { id: 'd' + Date.now().toString(36), kind, from, rel: $('dRel').value, axis, value: a.kind === 'measure' || kind === 'val' ? val : null, scope: $('dScope').value, note: $('dNote').value.trim(), at: today() };
+  S.dict.push(d);
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: `登録辞書に「${from}」を足した`, lines: [`${from} ${d.rel} ${a.name}${d.value != null ? '=' + d.value : ''}(${REL[d.rel]})${d.scope === 'all' ? '' : '・' + sheetById(d.scope).name + ' だけ'}${d.note ? '・' + d.note : ''}`], sources: [], results: [] });
+  $('dFrom').value = ''; $('dVal').value = ''; $('dNote').value = ''; save(); note('登録辞書に「' + from + '」を足しました。まとめは自動で更新されます'); renderAll();
+}
+
+// ---------- スプシのリンクで登録(試作:読み取り結果は決まった例) ----------
+let book = null;
+function mockBook(url) {
+  const name = (decodeURIComponent(url).split('/').find(x => /月次|売上|管理/.test(x)) || '売上管理').replace(/\?.*/, '');
+  const r = rnd(url), ms = ['2026-07', '2026-08', '2026-09'], shops = ['S-01', 'S-02'];
+  const tabs = ms.map(m => ({ name: 'auPAY_' + m, use: true, kind: 'data', month: m, cols: ['店舗コード', '売上金額', '決済手数料'],
+    rows: shops.map(s => { const v = Math.round((120000 + r() * 90000) / 10) * 10; return [s, String(v), String(Math.round(v * .1 / 10) * 10)]; }),
+    size: { rows: 38000 + Math.round(r() * 8000), cols: 14 },
+    cf: [{ col: 1, op: '<', v: 150000, text: '売上金額が 150,000 未満なら赤字' }],
+    dv: [{ col: 0, text: '店舗コードは S-01 / S-02 から選ぶ(プルダウン)' }],
+    formulas: { C: { f: '=ROUND(B{r}*0.1,-1)', text: '決済手数料 = 売上金額の10%(10円単位)' } } }));
+  tabs.push({ name: '集計', use: true, kind: 'calc', cols: ['店舗コード', '9月売上'], rows: [], size: { rows: 40, cols: 6 }, cf: [], dv: [],
+    formulas: { B: { f: "=SUMIFS('auPAY_2026-09'!B:B,'auPAY_2026-09'!A:A,A{r})", text: 'auPAY_2026-09 から店舗ごとの売上を合計' } },
+    q: { fix: { mall: 'au PAY', month: '2026-09', item: '売上' }, row: 'shop', col: 'item' } });
+  tabs.push({ name: '設定', use: false, kind: 'misc', cols: ['モール', '手数料率'], rows: [['au PAYマーケット', '8%']], size: { rows: 12, cols: 3 }, cf: [], dv: [], formulas: {} });
+  return { url, name, tabs, merge: true, gas: [
+    { fn: 'copyMonthlyTab', trig: '毎月1日 6時', text: '前の月のタブを複製して次の月のタブ(auPAY_YYYY-MM)を作り、数字を消す', plan: '月ごとにタブを増やす代わりに、まとめたシートへ次の月の行を足す' },
+    { fn: 'onEdit', trig: '編集したとき', text: '店舗コードを入れて売上金額が空のままなら、その行を黄色にする', plan: '入力のルール(空欄の注意)としてシートに持つ' }] };
+}
+function readBook() { book = mockBook($('bookUrl').value.trim() || 'sheet'); renderBook(); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
+function renderBook() {
+  const sec = $('bookSec'); sec.hidden = !book; if (!book) return;
+  const data = book.tabs.filter(t => t.kind === 'data'), tot = data.reduce((a, t) => a + t.size.rows * t.size.cols, 0);
+  let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・GAS ${book.gas.length} 個</p><div class="tabs">`;
+  h += book.tabs.map((t, i) => `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : t.kind === 'misc' ? 'その他' : 'データのタブ'}</span></b>
+    <span class="d">実物: 約${t.size.rows.toLocaleString()}行×${t.size.cols}列(${cellsTxt(t)}セル)・列: ${esc(t.cols.join(' / '))}</span>
+    ${Object.entries(t.formulas).map(([c, f]) => `<span class="d">関数 ${c}列: <code>${esc(f.f.replace('{r}', '2'))}</code> … ${esc(f.text)}${t.q ? ' → 「まとめる」の条件として再現' : ' → 同じ計算をシートに持つ'}</span>`).join('')}
+    ${t.cf.map(c => `<span class="d">条件付き書式: ${esc(c.text)} → 同じ表示ルールを再現</span>`).join('')}
+    ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}</label>`).join('');
+  h += '</div>';
+  h += book.gas.map(g => `<div class="gas"><b>GAS <code>${esc(g.fn)}</code></b> <span class="muted">(${esc(g.trig)})</span><br>AIの読み取り: ${esc(g.text)}<br>置き換え案: ${esc(g.plan)} <span class="muted">(GAS 自体は自動では動かしません)</span></div>`).join('');
+  if (data.length > 1) h += `<div class="ai"><b class="h">AIの提案(試作では決まった例文)</b>
+    <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、月ごとにタブを分けています。1タブ約4万行、${data.length}タブで約${Math.round(tot / 10000)}万セルあり、スプシの上限(1ファイル1,000万セル)や読み込みの重さを避けるために分けたと推定します。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
+    <label><input type="radio" name="merge" value="1"${book.merge ? ' checked' : ''}> 1枚にまとめる(おすすめ)</label>
+    <label><input type="radio" name="merge" value="0"${!book.merge ? ' checked' : ''}> 分けたまま、タブごとにシートにする</label></div>`;
+  h += `<div class="row"><button class="primary" id="bookGo">この内容で取り込む(このあと列ごとに承認)</button><button id="bookCancel">やめる</button></div>`;
+  $('book').innerHTML = h;
+  $('book').querySelectorAll('[data-use]').forEach(c => c.onchange = () => { book.tabs[+c.dataset.use].use = c.checked; });
+  $('book').querySelectorAll('input[name=merge]').forEach(r => r.onchange = () => { book.merge = r.value === '1'; });
+  $('bookGo').onclick = importBook; $('bookCancel').onclick = () => { book = null; renderBook(); };
+}
+function importBook() {
+  const b = book, target = $('bookTarget').value, data = b.tabs.filter(t => t.kind === 'data' && t.use), calc = b.tabs.filter(t => t.kind === 'calc' && t.use);
+  const skip = b.tabs.filter(t => !t.use).map(t => t.name);
+  const head = [`「${b.name}」を読み取った(${b.url})`, ...data.map(t => `${t.name}: 1行目を列名と判断(${t.cols.join(' / ')})。A2:C${t.rows.length + 1} の ${t.rows.length} 行を読み取り`),
+    ...data.slice(0, 1).flatMap(t => [...Object.entries(t.formulas).map(([c, f]) => `${c}列の関数 ${f.f.replace('{r}', 'n')} は「${f.text}」と読み取った`), ...t.cf.map(c => `条件付き書式「${c.text}」を表示ルールとして写した`), ...t.dv.map(c => `入力規則「${c.text}」を写した`)]),
+    ...b.gas.map(g => `GAS ${g.fn}(${g.trig}): ${g.text}。自動では動かさず「${g.plan}」とする案`), ...(skip.length ? [`使わないタブ: ${skip.join('・')}`] : [])];
+  const fx = t => Object.fromEntries(Object.entries(t.formulas).map(([c, f]) => [c, f]));
+  const mk = (name, cols, rows, tag, t, srcTabs, extra) => ({ name, cube: target, tag, cols, rows, picks: pickCols(cols, rows), cf: t.cf.map(c => ({ ...c, col: c.col + (extra || 0) })), dv: t.dv.map(c => ({ ...c, col: c.col + (extra || 0) })), formulas: fx(t),
+    origin: { text: b.name + ' › ' + srcTabs.map(x => x.name).join(' / '), short: srcTabs.length > 1 ? srcTabs.length + 'タブをまとめた' : 'スプシから', minutes: head, sources: srcTabs.map(x => ({ book: b.name, tab: x.name, range: 'A1:C' + (x.rows.length + 1) })) } });
+  const items = [];
+  if (data.length && b.merge) {
+    const p = mk('au PAYの売上(' + b.name + ')', ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), { mall: 'au PAYマーケット' }, data[0], data, 1);
+    p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(AIの提案を承認)`];
+    items.push(p);
+  } else data.forEach(t => { const p = mk('au PAYの売上 ' + t.month, t.cols, t.rows.map(r => [...r]), { mall: 'au PAYマーケット', month: t.month }, t, [t], 0); p.origin.minutes = [...head, `${t.name} はタブのまま1枚のシートにした。月はタブ名から「月=${t.month}」としてシート全体の値にした`]; items.push(p); });
+  calc.forEach(t => { if (!t.q) return; const sv = { id: 'v' + Date.now().toString(36) + t.name.length, name: t.name + '(スプシの関数から)', q: JSON.parse(JSON.stringify(t.q)), fav: false, scope: 'all', seen: '' };
+    S.saved.push(sv);
+    S.history.push({ id: 'h' + Date.now().toString(36) + 'c', at: today(), kind: '取り込み', title: `${b.name} › ${t.name} の関数を「まとめる」に置き換えた`, lines: Object.values(t.formulas).map(f => `${f.f.replace('{r}', 'n')} → モール=au PAY・月=2026-09・科目=売上 を ショップごとに`), sources: [{ book: b.name, tab: t.name, range: 'B2:B' }], results: [] }); });
+  book = null; queue = items.slice(1); pending = items[0] || null; save(); renderAll();
+  if (pending) $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---------- シート(スプシを模した表) ----------
+let viewId = null, viewCell = null;
+const colL = i => String.fromCharCode(65 + i);
+function renderView() {
+  const sec = $('viewSec'), sh = viewId && sheetById(viewId); sec.hidden = !sh; if (!sh) return;
+  $('viewTitle').textContent = 'シート: ' + where(sh);
+  const bindTxt = sh.cols.map((c, i) => { const b = sh.bind[i]; if (!b) return `${colL(i)} ${c}: 使わない`; const a = ax(b.axis); return `${colL(i)} ${c}: ${a ? a.name : '?'}${b.value != null ? '=' + b.value : ''}${b.rel && b.rel !== '=' ? '(' + b.rel + ')' : ''}`; });
+  $('viewInfo').innerHTML = (sh.origin ? `元: ${esc(sh.origin.text)}<br>` : '') + '列と軸: ' + esc(bindTxt.join(' ・ ')) + (sh.cf && sh.cf.length ? '<br>表示ルール: ' + esc(sh.cf.map(c => c.text).join('・')) : '') + (sh.dv && sh.dv.length ? '<br>入力規則: ' + esc(sh.dv.map(c => c.text).join('・')) : '');
+  const fcol = c => (sh.formulas || {})[colL(c)];
+  const cfHit = (c, v) => (sh.cf || []).some(r => r.col === c && r.op === '<' && num(v) < r.v);
+  $('viewGrid').innerHTML = `<thead><tr><th class="rn"></th>${sh.cols.map((_, i) => `<th>${colL(i)}</th>`).join('')}</tr></thead><tbody>
+    <tr><th class="rn">1</th>${sh.cols.map((c, i) => `<td><b>${esc(c)}</b>${(sh.dv || []).some(d => d.col === i) ? ' ▾' : ''}</td>`).join('')}</tr>
+    ${sh.rows.map((r, ri) => `<tr><th class="rn">${ri + 2}</th>${r.map((v, ci) => `<td class="${/^[\d,.-]+$/.test(v) ? 'num' : ''}${cfHit(ci, v) ? ' cf' : ''}${viewCell && viewCell[0] === ri && viewCell[1] === ci ? ' sel' : ''}" data-r="${ri}" data-c="${ci}">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  $('viewGrid').querySelectorAll('td[data-r]').forEach(td => {
+    td.onclick = () => { viewCell = [+td.dataset.r, +td.dataset.c]; const f = fcol(viewCell[1]); $('fbar').textContent = `${colL(viewCell[1])}${viewCell[0] + 2}: ` + (f ? f.f.replace('{r}', viewCell[0] + 2) + '  (' + f.text + ')' : sh.rows[viewCell[0]][viewCell[1]]); renderView(); };
+    td.ondblclick = () => { const r = +td.dataset.r, c = +td.dataset.c, v = prompt(`${where(sh)} の ${colL(c)}${r + 2} を直す`, sh.rows[r][c]); if (v == null) return; sh.rows[r][c] = v.trim(); save(); note('シートを直しました。まとめは自動で更新されます'); renderAll(); };
+  });
+  // 分ける・まとめる(元がどれかは履歴に残す)
+  const mi = sh.bind.findIndex(b => b && b.axis === 'month' && b.value == null), ms = mi >= 0 ? [...new Set(sh.rows.map(r => r[mi]))] : [];
+  const sib = S.sheets.filter(x => x !== sh && x.cube === sh.cube && x.cols.join('|') === sh.cols.join('|') && JSON.stringify(x.tag) === JSON.stringify(sh.tag));
+  $('viewActs').innerHTML = (ms.length > 1 ? `<button id="vSplit">月ごとに${ms.length}枚に分ける</button>` : '') + (sib.length ? `<button id="vMerge">同じ列の${sib.length}枚とまとめる</button>` : '') + '<span class="muted">分けたり、まとめたりした元は履歴に残ります</span>';
+  if ($('vSplit')) $('vSplit').onclick = () => splitSheet(sh, mi, ms);
+  if ($('vMerge')) $('vMerge').onclick = () => mergeSheets([sh, ...sib]);
+}
+function splitSheet(sh, mi, ms) {
+  const made = ms.map((m, k) => ({ ...JSON.parse(JSON.stringify(sh)), id: 'sh' + Date.now().toString(36) + k, name: sh.name + '(' + m + ')', rows: sh.rows.filter(r => r[mi] === m), origin: { text: where(sh) + ' を月で分けた ' + m + ' の分', short: '分けた' } }));
+  S.sheets = S.sheets.flatMap(x => x === sh ? made : [x]);
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '分ける', title: `${where(sh)} を月ごとに ${made.length} 枚に分けた`, lines: made.map(x => `${x.name}: ${x.rows.length}行(元の ${sh.name} の 月=${x.rows[0][mi]} の行)`), sources: [{ book: '', tab: where(sh), range: '全体' }], results: made.map(x => x.id) });
+  viewId = made[0].id; save(); renderAll();
+}
+function mergeSheets(list) {
+  const base = list[0], id = 'sh' + Date.now().toString(36);
+  const name = base.name.replace(/\(.*\)$/, '') + '(まとめ)';
+  S.sheets = S.sheets.filter(x => !list.includes(x));
+  S.sheets.push({ ...JSON.parse(JSON.stringify(base)), id, name, rows: list.flatMap(x => x.rows.map(r => [...r])), origin: { text: list.map(x => x.name).join(' + ') + ' をまとめた', short: list.length + '枚をまとめた' } });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: 'まとめる', title: `${list.length} 枚を ${name} にまとめた`, lines: list.map(x => `${x.name}: ${x.rows.length}行 → ${name}`), sources: list.map(x => ({ book: '', tab: where(x), range: '全体' })), results: [id] });
+  viewId = id; save(); renderAll();
+}
+
+// ---------- 履歴(議事録) ----------
+function renderHist() {
+  $('hist').innerHTML = [...S.history].reverse().map(h => `<details class="he"><summary><span class="pill cube">${esc(h.kind)}</span> ${esc(h.at)} ${esc(h.title)}${h.results.length ? ' → ' + h.results.map(id => sheetById(id) ? esc(sheetById(id).name) : '(今はないシート)').join('・') : ''}</summary>
+    ${h.sources.length ? `<div class="src">元: ${h.sources.map(s => esc([s.book, s.tab, s.range].filter(Boolean).join(' › '))).join(' / ')}</div>` : ''}<ul>${h.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></details>`).join('');
+}
+
 // ---------- 立体:箱の中にキューブ、キューブの中にシート ----------
 const stage = $('stage'), css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); stage.prepend(renderer.domElement);
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .1, 200);
 scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
 let world = new THREE.Group(); scene.add(world);
-const cam = { th: -.45, ph: .34, dist: 15 };
+const cam = { th: -.45, ph: .34, dist: 19 };
 function textSprite(t, color, h) {
   const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 44px ' + css('--sans');
   const w = Math.ceil(x.measureText(t).width) + 16; c.width = w; c.height = 60; x.font = '700 44px ' + css('--sans'); x.fillStyle = color; x.textBaseline = 'middle'; x.fillText(t, 8, 32);
@@ -440,7 +715,7 @@ function sheetTex(sh, on) {
 function paint() {
   scene.remove(world); world = new THREE.Group(); scene.add(world);
   const tops = S.boxes.filter(b => !b.parent), gap = 1.2;
-  const cubeW = 3.2, boxW = b => Math.max(1, S.boxes.filter(x => x.parent === b.id).length) * (cubeW + .8) + .8;
+  const cubeW = 3.2, boxW = b => Math.max(1, S.boxes.filter(x => x.parent === b.id).length + (S.sheets.some(s => s.cube === b.id) ? 1 : 0)) * (cubeW + .8) + .8;
   const total = tops.reduce((a, b) => a + boxW(b), 0) + gap * (tops.length - 1);
   let x0 = -total / 2;
   for (const b of tops) {
@@ -449,6 +724,11 @@ function paint() {
     const fill = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: .05, depthWrite: false })); bg.add(fill);
     bg.add(edges(W, H, D, new THREE.Color(css('--box')), true));
     const lb = textSprite(b.name + '(箱)', css('--box'), .42); lb.position.set(0, H / 2 + .4, 0); bg.add(lb);
+    const own = S.sheets.filter(x => x.cube === b.id), nk = S.boxes.filter(c => c.parent === b.id).length;
+    own.forEach((sh, i) => {   // 箱にじかに入れたシート(店舗をまたぐシートなど)
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
+      m.position.set(-W / 2 + .8 + cubeW / 2 + nk * (cubeW + .8), -.3, (own.length - 1) / 2 * .55 - i * .55); bg.add(m);
+    });
     S.boxes.filter(c => c.parent === b.id).forEach((c, k) => {
       const cg = new THREE.Group(); cg.position.set(-W / 2 + .8 + cubeW / 2 + k * (cubeW + .8), -.3, 0); bg.add(cg);
       const s = cubeW;
@@ -483,10 +763,13 @@ function loop() {
 new ResizeObserver(resize).observe(stage);
 
 // ---------- つなぐ ----------
-function renderAll() { renderInputs(); renderAxes(); renderGather(); renderSaved(); renderMatches(); }
+function renderAll() { renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
 $('read').onclick = readSheet;
 $('approve').onclick = approve;
-$('cancel').onclick = () => { pending = null; renderMatches(); };
+$('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
+$('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
+$('bookRead').onclick = readBook;
+$('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
 $('addMonth').onclick = addMonth;
 $('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
