@@ -38,6 +38,15 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
 <script>
 (() => {
+  // 埋め込み(data:)の GLB は自分で ArrayBuffer にして parse する。
+  // 中の画像は fetch を使う ImageBitmapLoader ではなく <img> で読ませる(公開ページは fetch が制限されるため)
+  const b64buf = (d) => { const s = atob(d.slice(d.indexOf(",") + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+  function loadGLTF(url) {
+    const loader = new THREE.GLTFLoader(), cib = window.createImageBitmap;
+    window.createImageBitmap = undefined;
+    return new Promise((ok, ng) => { try { if (url.startsWith("data:")) loader.parse(b64buf(url), "", ok, ng); else loader.load(url, ok, undefined, ng); } catch (e) { ng(e); } })
+      .finally(() => { window.createImageBitmap = cib; });
+  }
   const GLB = new URLSearchParams(location.search).get("glb") || "modern.glb";
   const stage = document.getElementById("stage");
   const r = new THREE.WebGLRenderer({ antialias: true });
@@ -73,7 +82,7 @@
   const SHAPES = [[6, 5, 4], [5, 7, 3], [8, 4, 4], [4, 6, 6]], NAMES = ["入金キューブ", "売上 × 月 × 店舗", "法人別の内訳", "申込者の推移"];
 
   // ---- 読み込み ----
-  new THREE.GLTFLoader().load(GLB, (gltf) => {
+  loadGLTF(GLB).then((gltf) => {
     const root = gltf.scene; scene.add(root);
     const spots = [];
     root.traverse((o) => {
@@ -112,7 +121,7 @@
       Object.assign(floorMesh.material, { transparent: true, opacity: 0.9 });
     }
     document.getElementById("load").remove();
-  }, undefined, (e) => { document.getElementById("load").textContent = "読み込めませんでした: " + (e.message || e); });
+  }).catch((e) => { document.getElementById("load").textContent = "読み込めませんでした: " + (e.message || e); });
 
   // ---- 焼き込みの光の切り替え(比較用) ----
   const bakeBtn = document.getElementById("bake");

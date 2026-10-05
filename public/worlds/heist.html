@@ -97,9 +97,18 @@
   const SHAPES = [[5, 5, 4], [4, 7, 3], [6, 4, 4], [4, 6, 5]], NAMES = ["入金キューブ", "売上 × 月 × 店舗", "法人別の内訳", "申込者の推移"];
 
   // ---- 建物 ----
+  // 埋め込み(data:)の GLB は自分で ArrayBuffer にして parse する。
+  // 中の画像は fetch を使う ImageBitmapLoader ではなく <img> で読ませる(公開ページは fetch が制限されるため)
+  const b64buf = (d) => { const s = atob(d.slice(d.indexOf(",") + 1)), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; };
+  function loadGLTF(url) {
+    const loader = new THREE.GLTFLoader(), cib = window.createImageBitmap;
+    window.createImageBitmap = undefined;
+    return new Promise((ok, ng) => { try { if (url.startsWith("data:")) loader.parse(b64buf(url), "", ok, ng); else loader.load(url, ok, undefined, ng); } catch (e) { ng(e); } })
+      .finally(() => { window.createImageBitmap = cib; });
+  }
   const tl = new THREE.TextureLoader();
   const loadTex = (name) => new Promise((ok, ng) => tl.load(src(name), ok, undefined, ng));
-  const gltf = await new Promise((ok, ng) => new THREE.GLTFLoader().load(src("heist.glb"), ok, undefined, ng));
+  const gltf = await loadGLTF(src("heist.glb"));
   const root = gltf.scene; scene.add(root);
   const lights = {};
   // 焼いた光は赤い非常灯の色が強く出るので、色みを半分ほど抜いてから使う
