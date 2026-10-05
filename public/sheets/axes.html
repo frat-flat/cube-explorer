@@ -169,6 +169,8 @@ tfoot td{font-weight:700}
 .he ul{margin:4px 0 0;padding-left:18px;color:var(--muted)}
 .he .src{font-size:12px;color:var(--muted)}
 .ap{color:var(--hl);font-weight:700}
+.msg{margin:0;font-size:13px;border-radius:6px;padding:6px 8px;background:var(--bg)}
+.msg.err{background:var(--hlSoft)}
 .node[data-sh]{cursor:pointer}
 .relrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px;padding:2px 4px}
 #prefs select{max-width:100%}
@@ -228,8 +230,9 @@ tfoot td{font-weight:700}
   <section><h2>スプシのリンクで登録</h2>
     <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
     <div class="row"><span class="muted">入れる先</span><select id="bookTarget" aria-label="入れる先"></select></div>
-    <button class="primary" id="bookRead">読み取る(試し)</button>
-    <p class="muted">本番では、システム用のアカウントにスプシの閲覧か編集の権限を渡すと、タブ・関数・条件付き書式・入力規則・GAS を読み取ります。試作では読み取った結果の見え方だけを作っています(AIの文は決まった例文です)。</p></section>
+    <button class="primary" id="bookRead">読み取る</button>
+    <p class="msg" id="bookMsg" hidden></p>
+    <p class="muted">スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
   <section><h2>シートを入れる</h2>
     <div class="row"><select id="preset" aria-label="例のシート"></select></div>
     <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先のキューブ"></select></div>
@@ -714,20 +717,38 @@ function mockBook(url) {
     { fn: 'copyMonthlyTab', trig: '毎月1日 6時', text: '前の月のタブを複製して次の月のタブ(auPAY_YYYY-MM)を作り、数字を消す', plan: '月ごとにタブを増やす代わりに、まとめたシートへ次の月の行を足す' },
     { fn: 'onEdit', trig: '編集したとき', text: '店舗コードを入れて売上金額が空のままなら、その行を黄色にする', plan: '入力のルール(空欄の注意)としてシートに持つ' }] };
 }
-function readBook() { book = mockBook($('bookUrl').value.trim() || 'sheet'); renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+// スプシのリンクを読む。アプリの中ならサーバー(/api/sheets/read)がシステム用アカウントで本物を読む。
+// サーバーがない所(アーティファクトなど)では例のデータ(mockBook)で流れだけ見せる。読めなかった理由はそのまま出す
+const bookMsg = (t, err) => { const m = $('bookMsg'); m.hidden = !t; m.textContent = t || ''; m.classList.toggle('err', !!err); };
+async function readBook() {
+  const url = $('bookUrl').value.trim(); if (!url) { bookMsg('スプシのリンクを入れてください', true); return; }
+  bookMsg('読み取っています…'); $('bookRead').disabled = true;
+  let j = null;
+  try { const r = await fetch('/api/sheets/read?url=' + encodeURIComponent(url), { credentials: 'same-origin' }); if ((r.headers.get('content-type') || '').includes('json')) j = await r.json(); } catch (e) {}
+  $('bookRead').disabled = false;
+  if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')';
+  if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。使うタブを選んで取り込んでください`); }
+  else if (j && j.error) { book = null; renderBook(); bookMsg(j.error, true); return; }
+  else { book = mockBook(url); bookMsg('ここからはリンク先を読めないため、例のデータで流れを見せています。本物はアプリの画面で読めます', true); }
+  renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
 const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
 function renderBook() {
   const sec = $('bookSec'); sec.hidden = !book; if (!book) return;
   const data = book.tabs.filter(t => t.kind === 'data'), tot = data.reduce((a, t) => a + t.size.rows * t.size.cols, 0);
-  let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・GAS ${book.gas.length} 個</p><div class="tabs">`;
+  let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・${book.real ? 'GAS は読めません' : 'GAS ' + book.gas.length + ' 個'}</p><div class="tabs">`;
   h += book.tabs.map((t, i) => `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : t.kind === 'misc' ? 'その他' : 'データのタブ'}</span></b>
-    <span class="d">実物: 約${t.size.rows.toLocaleString()}行×${t.size.cols}列(${cellsTxt(t)}セル)・列: ${esc(t.cols.join(' / '))}</span>
+    <span class="d">実物: 約${t.size.rows.toLocaleString()}行×${t.size.cols}列(${cellsTxt(t)}セル)・列: ${esc(t.cols.join(' / ') || 'なし')}${book.real ? `・読んだ行 ${t.rows.length}${t.truncated ? '(先頭だけ)' : ''}` : ''}</span>
     ${Object.entries(t.formulas).map(([c, f]) => `<span class="d">関数 ${c}列: <code>${esc(f.f.replace('{r}', '2'))}</code> … ${esc(f.text)}${t.q ? ' → 「まとめる」の条件として再現' : ' → 同じ計算をシートに持つ'}</span>`).join('')}
     ${t.cf.map(c => `<span class="d">条件付き書式: ${esc(c.text)} → 同じ表示ルールを再現</span>`).join('')}
     ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}</label>`).join('');
   h += '</div>';
   h += book.gas.map(g => `<div class="gas"><b>GAS <code>${esc(g.fn)}</code></b> <span class="muted">(${esc(g.trig)})</span><br>AIの読み取り: ${esc(g.text)}<br>置き換え案: ${esc(g.plan)} <span class="muted">(GAS 自体は自動では動かしません)</span></div>`).join('');
-  if (data.length > 1) h += `<div class="ai"><b class="h">AIの提案(試作では決まった例文)</b>
+  if (book.real && book.merge) h += `<div class="ai"><b class="h">まとめる提案(列とタブ名から判定)</b>
+    <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、タブ名に年月があります。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
+    <label><input type="radio" name="merge" value="1" checked> 1枚にまとめる(おすすめ)</label>
+    <label><input type="radio" name="merge" value="0"> 分けたまま、タブごとにシートにする</label></div>`;
+  else if (!book.real && data.length > 1) h += `<div class="ai"><b class="h">AIの提案(試作では決まった例文)</b>
     <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、月ごとにタブを分けています。1タブ約4万行、${data.length}タブで約${Math.round(tot / 10000)}万セルあり、スプシの上限(1ファイル1,000万セル)や読み込みの重さを避けるために分けたと推定します。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
     <label><input type="radio" name="merge" value="1"${book.merge ? ' checked' : ''}> 1枚にまとめる(おすすめ)</label>
     <label><input type="radio" name="merge" value="0"${!book.merge ? ' checked' : ''}> 分けたまま、タブごとにシートにする</label></div>`;
@@ -740,14 +761,17 @@ function renderBook() {
 function importBook() {
   const b = book, target = $('bookTarget').value, data = b.tabs.filter(t => t.kind === 'data' && t.use), calc = b.tabs.filter(t => t.kind === 'calc' && t.use);
   const skip = b.tabs.filter(t => !t.use).map(t => t.name);
-  const head = [`「${b.name}」を読み取った(${b.url})`, ...data.map(t => `${t.name}: 1行目を列名と判断(${t.cols.join(' / ')})。A2:C${t.rows.length + 1} の ${t.rows.length} 行を読み取り`),
+  const head = [`「${b.name}」を読み取った(${b.url})`, ...data.map(t => `${t.name}: 1行目を列名と判断(${t.cols.join(' / ')})。A2:${colL(t.cols.length - 1)}${t.rows.length + 1} の ${t.rows.length} 行を読み取り`),
     ...data.slice(0, 1).flatMap(t => [...Object.entries(t.formulas).map(([c, f]) => `${c}列の関数 ${f.f.replace('{r}', 'n')} は「${f.text}」と読み取った`), ...t.cf.map(c => `条件付き書式「${c.text}」を表示ルールとして写した`), ...t.dv.map(c => `入力規則「${c.text}」を写した`)]),
     ...b.gas.map(g => `GAS ${g.fn}(${g.trig}): ${g.text}。自動では動かさず「${g.plan}」とする案`), ...(skip.length ? [`使わないタブ: ${skip.join('・')}`] : [])];
   const fx = t => Object.fromEntries(Object.entries(t.formulas).map(([c, f]) => [c, f]));
   const mk = (name, cols, rows, tag, t, srcTabs, extra) => ({ name, cube: target, tag, cols, rows, picks: pickCols(cols, rows), cf: t.cf.map(c => ({ ...c, col: c.col + (extra || 0) })), dv: t.dv.map(c => ({ ...c, col: c.col + (extra || 0) })), formulas: fx(t),
-    origin: { text: b.name + ' › ' + srcTabs.map(x => x.name).join(' / '), short: srcTabs.length > 1 ? srcTabs.length + 'タブをまとめた' : 'スプシから', minutes: head, sources: srcTabs.map(x => ({ book: b.name, tab: x.name, range: 'A1:C' + (x.rows.length + 1) })) } });
+    origin: { text: b.name + ' › ' + srcTabs.map(x => x.name).join(' / '), short: srcTabs.length > 1 ? srcTabs.length + 'タブをまとめた' : 'スプシから', minutes: head, sources: srcTabs.map(x => ({ book: b.name, tab: x.name, range: 'A1:' + colL(x.cols.length - 1) + (x.rows.length + 1) })) } });
   const items = [];
-  if (data.length && b.merge) {
+  if (b.real) {   // 本物のスプシ: シート名はスプシとタブの名前、タブ名に年月があれば「月」の値にする
+    if (data.length && b.merge) { const p = mk(b.name, ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), {}, data[0], data, 1); p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(提案を承認)`]; items.push(p); }
+    else data.forEach(t => { const p = mk(data.length > 1 ? b.name + ' › ' + t.name : b.name, t.cols, t.rows.map(r => [...r]), t.month ? { month: t.month } : {}, t, [t], 0); p.origin.minutes = [...head, `${t.name} をタブのまま1枚のシートにした${t.month ? `。月はタブ名から「月=${t.month}」とした` : ''}`]; items.push(p); });
+  } else if (data.length && b.merge) {
     const p = mk('au PAYの売上(' + b.name + ')', ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), { mall: 'au PAYマーケット' }, data[0], data, 1);
     p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(AIの提案を承認)`];
     items.push(p);
@@ -1163,6 +1187,7 @@ $('approve').onclick = approve;
 $('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
 $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
 $('bookRead').onclick = readBook;
+fetch('/api/sheets/read', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')'; }).catch(() => {});
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && viewId) $('viewClose').click(); });
 
