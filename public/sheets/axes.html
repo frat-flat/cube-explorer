@@ -36,6 +36,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 .brand{display:flex;align-items:center;gap:8px;font-size:15px;white-space:nowrap}
 .logo{display:inline-flex;color:var(--accent)}
 .crumb{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .out{font-size:13px;color:var(--muted);white-space:nowrap}
+.top .out:hover{color:var(--accent)}
 .crumb::before{content:"/";margin-right:10px;color:var(--line)}
 .side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
 .nv{display:flex;align-items:center;gap:10px;border:none;background:none;border-radius:7px;padding:8px 10px;text-align:left;color:var(--muted);font-size:13.5px;width:100%}
@@ -188,6 +190,7 @@ tfoot td{font-weight:700}
   <span class="crumb" id="crumb">ホーム</span>
   <span class="sp"></span>
   <button class="small" id="addMonth" title="各シートに次の月の行が入ったことにする">次の月のデータが入った(試し)</button>
+  <a class="out" id="logout" href="/auth/signout" hidden>ログアウト</a>
 </header>
 <nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
 <div class="content">
@@ -1187,7 +1190,8 @@ $('approve').onclick = approve;
 $('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
 $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
 $('bookRead').onclick = readBook;
-fetch('/api/sheets/read', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')'; }).catch(() => {});
+// アプリの中で開いたときだけ(読み取りの口に答えがある)ログアウトを出す
+fetch('/api/sheets/read', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j) $('logout').hidden = false; if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')'; }).catch(() => {});
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && viewId) $('viewClose').click(); });
 

@@ -1,12 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // キューブ組み立ての試作(public/builder/index.html)を /builder、シートの器の試作を /sheets で開く
+  // 入口(/)は「軸の辞書と箱」のダッシュボード(public/sheets/axes.html)。ログインは src/proxy.ts で確かめる
   async rewrites() {
-    return [
-      { source: "/builder", destination: "/builder/index.html" },
-      { source: "/sheets", destination: "/sheets/index.html" },
-    ];
+    return {
+      beforeFiles: [{ source: "/", destination: "/sheets/axes.html" }],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 
