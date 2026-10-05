@@ -67,6 +67,7 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 /* 立体 */
 #stage{position:relative;height:360px;border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
 #pinBar{position:absolute;right:8px;top:8px;max-width:calc(100% - 16px);font-size:12px;color:var(--muted);pointer-events:none}
+#pinBar button{pointer-events:auto}
 #pinBar .hint{background:var(--stage);padding:1px 4px;border-radius:4px}
 #pinCtl{display:flex;flex-direction:column;gap:6px;margin:8px 0 4px;font-size:13px}
 #pinCtl .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -177,7 +178,7 @@ tfoot td{font-weight:700}
   </section>
 </aside>
 <main>
-  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
+  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
   <div id="pinCtl">
     <div class="row"><b>選ぶ</b><select id="selUnit" aria-label="箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
@@ -273,6 +274,8 @@ function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, 
 numberUnits();
 // 前の版の面の名前(front など)をサイコロの目に置き換える
 S.boxes.forEach(b => { if (b.pin && b.pin.face) b.pin.face = ({ front: 'd1', top: 'd2', right: 'd3', left: 'd4', bottom: 'd5', back: 'd6' })[b.pin.face] || b.pin.face; });
+// 固定はその場の見方なので、開き直したら外れた状態から始める(前に固定したまま保存された分もここで外す)
+S.boxes.forEach(b => { delete b.pin; });
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const ax = id => S.axes.find(a => a.id === id);
 const box = id => S.boxes.find(b => b.id === id);
@@ -782,7 +785,7 @@ function renderPinBar() {
   renderShowRow();
   const n = units().filter(b => b.pin).length;
   $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : '';
-  $('pinHint').hidden = !n;
+  $('pinHint').hidden = !n; $('unpinAll').hidden = !n;
   $('selUnit').innerHTML = '<option value="">(箱かキューブを選ぶ)</option>'
     + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
     + '<optgroup label="1つずつ">' + units().map(b => `<option value="${b.id}">${unitOf(b)} ${esc(b.name)}(${esc(levelOf(b))}単位)${b.pin ? '(固定中)' : ''}</option>`).join('') + '</optgroup>';
@@ -908,7 +911,6 @@ function paint() {
     const bg = new THREE.Group(); bg.position.set(...pos); parent.add(bg);
     const fill = new THREE.Mesh(new THREE.BoxGeometry(W, W, W), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: .05, depthWrite: false })); bg.add(fill);
     fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, box: true, home: bg.position.clone() });
-    if (b.pin) bg.add(edges(W + .16, W + .16, W + .16, new THREE.Color(css('--hl')), true, .9));
     if (selUnits().includes(b)) bg.add(edges(W + .3, W + .3, W + .3, new THREE.Color(css('--mine')), false, 1));
     bg.add(edges(W, W, W, new THREE.Color(css('--box')), true));
     const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
@@ -943,7 +945,6 @@ function paint() {
       const t2 = textSprite(names[1], css('--ay'), .26); t2.position.set(-h - .1 - t2.scale.x / 2, 0, h); cg.add(t2);
       const t3 = textSprite(names[2], css('--az'), .26); t3.position.set(-h - .1, -h - .25, 0); cg.add(t3);
       addDice(cg, c, s, s, s);
-      if (c.pin) cg.add(edges(s + .14, s + .14, s + .14, new THREE.Color(css('--hl')), true, .9));
       const cl = textSprite(unitOf(c) + ' ' + c.name + (c.pin ? '(固定 ' + faceOf(c.pin.face).name + ')' : ''), css(c.pin ? '--hl' : '--accent'), .32); cl.position.set(0, h + .3, 0); cg.add(cl);
       const shs = S.sheets.filter(x => x.cube === c.id);
       shs.forEach((sh, i) => {
@@ -1010,6 +1011,7 @@ $('bookRead').onclick = readBook;
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
 $('selUnit').onchange = e => select(e.target.value || null);
+$('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
 $('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
 $('selFace').onchange = e => { selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
 $('advFaces').onchange = e => { S.advFaces = e.target.checked; save(); paint(); renderPinBar(); };
