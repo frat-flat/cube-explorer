@@ -142,6 +142,7 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #miniMap[hidden]{display:none}#miniMap:hover{opacity:1}#miniMap svg{display:block;width:100%;height:auto}
 #jmap{position:absolute;inset:0;z-index:2;background:#dfe7ec;font:12px var(--sans)}
 #jmap .leaflet-tooltip{font-size:12px}
+#jmap .jlab{font-size:11px;color:#3a3f47;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;background:none;border:0}
 #guide .seg{display:inline-flex;gap:0;margin:2px 0 8px}
 #guide .seg button{border-radius:0;padding:3px 12px}
 #guide .seg button:first-child{border-radius:16px 0 0 16px}#guide .seg button:last-child{border-radius:0 16px 16px 0}
@@ -1469,11 +1470,112 @@ function loop() {
   }
   keepUpright();
   if (env && !entered && !layoutMode()) occlude();
+  stepLife();
   renderer.render(scene, camera); requestAnimationFrame(loop);
 }
 new ResizeObserver(resize).observe(stage);
 
 // ---------- World のまわりの世界 ----------
+// ---------- 世界の生き物と乗り物: 海は魚と泡、街は車と人、森は蝶と鳥…その世界らしい動きをランダムに入れる ----------
+// 世界(env.g)の中の座標で動かすので、世界と一緒に拡大される。立体のまわり(展示の円)には入らない。動きを減らす設定の人には止めて置くだけ
+const LIFE = { modern: { people: 6 }, european: { people: 7 }, heist: { people: 2, dark: 1 }, zen: { birds: 3, petals: 36 }, rpg: { birds: 4, butterflies: 9 }, game: { coins: 12, butterflies: 4 },
+  city: { cars: 12, people: 14, birds: 3 }, ruins: { birds: 3, people: 2 }, cyber: { flyers: 9, people: 5 }, underwater: { fish: 5, bubbles: 30 }, space: { comets: 4 } };
+const calmMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const rr = (a, b) => a + Math.random() * (b - a), pickOf = a => a[Math.floor(Math.random() * a.length)];
+const lamb = (c, e) => new THREE.MeshLambertMaterial({ color: c, emissive: e || 0 });
+function mkPerson(dark) {
+  const g = new THREE.Group(), cloth = lamb(pickOf(dark ? [0x1d2430, 0x2b2f3a] : [0x3b6ea5, 0xc0392b, 0x2e8b57, 0xe0b04a, 0x6b4f9a, 0x444444, 0xd9d4c7, 0xf08a5d])), skin = lamb(pickOf([0xf1c9a5, 0xd8a47f, 0x9c6b4b]));
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.19, .24, .78, 8), cloth); body.position.y = 1.17; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.15, 10, 8), skin); head.position.y = 1.7; g.add(head);
+  g.userData.legs = [-.1, .1].map(x => { const p = new THREE.Group(); p.position.set(x, .8, 0); const l = new THREE.Mesh(new THREE.BoxGeometry(.13, .8, .13), lamb(0x2a2a33)); l.position.y = -.4; p.add(l); g.add(p); return p; });
+  return g;
+}
+function mkCar(fly) {
+  const g = new THREE.Group(), col = pickOf(fly ? [0x1b1f2a, 0x2a1838, 0x10303a] : [0xd8d8d8, 0x1f2a44, 0xb0272f, 0x2f6d4f, 0xe6c34a, 0x111111, 0x6c7a89]);
+  const b = new THREE.Mesh(new THREE.BoxGeometry(1.8, .75, 4.2), lamb(col)); b.position.y = .7; g.add(b);
+  const c = new THREE.Mesh(new THREE.BoxGeometry(1.6, .6, 2.1), lamb(0x22303d)); c.position.set(0, 1.35, -.2); g.add(c);
+  const lamp = new THREE.MeshBasicMaterial({ color: 0xfff3c4 }), tail = new THREE.MeshBasicMaterial({ color: 0xff3a3a });
+  [-.6, .6].forEach(x => { const f = new THREE.Mesh(new THREE.BoxGeometry(.35, .18, .05), lamp); f.position.set(x, .78, 2.12); g.add(f); const t = new THREE.Mesh(new THREE.BoxGeometry(.35, .15, .05), tail); t.position.set(x, .8, -2.12); g.add(t); });
+  if (fly) { const glow = new THREE.Mesh(new THREE.BoxGeometry(1.5, .06, 3.6), new THREE.MeshBasicMaterial({ color: pickOf([0x35e0ff, 0xff3fd2, 0x8cff5a]) })); glow.position.y = .3; g.add(glow); }
+  else [[-.85, 1.3], [.85, 1.3], [-.85, -1.3], [.85, -1.3]].forEach(([x, z]) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(.34, .34, .25, 10), lamb(0x151515)); w.rotation.z = Math.PI / 2; w.position.set(x, .34, z); g.add(w); });
+  return g;
+}
+function mkFish() {
+  const g = new THREE.Group(), col = pickOf([0xf2a03d, 0x5fb3d9, 0xe8e2c9, 0xd8584b, 0xf4d35e]);
+  const b = new THREE.Mesh(new THREE.SphereGeometry(.3, 10, 8), lamb(col)); b.scale.set(.45, .7, 1.2); g.add(b);
+  const t = new THREE.Group(); t.position.z = -.33; const tm = new THREE.Mesh(new THREE.ConeGeometry(.22, .35, 4), lamb(col)); tm.rotation.x = -Math.PI / 2; tm.scale.set(.25, 1, 1); tm.position.z = -.12; t.add(tm); g.add(t);
+  g.userData.tail = t; return g;
+}
+function mkWings(col, w, body) {
+  const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({ color: col, side: THREE.DoubleSide });
+  g.userData.wings = [-1, 1].map(s => { const p = new THREE.Group(); const q = new THREE.Mesh(new THREE.PlaneGeometry(w, w * .6), m); q.rotation.x = -Math.PI / 2; q.position.x = s * w / 2; p.add(q); g.add(p); return p; });
+  if (body) { const b = new THREE.Mesh(new THREE.BoxGeometry(w * .18, w * .14, w * .7), lamb(body)); g.add(b); }
+  return g;
+}
+function mkCoin() { const m = new THREE.Mesh(new THREE.CylinderGeometry(.45, .45, .1, 20), new THREE.MeshLambertMaterial({ color: 0xffcc33, emissive: 0x553300 })); m.rotation.x = Math.PI / 2; const g = new THREE.Group(); g.add(m); return g; }
+function mkComet() {
+  const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(.9, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+  const t = new THREE.Mesh(new THREE.ConeGeometry(.8, 16, 10, 1, true), new THREE.MeshBasicMaterial({ color: 0x9fe3ff, transparent: true, opacity: .35, depthWrite: false })); t.rotation.x = -Math.PI / 2; t.position.z = -8; g.add(t); return g;
+}
+// 歩ける範囲のうち、立体のまわり(展示の円)より外の点。円の中を横切らないように、角度は少しずつしか変えない
+function lifeRing(L, a) {
+  const { r } = L, R0 = L.R0(), m = Math.min(r.hx, r.hz), f = Math.min(.8, Math.max(R0 / m, .45) + rr(0, .3));
+  return [r.cx + Math.cos(a) * f * Math.max(r.hx * .92, R0), r.cz + Math.sin(a) * f * Math.max(r.hz * .92, R0)];
+}
+function makeLife(name, info) {
+  const spec = LIFE[name]; if (!spec) return null;
+  const g = new THREE.Group(), r = roomOf(info), A = [], L = { g, A, r, R0: () => (extent.span / 2) / Math.max(1, fitDist(extent.span) * 1.15 / Math.min(r.hx, r.hz)) * 1.35 + .5 };
+  const walker = (o, speed, y = 0, wob = 0) => { const a = rr(0, Math.PI * 2), [x, z] = lifeRing(L, a); o.position.set(x, y, z); g.add(o);
+    const s = { o, a, speed, y, wob, ph: rr(0, 9), gx: x, gz: z };
+    s.next = () => { s.a += rr(-.9, .9); [s.gx, s.gz] = lifeRing(L, s.a); }; s.next();
+    s.step = (dt, t) => { const dx = s.gx - o.position.x, dz = s.gz - o.position.z, d = Math.hypot(dx, dz); if (d < .3) { s.next(); return; }
+      const v = Math.min(d, speed * dt); o.position.x += dx / d * v; o.position.z += dz / d * v; o.rotation.y = Math.atan2(dx, dz);
+      o.position.y = y + (wob ? Math.sin(t * 2 + s.ph) * wob : 0);
+      if (o.userData.legs) o.userData.legs.forEach((l, i) => { l.rotation.x = Math.sin(t * speed * 4 + s.ph + i * Math.PI) * .5; });
+      if (o.userData.wings) o.userData.wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * Math.sin(t * 18 + s.ph) * .9; }); };
+    A.push(s); };
+  const circler = (o, rad, h, w, flap) => { g.add(o); const s = { o, a: rr(0, 7), ph: rr(0, 9) };
+    s.step = (dt, t) => { s.a += w * dt; const R = Math.max(rad, L.R0() + 2); o.position.set(r.cx + Math.cos(s.a) * R, h + Math.sin(t * .7 + s.ph) * .6, r.cz + Math.sin(s.a) * R); o.rotation.y = -s.a + (w > 0 ? 0 : Math.PI);
+      if (o.userData.wings) o.userData.wings.forEach((x, i) => { x.rotation.z = (i ? -1 : 1) * Math.sin(t * flap + s.ph) * .7; });
+      if (o.userData.tail) o.userData.tail.rotation.y = Math.sin(t * 9 + s.ph) * .5; };
+    s.step(0, 0); A.push(s); };
+  const span = Math.max(r.hx, r.hz);
+  for (let i = 0; i < (spec.people || 0); i++) walker(mkPerson(spec.dark), rr(.9, 1.5));
+  for (let i = 0; i < (spec.butterflies || 0); i++) walker(mkWings(pickOf([0xffd166, 0xef476f, 0x8ecae6, 0xffffff]), .22), rr(.6, 1.1), rr(.8, 2.2), .4);
+  for (let i = 0; i < (spec.birds || 0); i++) circler(mkWings(0x3a3a3a, 1.1, 0x2b2b2b), rr(.6, 1.1) * span, rr(10, 16), rr(.15, .3) * pickOf([1, -1]), 6);
+  // 魚は群れで回る
+  for (let i = 0; i < (spec.fish || 0); i++) { const n = 5 + Math.floor(rr(0, 6)), rad = rr(.4, .9) * span, h = rr(1.5, 7), w = rr(.08, .18) * pickOf([1, -1]);
+    for (let j = 0; j < n; j++) { const f = mkFish(), off = [rr(-1.4, 1.4), rr(-.8, .8), rr(-1.4, 1.4)], sc = rr(.8, 1.3); f.scale.setScalar(sc * 1.6); circler(f, rad + off[0], h + off[1], w * (1 + off[2] * .02), 0); } }
+  // 街の車: 横に長い道(歩ける範囲の細長い四角)を両方向に走る。立体のある大通りは走らない
+  if (spec.cars) { const roads = (info.walk || []).slice(1).filter(w => w.t === 'rect' && (w.x1 - w.x0) > 3 * (w.z1 - w.z0) && Math.min(Math.abs(w.z0 - r.cz), Math.abs(w.z1 - r.cz)) > L.R0() + 2);
+    for (let i = 0; i < spec.cars && roads.length; i++) { const w = roads[i % roads.length], dir = i % 2 ? 1 : -1, lane = (w.z0 + w.z1) / 2 + dir * (w.z1 - w.z0) / 4, o = mkCar(false), sp = rr(6, 11); o.rotation.y = dir * Math.PI / 2; g.add(o);
+      const s = { o, x: rr(w.x0, w.x1) }; o.position.set(s.x, 0, lane);
+      s.step = dt => { s.x += dir * sp * dt; if (s.x > w.x1) s.x = w.x0; if (s.x < w.x0) s.x = w.x1; o.position.x = s.x; }; A.push(s); } }
+  // ネオン街の空飛ぶ車: 高いところを一直線に横切る
+  for (let i = 0; i < (spec.flyers || 0); i++) { const o = mkCar(true), h = rr(7, 15), z = r.cz + rr(-1, 1) * span, dir = pickOf([1, -1]), sp = rr(7, 13), X = span * 2.2; o.rotation.y = dir * Math.PI / 2; g.add(o);
+    const s = { o, x: rr(-X, X) }; s.step = (dt, t) => { s.x += dir * sp * dt; if (Math.abs(s.x) > X) s.x = -dir * X; o.position.set(r.cx + s.x, h + Math.sin(t + z) * .3, z); }; s.step(0, 0); A.push(s); }
+  // ゲームのコイン: その場で回って上下する
+  for (let i = 0; i < (spec.coins || 0); i++) { const o = mkCoin(), [x, z] = lifeRing(L, i / spec.coins * Math.PI * 2), y = rr(1.4, 3), ph = rr(0, 9); o.position.set(x, y, z); g.add(o);
+    A.push({ o, step: (dt, t) => { o.rotation.y += dt * 2.5; o.position.y = y + Math.sin(t * 2 + ph) * .25; } }); }
+  // 海の泡・庭の花びら: 上る/舞い落ちる
+  const drift = (n, mk, up) => { for (let i = 0; i < n; i++) { const o = mk(); g.add(o); const s = { o, ph: rr(0, 9) };
+    s.reset = first => { const [x, z] = lifeRing(L, rr(0, 7)); o.position.set(x, up ? (first ? rr(0, 12) : 0) : (first ? rr(0, 10) : 10), z); };
+    s.reset(true); s.step = (dt, t) => { o.position.y += (up ? 1.2 : -.6) * dt; o.position.x += Math.sin(t + s.ph) * dt * .4; o.rotation.z += dt; if (up ? o.position.y > 12 : o.position.y < 0) s.reset(false); }; A.push(s); } };
+  drift(spec.bubbles || 0, () => new THREE.Mesh(new THREE.SphereGeometry(rr(.06, .16), 8, 6), new THREE.MeshBasicMaterial({ color: 0xcff6ff, transparent: true, opacity: .55 })), true);
+  drift(spec.petals || 0, () => new THREE.Mesh(new THREE.PlaneGeometry(.14, .1), new THREE.MeshBasicMaterial({ color: pickOf([0xffc9d9, 0xffb3c8, 0xfff0f4]), side: THREE.DoubleSide })), false);
+  // 宇宙の彗星: 遠くを横切る
+  for (let i = 0; i < (spec.comets || 0); i++) { const o = mkComet(); g.add(o); const s = { o, v: new THREE.Vector3() };
+    s.reset = () => { const a = rr(0, 7), e = rr(-.3, .5), R = rr(90, 160), p = new THREE.Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e)).multiplyScalar(R), q = new THREE.Vector3(rr(-60, 60), rr(-20, 40), rr(-60, 60));
+      o.position.copy(p); s.v.copy(q).sub(p).normalize().multiplyScalar(rr(10, 18)); s.life = rr(12, 20); o.lookAt(p.clone().add(s.v)); };
+    s.reset(); s.life = rr(0, 20); s.step = dt => { o.position.addScaledVector(s.v, dt); if ((s.life -= dt) < 0) s.reset(); }; A.push(s); }
+  return L;
+}
+let lifeT = performance.now();
+function stepLife() {
+  const now = performance.now(), dt = Math.min(.05, (now - lifeT) / 1000); lifeT = now;
+  const L = env && env.life; if (!L || calmMotion || env.g.parent !== scene) return;
+  const t = now / 1000; for (const s of L.A) s.step(dt, t);
+}
 // 設定で選んだ世界(public/worlds/<名前>.glb・.json、Blender で光を焼き込んだもの)を、箱とキューブのまわりに映す。
 // 箱とキューブは原点のまま動かさず、世界の方を動かす: 部屋の真ん中を原点に、床を立体の下に、長い方を箱の並ぶ向き(X)に合わせ、
 // 全体が見える距離までカメラを引いても部屋の中に収まる大きさに広げる。ズームの上限も部屋の中まで
@@ -1510,7 +1612,9 @@ function setWorld(name) {
     if (envName !== name) return;
     // 宇宙はタイムスリップ専用: 惑星・月・岩・人工物・光の輪は隠し、星空だけの何もない場所にする
     if (name === 'space') root.traverse(o => { if (o.isMesh && o.userData.group !== 'sky') o.visible = false; });
-    const g = new THREE.Group(); g.add(root); env = { g, info }; worldMsg(''); paint();
+    const g = new THREE.Group(); g.add(root); env = { g, info, root }; worldMsg('');
+    env.life = makeLife(name, info); if (env.life) g.add(env.life.g);
+    paint();
   }).catch(e => { delete envCache[name]; console.error('世界を読み込めませんでした', name, e); if (envName === name) { envName = null; worldMsg('世界を読み込めませんでした。標準で表示しています'); } });
 }
 // 歩ける範囲(json の walk の1つ目)を部屋とみなす。宇宙・海の底のように無い世界は原点のまわり
@@ -1547,7 +1651,7 @@ function occlude() {
   for (const [p, r] of aims) {
     occD.copy(p).sub(camera.position); const len = occD.length(); if (len <= r) continue;
     occRay.set(camera.position, occD.normalize()); occRay.far = len - r;
-    for (const h of occRay.intersectObject(env.g, true)) if (h.object.visible) { h.object.visible = false; occHidden.push(h.object); }
+    for (const h of occRay.intersectObject(env.root, true)) if (h.object.visible) { h.object.visible = false; occHidden.push(h.object); }
   }
 }
 // ---------- 中に入る(世界から、選んだ箱・キューブを無地で見る)----------
@@ -1704,11 +1808,31 @@ function setJStyle(k) {
   if (!JTILES[k]) return; jStyle = k;
   try { localStorage.setItem('axis-boxes-v2:jmap', k); } catch (e) {}
   if (jm) { if (jTile) jm.removeLayer(jTile); const [, url, name] = JTILES[k]; jTile = L.tileLayer(url, { maxZoom: 18, maxNativeZoom: 18, attribution: `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>(${name})` }).addTo(jm); jTile.bringToBack();
-    // 空撮には県境の線を重ねる(白地図には元から入っている)
+    // 県境の線を重ねる(空撮は黄色、白地図は灰色)
     if (jBorder) { jm.removeLayer(jBorder); jBorder = null; }
-    if (k === 'photo' && JP && JP.border) jBorder = L.polyline(JP.border.map(l => l.map(([lon, lat]) => [lat, lon])), { color: '#ffe066', weight: 1.6, opacity: .9, interactive: false }).addTo(jm);
+    if (JP && JP.border) jBorder = L.polyline(JP.border.map(l => l.map(([lon, lat]) => [lat, lon])), k === 'photo' ? { color: '#ffe066', weight: 1.6, opacity: .9, interactive: false } : { color: '#7d8590', weight: 1.3, opacity: .85, interactive: false }).addTo(jm);
+    jDotsDraw();
   }
   document.querySelectorAll('[data-js]').forEach(b => b.classList.toggle('on', b.dataset.js === k));
+}
+// 白地図の市区町村ドット(人口に合わせた大きさ)。日本全体では主要都市(50万人以上、東京は23区で1つ)だけ、寄るほど小さな町まで出す
+let jDots = null, jDotR = null;
+function jDotsDraw() {
+  if (!jm || !JP || !JP.dots) return;
+  if (!jDots) { jm.createPane('jdots').style.zIndex = 390; jm.getPane('jdots').style.pointerEvents = 'none'; jDotR = L.canvas({ pane: 'jdots' }); jDots = L.layerGroup().addTo(jm); jm.on('zoomend moveend', jDotsDraw); }
+  jDots.clearLayers(); if (jStyle !== 'pale') return;
+  const z = jm.getZoom(), b = jm.getBounds().pad(.3), wide = z < 6.5, mid = z < 8.5;
+  const min = wide ? 5e5 : mid ? 1e5 : z < 9.5 ? 2e4 : 0, lab = wide ? 1e6 : mid ? 4e5 : z < 10 ? 1e5 : z < 11 ? 2e4 : 0, grow = wide ? 1 : mid ? 1.15 : 1.35;
+  const placed = [];   // 名前は大きい市から置き、先に置いた名前と重なるものは出さない
+  for (const [lon, lat, p, n, t] of JP.dots) {
+    if (p < min || (t === 1 && !mid) || (t === 2 && mid) || !b.contains([lat, lon])) continue;
+    const r = Math.max(2, Math.sqrt(p) / 150 * grow);
+    L.circleMarker([lat, lon], { pane: 'jdots', renderer: jDotR, radius: r, color: '#ffffff', weight: 1, fillColor: '#d9622b', fillOpacity: .5, interactive: false }).addTo(jDots);
+    if (p < lab) continue;
+    const q = jm.latLngToContainerPoint([lat, lon]), x0 = q.x + r + 3, x1 = x0 + n.length * 11, y0 = q.y - 8;
+    if (placed.some(o => x0 < o[1] && x1 > o[0] && Math.abs(y0 - o[2]) < 13)) continue; placed.push([x0, x1, y0]);
+    L.marker([lat, lon], { pane: 'jdots', interactive: false, keyboard: false, icon: L.divIcon({ className: 'jlab', html: esc(n), iconSize: null, iconAnchor: [-r - 3, 8] }) }).addTo(jDots);
+  }
 }
 function japanPins(items) {
   Promise.all([leaflet(), loadJP()]).then(([L]) => {
@@ -1901,22 +2025,25 @@ function renderCal() {
   $('calCube').onclick = () => { calCube = !calCube; try { localStorage.setItem('axis-boxes-v2:calCube', calCube ? '1' : ''); } catch (e) {} calCam(); fitted = 0; paint(); };
   if (u) { $('calEnter').onclick = () => enterUnit(u); $('calClose').onclick = () => { sel = null; renderTree(); calCube ? paint() : renderCal(); }; }
 }
-// 立体のカレンダーの視点: 日は横から(縦の時間軸を見る)、ほかは斜め上から
-function calCam() { if (!calCube) return; cam.th = 0; cam.ph = calView === 'day' ? .25 : .95; tgtGoal.copy(homeC); fitted = 0; }
-// カレンダーの並びのまま、札をキューブにして 3D に置く(床に暦の枠、日は縦の時間軸)
+// 立体のカレンダーの視点: 暦の面(X・Y)を正面に、少し斜めから見て手前に出た Z(札の積み重ね)が分かるようにする
+function calCam() { if (!calCube) return; cam.th = calView === 'day' ? 0 : .32; cam.ph = calView === 'day' ? .25 : .2; tgtGoal.copy(homeC); fitted = 0; }
+// カレンダーの並びのまま、札をキューブにして 3D に置く(暦の面は正面の X・Y、札は Z で手前に積む。日は縦の時間軸)
 function paintCal3D() {
   const { items, Y, M } = calItems(), ink = '#1d2430';
-  const plate = (x, z, w, d, col, op = .9) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0, z); world.add(m);
-    const e = edges(w, .01, d, new THREE.Color('#9aa6b5'), false, .9); e.position.set(x, 0, z); world.add(e); };
-  const label = (t, x, y, z, h = .45, col = ink) => { const lb = textSprite(String(t), col, h); lb.position.set(x, y, z); world.add(lb); return lb; };
-  const put = (it, x, y, z, h) => { const tk = token(it.u, h, topColor(it.u)); tk.position.set(x, y + h / 2, z); world.add(tk);
+  // 暦の面(曜日・週、月・日付)をこちらを向いた X・Y の面に立て、札の積み重ねだけを Z(手前)に出す。日はもとから縦の時間軸なのでそのまま
+  const cg = calView === 'day' ? world : new THREE.Group();
+  if (cg !== world) { cg.rotation.x = Math.PI / 2; world.add(cg); }
+  const plate = (x, z, w, d, col, op = .9) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0, z); cg.add(m);
+    const e = edges(w, .01, d, new THREE.Color('#9aa6b5'), false, .9); e.position.set(x, 0, z); cg.add(e); };
+  const label = (t, x, y, z, h = .45, col = ink) => { const lb = textSprite(String(t), col, h); lb.position.set(x, y, z); cg.add(lb); return lb; };
+  const put = (it, x, y, z, h) => { const tk = token(it.u, h, topColor(it.u)); tk.position.set(x, y + h / 2, z); cg.add(tk);
     if (selUnits().includes(it.u)) { const lb = textSprite(`${it.u.name} ${String(it.v)}`, ink, .5); lb.position.set(0, h / 2 + .6, 0); tk.add(lb); }
     groups.push({ g: tk, u: it.u, box: true, home: tk.position.clone() }); };
   // 横軸(月か日付)のある枠を並べる(複数年・年)
   const panels = (n, head, list, xOf, ticks) => { const PW = 10, PD = 3, G = 1.2;
     for (let k = 0; k < n; k++) { const c = k % 3, r = Math.floor(k / 3), px = (c - 1) * (PW + G), pz = (r - 1.5) * (PD + G);
       plate(px, pz, PW, PD, '#ffffff'); label(head(k), px - PW / 2 + 1, .05, pz - PD / 2 + .45, .55);
-      const az = pz + PD / 2 - .55; world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(px - PW / 2 + .2, .02, az), new THREE.Vector3(px + PW / 2 - .2, .02, az)]), new THREE.LineBasicMaterial({ color: 0x6b7686 })));
+      const az = pz + PD / 2 - .55; cg.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(px - PW / 2 + .2, .02, az), new THREE.Vector3(px + PW / 2 - .2, .02, az)]), new THREE.LineBasicMaterial({ color: 0x6b7686 })));
       ticks(k).forEach(([v, t]) => label(t, px - PW / 2 + v * PW, .02, az + .3, .3, '#5b6676'));
       const stack = []; list(k).forEach(it => { const v = xOf(k, it), x = px - PW / 2 + v * PW, lv = stack.filter(s => Math.abs(s - x) < .65).length; stack.push(x); put(it, x, lv * .65, pz - .1, .55); }); }
     return 3 * PW + 2 * G + 2; };
@@ -1935,8 +2062,8 @@ function paintCal3D() {
     world.position.y = -H / 2;
     plate(0, 0, 16, 6, '#ffffff', .6);
     label(`${D.getUTCMonth() + 1}月${D.getUTCDate()}日(${DOW[D.getUTCDay()]})`, -5, .05, 2.4, .6);
-    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, H, 0)]), new THREE.LineBasicMaterial({ color: 0x4b5563 })));
-    for (let h = h0; h <= h1; h++) { const y = (h - h0) * HU; world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.3, y, 0), new THREE.Vector3(.3, y, 0)]), new THREE.LineBasicMaterial({ color: 0x4b5563 }))); label(`${h}時`, -1.1, y, 0, .4); }
+    cg.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, H, 0)]), new THREE.LineBasicMaterial({ color: 0x4b5563 })));
+    for (let h = h0; h <= h1; h++) { const y = (h - h0) * HU; cg.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.3, y, 0), new THREE.Vector3(.3, y, 0)]), new THREE.LineBasicMaterial({ color: 0x4b5563 }))); label(`${h}時`, -1.1, y, 0, .4); }
     const lane = []; tm.forEach(it => { const y = ((it.t - calDay) / 36e5 - h0) * HU, l = lane.filter(v => Math.abs(v - y) < .9).length; lane.push(y); put(it, 1.2 + l * 1.4, y - .35, 0, .7); label(hm(it.t), 1.2 + l * 1.4, y + .65, 0, .32); });
     label('時刻なし', -5, .05, -1.6, .45); nt.forEach((it, k) => put(it, -6.5 + (k % 5) * 1.3, 0, -.6 + Math.floor(k / 5) * 1.3, .8));
     span = Math.max(16, H + 4);

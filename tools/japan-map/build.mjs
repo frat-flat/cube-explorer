@@ -2,7 +2,8 @@
 //   npm i --no-save jpn-atlas @b4moss/jp-local-gov-id-data && node tools/japan-map/build.mjs
 // 位置: jpn-atlas(BSD-3-Clause)に入っている国土地理院「地球地図日本」2016 の shapefile(経度・緯度)
 // 名前: @b4moss/jp-local-gov-id-data(元は総務省「全国地方公共団体コード」)
-// 出力: 都道府県と市区町村ごとの代表点(経度・緯度)と県境の線。地図そのものは画面で地理院タイルを読む
+// 人口: tools/japan-map/population.json(population.py で作る。総務省「住民基本台帳人口」CC BY 4.0)
+// 出力: 都道府県と市区町村ごとの代表点(経度・緯度)と県境の線と人口のドット。地図そのものは画面で地理院タイルを読む
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -69,6 +70,14 @@ function simplify(pts, tol) { if (pts.length < 3) return pts; const keep = new U
     for (let i = a + 1; i < b; i++) { const d = L > 1e-12 ? Math.abs(dy * pts[i][0] - dx * pts[i][1] + bx * ay - by * ax) / L : Math.hypot(pts[i][0] - ax, pts[i][1] - ay); if (d > md) { md = d; mi = i; } }
     if (md > tol) { keep[mi] = 1; st.push([a, mi], [mi, b]); } } return pts.filter((_, i) => keep[i]); }
 const border = lines.map((l) => simplify(l, 0.002).map(([x, y]) => [r4(x), r4(y)]));
-const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」", pref: prefOut, city: cityOut, border };
+// 白地図のドット: 地図に形がある市区町村(政令市は市でまとめ、区は除く)ごとに [経度, 緯度, 人口, 名前, 出す縮尺]
+// 出す縮尺: 0=いつも、1=日本全体のときだけ(東京23区をまとめた点)、2=寄ったときだけ(23区の一つ一つ)
+const pop = JSON.parse(readFileSync(new URL("./population.json", import.meta.url), "utf8"));
+const ku = (m) => /^131[0-2]\d$/.test(m.code.slice(0, 5)) && m.code.slice(0, 5) <= "13123";
+const dots = munis.filter((m) => geo.has(m.code.slice(0, 5)) && pop[m.code]).map((m) => { const c = geo.get(m.code.slice(0, 5)).c; return [r4(c[0]), r4(c[1]), pop[m.code], m.name, ku(m) ? 2 : 0]; });
+const k23 = dots.filter((d) => d[4] === 2), s23 = k23.reduce((a, d) => a + d[2], 0);
+if (k23.length) dots.push([r4(k23.reduce((a, d) => a + d[0] * d[2], 0) / s23), r4(k23.reduce((a, d) => a + d[1] * d[2], 0) / s23), s23, "東京23区", 1]);
+dots.sort((a, b) => b[2] - a[2]);
+const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」 / 人口: 総務省「住民基本台帳人口」令和4年1月1日", pref: prefOut, city: cityOut, border, dots };
 writeFileSync(new URL("../../public/worlds/japan.json", import.meta.url), JSON.stringify(out));
-console.log("prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
+console.log("dots", dots.length, "23ku", k23.length, "prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
