@@ -38,6 +38,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 .crumb{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top .out{font-size:13px;color:var(--muted);white-space:nowrap}
 .top .out:hover{color:var(--accent)}
+.top .cloud{font-size:12px;color:var(--muted);white-space:nowrap}
+.top .cloud.err{color:#d9534f}
 .crumb::before{content:"/";margin-right:10px;color:var(--line)}
 .side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
 .nv{display:flex;align-items:center;gap:10px;border:none;background:none;border-radius:7px;padding:8px 10px;text-align:left;color:var(--muted);font-size:13.5px;width:100%}
@@ -190,6 +192,7 @@ tfoot td{font-weight:700}
   <span class="crumb" id="crumb">ホーム</span>
   <span class="sp"></span>
   <button class="small" id="addMonth" title="各シートに次の月の行が入ったことにする">次の月のデータが入った(試し)</button>
+  <span class="cloud" id="cloud" hidden></span>
   <a class="out" id="logout" href="/auth/signout" hidden>ログアウト</a>
 </header>
 <nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
@@ -343,19 +346,33 @@ const SAMPLE = () => {
 };
 const KEY = 'axis-boxes-v2';
 let S;
-try { S = JSON.parse(localStorage.getItem(KEY)); if (!S || !S.axes || !S.boxes || !S.sheets || !S.saved || !S.dict || !S.history) S = SAMPLE(); } catch (e) { S = SAMPLE(); }
-S.prefs = S.prefs || {};
+const validState = x => !!(x && x.axes && x.boxes && x.sheets && x.saved && x.dict && x.history);
+try { S = JSON.parse(localStorage.getItem(KEY)); if (!validState(S)) S = SAMPLE(); } catch (e) { S = SAMPLE(); }
 // 箱とキューブには必ず番号(箱1・キューブ1…)を振る。指示で呼べるように一度振った番号は変えない
 const unitOf = b => (b.kind === 'box' ? '箱' : 'キューブ') + b.no;
 // 単位=段(法人単位・ショップ単位)。箱・キューブが持つ軸の名前で決まる
 const levelOf = b => { if (b.levelName) return b.levelName; const k = Object.keys(b.own || {})[0]; return k && ax(k) ? ax(k).name : (b.kind === 'box' ? '箱' : 'キューブ'); };
 function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, ...S.boxes.filter(b => b.kind === k && b.no).map(b => b.no)); S.boxes.filter(b => b.kind === k && !b.no).forEach(b => b.no = ++n); } }
-numberUnits();
-// 前の版の面の名前(front など)をサイコロの目に置き換える
-S.boxes.forEach(b => { if (b.pin && b.pin.face) b.pin.face = ({ front: 'd1', top: 'd2', right: 'd3', left: 'd4', bottom: 'd5', back: 'd6' })[b.pin.face] || b.pin.face; });
-// 固定はその場の見方なので、開き直したら外れた状態から始める(前に固定したまま保存された分もここで外す)
-S.boxes.forEach(b => { delete b.pin; });
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+// 読み込んだ中身を画面で使える形にそろえる(はじめと、Supabase から読んだとき)
+function adopt(x) {
+  S = x; S.prefs = S.prefs || {};
+  numberUnits();
+  // 前の版の面の名前(front など)をサイコロの目に置き換える
+  S.boxes.forEach(b => { if (b.pin && b.pin.face) b.pin.face = ({ front: 'd1', top: 'd2', right: 'd3', left: 'd4', bottom: 'd5', back: 'd6' })[b.pin.face] || b.pin.face; });
+  // 固定はその場の見方なので、開き直したら外れた状態から始める(前に固定したまま保存された分もここで外す)
+  S.boxes.forEach(b => { delete b.pin; });
+}
+adopt(S);
+// 保存はまずこのブラウザに。アプリの中で Supabase がつながっていれば、少し待ってからまとめて Supabase にも送る
+let cloud = false, pushTimer = 0;
+const cloudMark = (t, err) => { const el = $('cloud'); el.hidden = false; el.textContent = t; el.classList.toggle('err', !!err); };
+const pushCloud = () => {
+  if (!cloud) return;
+  clearTimeout(pushTimer); cloudMark('保存中…');
+  pushTimer = setTimeout(() => fetch('/api/workspace', { method: 'PUT', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: S }) })
+    .then(r => cloudMark(r.ok ? 'Supabase に保存済み' : 'Supabase に保存できませんでした', !r.ok)).catch(() => cloudMark('Supabase に保存できませんでした', true)), 1200);
+};
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} pushCloud(); };
 const ax = id => S.axes.find(a => a.id === id);
 const box = id => S.boxes.find(b => b.id === id);
 const $ = id => document.getElementById(id);
@@ -1247,5 +1264,12 @@ $('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
 $('preset').onchange = e => fillPreset(+e.target.value);
 S.saved.forEach(s => { if (!s.seen) s.seen = sig(s); });
 renderAll(); fillPreset(0); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
+// Supabase に保存があればそれを正として開き直す。まだ無ければ、いまの中身を最初の保存として送る
+fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => {
+  if (!j || !j.configured) return;
+  cloud = true;
+  if (validState(j.state)) { adopt(j.state); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} renderAll(); cloudMark('Supabase から読み込みました'); }
+  else pushCloud();
+}).catch(() => {});
 })();
 </script>
