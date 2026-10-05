@@ -47,6 +47,12 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 .nv.on{background:var(--bg);color:var(--accent);font-weight:700}
 .nv .ic{width:18px;text-align:center;font-size:15px}
 .nv .lb{flex:1;white-space:nowrap}
+.navbtn{border:none;background:none;color:var(--muted);font-size:18px;line-height:1;padding:4px 6px;border-radius:6px;cursor:pointer}
+.navbtn:hover{background:var(--bg);color:var(--ink)}
+/* 左のメニューを閉じると、印だけの細い帯になる(3D を広く見るため) */
+.shell.navc{grid-template-columns:52px minmax(0,1fr)}
+.shell.navc .nv{justify-content:center;padding:8px 0}.shell.navc .nv .lb{display:none}
+.shell.navc .nv .nb{position:absolute;margin:-18px -22px 0 0;padding:0 5px}
 .nv .nb{font-size:11px;border-radius:99px;padding:0 7px;background:var(--hl);color:#000;font-weight:700}
 .content{overflow:auto;padding:18px 20px 28px;min-width:0}
 .view{display:flex;flex-direction:column;gap:14px;max-width:1400px;margin:0 auto}
@@ -98,7 +104,7 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 .axis .al{grid-column:2/4;color:var(--muted);font-size:12px}
 .axis.mine{border-style:dashed;border-color:var(--mine)}
 /* 立体 */
-#stage{position:relative;height:clamp(380px,calc(100vh - 300px),900px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
+#stage{position:relative;height:clamp(420px,calc(100vh - 210px),1200px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
 #pinBar{position:absolute;right:8px;top:8px;max-width:calc(100% - 16px);font-size:12px;color:var(--muted);pointer-events:none}
 #pinBar button{pointer-events:auto}
 #pinBar .hint{background:var(--stage);padding:1px 4px;border-radius:4px}
@@ -114,6 +120,7 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 #gizmo{position:absolute;left:-10px;top:-12px;width:96px;height:96px;overflow:visible}
 #gizmo .end{cursor:pointer}
+#gizmo line.neg{stroke-width:1.5;stroke-dasharray:3 3;opacity:.7}#gizmo text.neg{font-size:11px;opacity:.75}
 #gizmo text{font:700 13px var(--sans);text-anchor:middle;dominant-baseline:central;cursor:pointer}
 #gizmo .end:hover text{text-decoration:underline}
 .wfind{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
@@ -122,9 +129,14 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #worldBar[hidden],#guide[hidden],#cal[hidden],#jmap[hidden]{display:none}
 /* 宇宙・日本地図では案内(項目・検索・凡例)を枠の外(右、狭い画面では下)に出す */
 .stagewrap{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:start}
-.stagewrap.side{grid-template-columns:minmax(0,1fr) 320px}
+.stagewrap.side{grid-template-columns:minmax(0,1fr) 240px}
+.stagewrap.side.gc{grid-template-columns:minmax(0,1fr) 34px}
 @media (max-width:900px){.stagewrap.side{grid-template-columns:minmax(0,1fr)}}
-#guide.out{position:static;width:auto;max-height:none;box-shadow:none;align-self:stretch}
+#guide.out{position:static;width:auto;max-height:none;box-shadow:none;align-self:stretch;font-size:12px;padding:10px 10px}
+#guide .gx{float:right;background:transparent!important;color:inherit!important;border:0!important;padding:0 2px!important;font-size:16px;line-height:1;cursor:pointer;opacity:.75}
+#guide.gc{width:auto;padding:6px 4px;max-height:none}
+#guide.gc .gx{float:none;writing-mode:vertical-rl;font-size:13px;letter-spacing:.1em;opacity:1}
+.cmode{display:inline-flex;gap:3px;align-items:center;font-size:12px;color:var(--muted);margin-left:10px}
 #jmap{position:absolute;inset:0;z-index:2;background:#dfe7ec;font:12px var(--sans)}
 #jmap .leaflet-tooltip{font-size:12px}
 #guide .seg{display:inline-flex;gap:0;margin:2px 0 8px}
@@ -274,11 +286,13 @@ tfoot td{font-weight:700}
 @media (max-width:1100px){.home,.two,.two.wide{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:760px){.shell{grid-template-columns:minmax(0,1fr);grid-template-rows:52px auto minmax(0,1fr)}
   .top{grid-column:1}.side{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px}.nv{width:auto;padding:6px 10px}
-  .content{padding:14px 16px 24px}#stage{height:320px}.drawer{top:0}.crumb,#addMonth{display:none}}
+  .shell.navc{grid-template-columns:minmax(0,1fr)}.shell.navc .nv .lb{display:inline}
+  .content{padding:14px 16px 24px}#stage{height:420px}.drawer{top:0}.crumb,#addMonth{display:none}}
 </style>
 
 <div class="shell">
 <header class="top">
+  <button class="navbtn" id="navToggle" aria-label="メニューを閉じる" title="メニューを閉じる・開く">☰</button>
   <div class="brand"><span class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5 21 7v10l-9 4.5L3 17V7z"/><path d="M3 7l9 4.5L21 7M12 11.5v10"/></svg></span><b>軸の辞書と箱</b></div>
   <span class="crumb" id="crumb">ホーム</span>
   <span class="sp"></span>
@@ -298,11 +312,11 @@ tfoot td{font-weight:700}
 </div>
 <div class="view" data-view="world" hidden>
   <div class="vhead"><h1>World</h1><p class="lead">箱とキューブを立体で並べます。まわりの世界は <button class="small" data-go="settings">設定</button> で選べます。<span id="worldNow" style="white-space:nowrap"></span></p>
-    <div class="wmodes" role="tablist" aria-label="World の見せ方"><button class="small" data-wm="world" role="tab">いつもの世界</button><span class="wsp">特別枠</span><button class="small" data-wm="japan" role="tab">日本地図</button><button class="small" data-wm="cal" role="tab">タイムスリップ(カレンダー)</button><button class="small" data-wm="space" role="tab">タイムスリップ(宇宙)</button></div>
+    <div class="wmodes" role="tablist" aria-label="World の見せ方"><button class="small" data-wm="world" role="tab">いつもの世界</button><span class="wsp">特別枠</span><button class="small" data-wm="japan" role="tab">日本地図</button><button class="small" data-wm="cal" role="tab">タイムスリップ(カレンダー)</button><button class="small" data-wm="space" role="tab">タイムスリップ(宇宙)</button><span class="cmode" role="group" aria-label="軸の中心">軸の中心 <button class="small" data-center="origin" title="X=0・Y=0・Z=0 を中心にする">原点(0,0,0)</button><button class="small" data-center="median" title="並んでいるものの中央値を中心にする">中央値</button></span></div>
     <div class="row wfind" id="wFindRow"><input id="wFind" list="wFindList" placeholder="箱・キューブ・シートの名前で探して中に入る(選んでいれば空のまま Enter)" aria-label="探して中に入る"><datalist id="wFindList"></datalist><button class="small" id="wFindGo">中に入る</button><span class="muted" id="wFindMsg"></span></div></div>
     <section class="stagecard"><div class="stagewrap" id="stageWrap">
   <div id="stage"><div id="jmap" hidden></div><div id="worldMsg" hidden></div><div id="worldBar" hidden><span id="worldBarT"></span> <button class="small" id="worldBack"></button></div><div id="guide" hidden></div><div id="cal" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
-    <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div></div>
+    <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">+X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><line id="glxn" class="neg" style="stroke:var(--ax)"/><g class="end" data-mv="x-1"><title>X のマイナスへ動かす</title><text id="gtxn" class="neg" style="fill:var(--ax)">−X</text></g><line id="glyn" class="neg" style="stroke:var(--ay)"/><g class="end" data-mv="y1"><title>Y のプラス(上)へ動かす</title><text id="gtyn" class="neg" style="fill:var(--ay)">+Y</text></g><line id="glzn" class="neg" style="stroke:var(--az)"/><g class="end" data-mv="z1"><title>Z のプラス(手前)へ動かす</title><text id="gtzn" class="neg" style="fill:var(--az)">+Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
@@ -510,7 +524,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let showMine = true;
 // システムの初期値。画面からは変えられない(秩序のもと)。自分の設定は S.prefs に別で持つ
-const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']), world: 'none' });
+const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']), world: 'none', center: 'origin' });
 const SHADES = { view: '表示中の最大値で割る', global: 'その科目の全期間の最大値で割る(絞っても色が変わらない)', row: '行ごとの最大値で割る', share: '行の合計に占める割合' };
 const curPref = k => (S.prefs && S.prefs[k] != null ? S.prefs[k] : SYSTEM[k]);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -1149,6 +1163,19 @@ function runCmd(text) {
   return `${lv ? lv + '単位の ' : ''}${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${isBox ? '中のキューブの' : ''}${faceOf(targets[0].pin.face).name}を正面にしました${isBox ? '(箱は置き場所も向きもそのまま)' : ''}`;
 }
 const cam = { th: .45, ph: .34, dist: 24 };   // 最初は X・Y・Z のプラス側が見える向き
+// 軸の中心(原点か中央値)。見る中心もここに合わせ、X・Y・Z のプラスとマイナスの軸と名前を出す
+const homeC = new THREE.Vector3();
+function setHome(c, half, names = {}) {
+  tgtGoal.add(c.clone().sub(homeC)); homeC.copy(c);
+  const g = new THREE.Group(); g.position.copy(c);
+  ['x', 'y', 'z'].forEach((k, i) => {
+    const col = new THREE.Color(css(['--ax', '--ay', '--az'][i]) || '#888'), e = new THREE.Vector3(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, k === 'z' ? 1 : 0), H = half[k];
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([e.clone().multiplyScalar(-H), e.clone().multiplyScalar(H)]), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: .55, depthWrite: false })));
+    const sz = Math.max(.45, Math.min(1.2, H * .04)), nm = names[k] ? ' ' + names[k] : '';
+    [[1, '+'], [-1, '−']].forEach(([sg, t]) => { const lb = textSprite(t + k.toUpperCase() + (sg > 0 ? nm : ''), '#' + col.getHexString(), sz); lb.position.copy(e.clone().multiplyScalar(sg * (H + sz))); g.add(lb); });
+  });
+  world.add(g);
+}
 function textSprite(t, color, h) {
   const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 44px ' + css('--sans');
   const w = Math.ceil(x.measureText(t).width) + 16; c.width = w; c.height = 60; x.font = '700 44px ' + css('--sans'); x.fillStyle = color; x.textBaseline = 'middle'; x.fillText(t, 8, 32);
@@ -1358,6 +1385,9 @@ function paint() {
   for (const b of tops) { const W = sizeOf(b); drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
   // 全体の大きさが変わったときだけ、全体が入る距離に引く(ふだんのズームは触らない)
   const span = Math.max(total, ...tops.map(sizeOf));
+  world.updateMatrixWorld(true);
+  const pts = groups.filter(x => !x.box).map(x => x.g.getWorldPosition(new THREE.Vector3())), c = curPref('center') === 'median' && pts.length ? new THREE.Vector3(median(pts.map(p => p.x)), median(pts.map(p => p.y)), median(pts.map(p => p.z))) : new THREE.Vector3();
+  const h = Math.max(span / 2, ...tops.map(sizeOf)) + 2; setHome(c, { x: h + Math.abs(c.x), y: h, z: h + Math.abs(c.z) });
   extent = { span, bottom: -Math.max(1, ...tops.map(sizeOf)) / 2 - .2 }; placeEnv(); renderWorldUi();
   if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
 }
@@ -1404,6 +1434,9 @@ function loop() {
       const gap = ([ux, uy]) => Math.min(...GZ.filter(o => o[0] !== k).map(([, ox, oy]) => { const m = Math.hypot(ox, oy) || 1; return Math.acos(Math.max(-1, Math.min(1, (ux * ox + uy * oy) / m))); }));
       const [ux, uy] = [rot(.5), rot(-.5)].sort((p, q) => gap(q) - gap(p))[0], r = Math.max(L * 1.05, 16), tx = ux * r, ty = uy * r;
       $('gt' + k).setAttribute('x', tx); $('gt' + k).setAttribute('y', ty);
+      // 反対の向き(−X・+Y・+Z)も点線で出す
+      $('gl' + k + 'n').setAttribute('x1', 0); $('gl' + k + 'n').setAttribute('y1', 0); $('gl' + k + 'n').setAttribute('x2', -x * .8); $('gl' + k + 'n').setAttribute('y2', -y * .8);
+      $('gt' + k + 'n').setAttribute('x', -ux * r); $('gt' + k + 'n').setAttribute('y', -uy * r);
     });
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
@@ -1504,7 +1537,7 @@ function enterUnit(u) {
   renderTree(); paint(); renderPinBar(); focusSel();
 }
 function leaveUnit() {
-  entered = null; focused = sel; tgtGoal.set(0, 0, 0);
+  entered = null; focused = sel; tgtGoal.copy(homeC);
   renderTree(); paint(); renderPinBar(); cam.dist = Math.min(envLimit, fitDist(extent.span));
 }
 function findUnit(q) {
@@ -1529,6 +1562,7 @@ function renderWorldUi() {
   $('worldBar').hidden = !eu;
   if (eu) { $('worldBarT').textContent = `${unitOf(eu)} ${eu.name} の中(無地)`; $('worldBack').textContent = '← ' + (wmode === 'world' ? WORLDS[envName] : WMODES[wmode]) + 'に戻る'; }
   document.querySelectorAll('[data-wm]').forEach(b => { b.classList.toggle('on', b.dataset.wm === wmode); b.setAttribute('aria-selected', b.dataset.wm === wmode); });
+  document.querySelectorAll('[data-center]').forEach(b => b.classList.toggle('on', b.dataset.center === curPref('center')));
   renderCal();
   $('legend').hidden = exhibit() || layoutMode();
   $('wFindList').innerHTML = [...units().map(b => b.name), ...S.sheets.map(x => x.name)].filter((v, i, a) => a.indexOf(v) === i).map(v => `<option value="${esc(v)}">`).join('');
@@ -1569,17 +1603,24 @@ function renderGuide() {
   el.hidden = !show; $('stageWrap').classList.toggle('side', show && lay);
   if (el.parentNode !== home) home.appendChild(el);
   if (!show) return;
+  // 案内は閉じられる(閉じると細いつまみだけ残る。ブラウザに覚える)
+  let gc = false; try { gc = !!localStorage.getItem('axis-boxes-v2:guideC'); } catch (e) {}
+  $('stageWrap').classList.toggle('gc', gc && lay);
+  const gToggle = v => { try { localStorage.setItem('axis-boxes-v2:guideC', v ? '1' : ''); } catch (e) {} renderGuide(); requestAnimationFrame(resize); };
+  if (gc) { el.className = (GUIDE[lay ? wmode : envName] || ['museum'])[0] + ' gc' + (lay ? ' out' : ''); el.innerHTML = '<button class="gx" id="gShow" title="案内を開く" aria-label="案内を開く">« 案内・検索</button>'; $('gShow').onclick = () => gToggle(false); return; }
   const [type, head, tone] = GUIDE[lay ? wmode : envName] || ['museum', '案内'], [c0, c1] = lay ? (wmode === 'japan' ? ['#f6f3ea', '#2a5f8a'] : ['#020812', '#7fdcff']) : palette(), u = selUnits().length === 1 ? selUnits()[0] : null;
   el.className = type + (tone ? ' ' + tone : '') + (lay ? ' out' : ''); el.style.setProperty('--g0', c0); el.style.setProperty('--g1', c1);
   const ph = { museum: '作品名・キーワードで探す', map: '行き先(箱・キューブ・シート)を探す', sign: '名を記して探す', game: 'なまえを いれてください', term: '> search' }[type];
   const title = u ? `${unitOf(u)} ${esc(u.name)}` : lay ? (wmode === 'space' ? 'タイムスリップ' : '日本地図') : esc(env.info.title || WORLDS[envName]);
   const desc = u && lay ? `<dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : lay ? `<div class="gd">${wmode === 'japan' ? 'ピンを押すと説明が出ます。地図はホイールやピンチで番地が分かるところまで拡大できます。' : '立体を押すと説明が出ます。'}ダブルクリックか下で探すと中に入れます。</div>` : u ? `<dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : `<div class="gd">${type === 'map' || type === 'term' ? '図の箱や点を押すと選べます。' : ''}立体を押すと説明が出ます。ダブルクリックか下で探すと中に入れます。</div>`;
-  el.innerHTML = `<div class="gh">${esc(head)}</div><h3>${title}</h3>${layoutMode() ? layoutPanel() : type === 'map' || type === 'term' ? guideMap() : ''}${desc}
+  el.innerHTML = `<div class="gh"><button class="gx" id="gHide" title="案内を閉じる" aria-label="案内を閉じる">»</button>${esc(head)}</div><h3>${title}</h3>${layoutMode() ? layoutPanel() : type === 'map' || type === 'term' ? guideMap() : ''}${desc}
     ${u ? `<div class="acts"><button id="gClose">閉じる</button><button id="gEnter">中に入る</button></div>` : ''}
     <div class="gf"><input id="gFind" list="wFindList" placeholder="${ph}" aria-label="探して中に入る"><button id="gGo">${type === 'game' ? 'しらべる' : '探す'}</button></div><div class="gmsg" id="gMsg"></div>`;
   el.querySelectorAll('[data-pick]').forEach(n => n.onclick = () => select(n.dataset.pick));
   const lf = $('lField'); if (lf) lf.onchange = () => { setField(wmode, lf.value); paint(); };
+  ['y', 'z'].forEach(k => { const e = $('lField' + k.toUpperCase()); if (e) e.onchange = () => { setSlipAxis(k, e.value); paint(); }; });
   el.querySelectorAll('[data-js]').forEach(b => b.onclick = () => setJStyle(b.dataset.js));
+  $('gHide').onclick = () => gToggle(true);
   const go = () => findGo($('gFind'), $('gMsg'));
   $('gGo').onclick = go; $('gFind').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) go(); };
   if (u) { $('gClose').onclick = () => { sel = null; focused = null; renderTree(); paint(); renderPinBar(); }; $('gEnter').onclick = () => enterUnit(u); }
@@ -1678,36 +1719,73 @@ function paintLayout() {
     if (!JP) { loadJP().then(() => { if (layoutMode() && wmode === 'japan') paint(); }).catch(() => worldMsg('日本地図を読み込めませんでした(通信を確かめてください)')); }
     japanPins(items); renderWorldUi(); return;
   }
-  // タイムスリップ(宇宙): 光の線(X)と、その下の時間の目盛り
+  // タイムスリップ(宇宙): X は日付で、光の線とその下の時間の目盛り。Y・Z にも項目を選べる(日付・数・区分)。
+  // 中心は「原点」(日付は今日、数は 0、区分は最初のもの)か「中央値」。X・Y・Z ともプラスとマイナスの軸を出す
   items.sort((a, b) => a.k - b.k);
-  const d0 = new Date(items.length ? items[0].k : Date.now()), d1 = new Date(items.length ? items[items.length - 1].k : Date.now());
-  const t0 = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1), t1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth() + 1, 1);
-  const L = Math.max(24, Math.min(90, items.length * 4)), X = t => -L / 2 + (t - t0) / (t1 - t0) * L;
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, L + 6, 8), new THREE.MeshBasicMaterial({ color: 0xd8f4ff })); beam.rotation.z = Math.PI / 2; world.add(beam);
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, L + 6, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending, depthWrite: false })); glow.rotation.z = Math.PI / 2; world.add(glow);
-  const months = (d1.getUTCFullYear() - d0.getUTCFullYear()) * 12 + d1.getUTCMonth() - d0.getUTCMonth() + 1, every = months > 48 ? 12 : months > 18 ? 3 : 1;
+  const useMed = curPref('center') === 'median', now = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+  const cX = useMed && items.length ? median(items.map(i => i.k)) : now;
+  const lo = Math.min(cX, ...items.map(i => i.k)), hi = Math.max(cX, ...items.map(i => i.k));
+  const d0 = new Date(lo), d1 = new Date(hi), t0 = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1), t1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth() + 1, 1);
+  const L = Math.max(24, Math.min(90, items.length * 4)), sX = L / (t1 - t0), X = t => (t - cX) * sX, xa = X(t0), xb = X(t1);
+  const beamAt = (len, mid) => { const g = new THREE.Group(); g.position.x = mid;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, len, 8), new THREE.MeshBasicMaterial({ color: 0xd8f4ff })); beam.rotation.z = Math.PI / 2; g.add(beam);
+    const glow = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, len, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending, depthWrite: false })); glow.rotation.z = Math.PI / 2; g.add(glow); return g; };
+  world.add(beamAt(xb - xa + 6, (xa + xb) / 2));
+  const months = (new Date(t1).getUTCFullYear() - d0.getUTCFullYear()) * 12 + new Date(t1).getUTCMonth() - d0.getUTCMonth(), every = months > 48 ? 12 : months > 18 ? 3 : 1;
   const tick = new THREE.LineBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: .8 });
   for (let i = 0; i <= months; i++) {
     const d = new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + i, 1)), x = X(d.getTime()), jan = d.getUTCMonth() === 0, big = jan || i === 0;
     world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, -.15, 0), new THREE.Vector3(x, big ? -1.1 : -.6, 0)]), tick));
     if (i % every === 0 || big) { const lb = textSprite(big ? `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月` : `${d.getUTCMonth() + 1}月`, '#cfeeff', big ? .6 : .45); lb.position.set(x, big ? -1.7 : -1.2, 0); world.add(lb); }
   }
+  // 中心(今日か中央値)の印
+  { const lb = textSprite(useMed ? '中央値' : '今日', '#ffe9a8', .5); lb.position.set(0, -2.4, 0); world.add(lb);
+    world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -.15, 0), new THREE.Vector3(0, -2, 0)]), new THREE.LineBasicMaterial({ color: 0xffe9a8 }))); }
+  const fy = slipAxis('y'), fz = slipAxis('z'), SY = fy ? axisScale(fy, items, 16, useMed) : null, SZ = fz ? axisScale(fz, items, 16, useMed) : null;
+  const tickOn = (S2, k) => S2.ticks.forEach(([p, t]) => { const lb = textSprite(t, k === 'y' ? '#d9c8ff' : '#ffc8e0', .42); if (k === 'y') lb.position.set(xa - 1.6, p, 0); else lb.position.set(xa - 1.6, -.6, p); world.add(lb); });
+  if (SY) tickOn(SY, 'y'); if (SZ) tickOn(SZ, 'z');
   const placed = [];
   for (const it of items) {
-    const x = X(it.k), lv = placed.filter(p => Math.abs(p - x) < 1.4).length; placed.push(x);
-    const col = topColor(it.u), tk = token(it.u, 1.1, col); tk.position.set(x, 1.9 + lv * 1.6, 0); world.add(tk);
-    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, .1, 0), new THREE.Vector3(x, 1.3 + lv * 1.6, 0)]), new THREE.LineBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: .7 })));
+    const x = X(it.k), py = SY && SY.pos(it.u), pz = SZ ? SZ.pos(it.u) ?? 0 : 0;
+    let y;
+    if (SY) { if (py == null) continue; y = py; } else { const lv = placed.filter(p => Math.abs(p[0] - x) < 1.4 && Math.abs(p[1] - pz) < 1.4).length; placed.push([x, pz]); y = 1.9 + lv * 1.6; }
+    const col = topColor(it.u), tk = token(it.u, 1.1, col); tk.position.set(x, y, pz); world.add(tk);
+    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, 0, pz), new THREE.Vector3(x, y - Math.sign(y || 1) * .6, pz)]), new THREE.LineBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: .7 })));
     if (selUnits().includes(it.u)) { const lb = textSprite(`${it.u.name} ${String(it.v)}`, '#ffffff', .55); lb.position.set(0, 1.2, 0); tk.add(lb); }
     groups.push({ g: tk, u: it.u, box: true, home: tk.position.clone() });
   }
-  extent = { span: L + 6, bottom: -2.5 }; placeEnv(); fitLayout(); renderWorldUi();
+  const half = Math.max(Math.abs(xa), Math.abs(xb), 8) + 3;
+  setHome(new THREE.Vector3(), { x: half, y: SY ? SY.half + 2 : 8, z: SZ ? SZ.half + 2 : 8 }, { x: layoutInfo.f, y: fy ? slipName(fy) : '', z: fz ? slipName(fz) : '' });
+  extent = { span: xb - xa + 6, bottom: -2.5 }; placeEnv(); fitLayout(); renderWorldUi();
+}
+// 宇宙の Y・Z に使う項目(なし・いちばん外の箱・情報の項目)。ブラウザに覚える
+const slipAxis = k => { let f = ''; try { f = localStorage.getItem('axis-boxes-v2:slip' + k) || ''; } catch (e) {} return f === '@top' || infoKeys().includes(f) ? f : ''; };
+const slipName = f => f === '@top' ? 'いちばん外の箱' : f;
+function setSlipAxis(k, f) { try { localStorage.setItem('axis-boxes-v2:slip' + k, f); } catch (e) {} }
+const median = a => { const s = [...a].sort((p, q) => p - q), n = s.length; return n ? (n % 2 ? s[n >> 1] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+// 項目の値を軸の位置にする。全部が日付なら時間、全部が数なら数、それ以外は区分(並び順に3ずつ)
+function axisScale(f, items, len, useMed) {
+  const val = u => f === '@top' ? topOf(u).name : u.info && u.info[f], has = v => v != null && String(v).trim() !== '';
+  const vals = items.map(it => val(it.u)).filter(has), numOf = v => +String(v).replace(/[,円]/g, '');
+  const dates = vals.length && vals.every(v => parseDate(v) != null), nums = !dates && vals.length && vals.every(v => isFinite(numOf(v)));
+  if (dates || nums) {
+    const n = v => dates ? parseDate(v) : numOf(v), xs = vals.map(n), today = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+    const c = useMed ? median(xs) : dates ? today : 0, lo = Math.min(c, ...xs), hi = Math.max(c, ...xs), sc = len / ((hi - lo) || 1);
+    const fmt = v => dates ? (d => `${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`)(new Date(v)) : String(Math.round(v * 100) / 100);
+    const ticks = [...new Set([lo, c, hi])].map(v => [(v - c) * sc, (v === c ? (useMed ? '中央値 ' : dates ? '今日 ' : '0 ') : '') + fmt(v)]);
+    return { pos: u => has(val(u)) ? (n(val(u)) - c) * sc : null, ticks, half: Math.max(Math.abs(lo - c), Math.abs(hi - c)) * sc };
+  }
+  const cats = [...new Set(vals.map(String))], ix = items.map(it => cats.indexOf(String(val(it.u)))).filter(i => i >= 0), c = useMed ? median(ix) : 0;
+  return { pos: u => has(val(u)) ? (cats.indexOf(String(val(u))) - c) * 3 : null, ticks: cats.map((t, i) => [(i - c) * 3, t]), half: Math.max(c, cats.length - 1 - c) * 3 };
 }
 function fitLayout() { if (fitted !== extent.span) { fitted = extent.span; cam.dist = Math.min(envLimit, fitDist(extent.span)); } }
 let layoutInfo = { f: null, n: 0, miss: 0 };
 function layoutPanel() {
   const fs = fieldsFor(wmode), tops = S.boxes.filter(b => !b.parent);
   if (!fs.length) return `<div class="gd">${wmode === 'japan' ? '住所' : '日付'}の入った項目がありません。シートの行から箱を作ると、列が項目になります。</div>`;
-  return `<div class="gd">並べる項目 <select id="lField" aria-label="並べる項目">${fs.map(k => `<option${k === layoutInfo.f ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+  const opt = k => `<option value="">なし</option><option value="@top"${slipAxis(k) === '@top' ? ' selected' : ''}>いちばん外の箱</option>${infoKeys().map(f => `<option${f === slipAxis(k) ? ' selected' : ''}>${esc(f)}</option>`).join('')}`;
+  return `<div class="gd">${wmode === 'space' ? 'X(光の線)' : '並べる項目'} <select id="lField" aria-label="${wmode === 'space' ? 'X 軸の項目' : '並べる項目'}">${fs.map(k => `<option${k === layoutInfo.f ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+    ${wmode === 'space' ? `<div class="gd">Y(上下) <select id="lFieldY" aria-label="Y 軸の項目">${opt('y')}</select></div><div class="gd">Z(奥行き) <select id="lFieldZ" aria-label="Z 軸の項目">${opt('z')}</select></div>` : ''}
     <div class="gd">${wmode === 'japan' ? 'ピン' : '並んだもの'} ${layoutInfo.n} 件${layoutInfo.miss ? `(この項目が無い・読めないもの ${layoutInfo.miss} 件)` : ''}</div>
     <div class="lg">${tops.map(t => `<span><i style="background:${topColor(t)}"></i>${esc(t.name)}</span>`).join('')}</div>
     ${wmode === 'japan' ? `<div class="seg" role="group" aria-label="地図の見た目">${Object.entries(JTILES).map(([k, [t]]) => `<button data-js="${k}" class="${k === jStyle ? 'on' : ''}">${t}</button>`).join('')}</div>${JP ? `<div class="gd" style="font-size:11px">地図: 地理院タイル / ${esc(JP.src)}</div>` : ''}` : ''}`;
@@ -1782,10 +1860,16 @@ function setWMode(m) {
   wmode = m; entered = null; calYM = null; calDay = null; focused = null;
   try { localStorage.setItem('axis-boxes-v2:wmode', m); } catch (e) {}
   if (m === 'japan') { cam.th = 0; cam.ph = 1.0; } else if (m === 'space') { cam.th = 0; cam.ph = .22; }
-  tgtGoal.set(0, 0, 0); fitted = 0;
+  tgtGoal.copy(homeC); fitted = 0;
   setWorld(activeWorld()); paint(); renderPinBar();
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-wm]'); if (b) setWMode(b.dataset.wm); });
+// 軸の中心: 原点(0,0,0)か、並んでいるものの中央値(設定として保存)
+document.addEventListener('click', e => { const b = e.target.closest('[data-center]'); if (!b) return; if (b.dataset.center === SYSTEM.center) delete S.prefs.center; else S.prefs.center = b.dataset.center; save(); paint(); });
+// 左のメニューを閉じる・開く(ブラウザに覚える)
+function navC(v) { document.querySelector('.shell').classList.toggle('navc', v); $('navToggle').setAttribute('aria-label', v ? 'メニューを開く' : 'メニューを閉じる'); try { localStorage.setItem('axis-boxes-v2:navc', v ? '1' : ''); } catch (e) {} requestAnimationFrame(resize); }
+$('navToggle').onclick = () => navC(!document.querySelector('.shell').classList.contains('navc'));
+try { if (localStorage.getItem('axis-boxes-v2:navc')) navC(true); } catch (e) {}
 
 // ---------- つなぐ ----------
 function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
@@ -1828,7 +1912,7 @@ $('save').onclick = saveQuery;
 $('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); focusSel(); };
 document.querySelectorAll('#gizmo [data-mv]').forEach(b => b.onclick = () => {
   const k = b.dataset.mv, step = Math.max(.6, cam.dist * .12);
-  if (k === 'home') { tgtGoal.set(0, 0, 0); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
+  if (k === 'home') { tgtGoal.copy(homeC); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
   if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
   tgtGoal[k[0]] += step * +k.slice(1);
 });
