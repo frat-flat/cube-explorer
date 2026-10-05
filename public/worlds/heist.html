@@ -118,7 +118,7 @@
     for (let i = 0; i < p.length; i += 4) { const l = 0.3 * p[i] + 0.55 * p[i + 1] + 0.15 * p[i + 2]; p[i] = l + (p[i] - l) * keep; p[i + 1] = l + (p[i + 1] - l) * keep; p[i + 2] = l + (p[i + 2] - l) * keep; }
     x.putImageData(d, 0, 0); return c;
   };
-  for (const [name, g] of Object.entries(info.groups)) { const t = await loadTex(g.light), c = new THREE.CanvasTexture(calmLight(t.image)); c.flipY = false; c.encoding = THREE.sRGBEncoding; lights[name] = c; }
+  for (const [name, g] of Object.entries(info.groups)) { if (!g.light) continue; const t = await loadTex(g.light), c = new THREE.CanvasTexture(calmLight(t.image)); c.flipY = false; c.encoding = THREE.sRGBEncoding; lights[name] = c; }
   root.traverse((o) => {
     if (!o.isMesh) return;
     const name = o.name.replace(/_\d+$/, ""), g = info.groups[name] || info.groups[o.parent?.name];
