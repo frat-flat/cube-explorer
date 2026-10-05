@@ -71,7 +71,13 @@ input[type=text]{min-width:0}
 #filters .lb{color:var(--muted)}
 #filters button.on{background:var(--stack);border-color:var(--stack);color:#fff}
 #filters input{font:inherit;font-size:12.5px;width:7.5em;padding:1px 6px}
+#filters input[type=checkbox]{width:auto;padding:0}
 #filters .chip{border-color:var(--hl);background:var(--hlSoft)}
+#filters .recipe{flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#filters .step{border:1px solid var(--stack);border-radius:4px;padding:0 6px;background:var(--panel)}
+#crumbs[hidden],#filters[hidden]{display:none}
+#filters label.lb{display:inline-flex;gap:4px;align-items:center}
+#filters .note{color:var(--stack);font-weight:600}
 tfoot td{font-weight:700;background:var(--paper2);cursor:default}
 td.sum{font-weight:700}
 #crumbs span{color:var(--muted);font-size:12px}
@@ -232,15 +238,19 @@ function viewSlots() {
   if (path.length) {
     // 潜った先のフィルター。データは消さず、見る範囲だけ絞る(y=行の値、z=重ねの目盛り)
     const e = path[path.length - 1], f = e.filters || {};
+    const copy = (x, tag, ch) => { const c = { ...x, id: x.id + '~' + tag, ...ch }; virt.set(c.id, c); return c; };
+    const vcOf = x => x.valueCols || x.cols.map((_, i) => i).slice(1);
+    // かけた順に効かせる(組み替えの手順と同じ順)。計の条件は、それまでに残った列の合計で判定する
+    const apply = {
+      z: shs => shs.filter(x => x.member === f.z),
+      y: shs => shs.map(x => copy(x, f.y, { rows: x.rows.filter(r => r[0] === f.y) })),
+      x: shs => shs.map(x => copy(x, 'x' + f.x, { valueCols: vcOf(x).filter(k => x.cols[k] === f.x) })),
+      min: shs => shs.map(x => { const vc = vcOf(x); return copy(x, 'm' + f.min, { rows: x.rows.filter(r => vc.reduce((a, k) => a + num(r[k]), 0) >= f.min) }); }).filter(x => x.rows.length)
+    };
+    const order = [...(e.order || []), ...['z', 'y', 'x', 'min'].filter(k => !(e.order || []).includes(k))];
     return e.slots.map(sl => {
       let shs = sl.sheets;
-      if (f.z) shs = shs.filter(x => x.member === f.z);
-      if (f.y) shs = shs.map(x => { const c = { ...x, id: x.id + '~' + f.y, rows: x.rows.filter(r => r[0] === f.y) }; virt.set(c.id, c); return c; });
-      if (f.min != null) {   // 値の条件:行の計(値の列の合計)が min 以上の行だけ残す。行が残らない目盛りは外す
-        shs = shs.map(x => { const vc = x.valueCols || x.cols.map((_, i) => i).slice(1);
-          const c = { ...x, id: x.id + '~m' + f.min, rows: x.rows.filter(r => vc.reduce((a, k) => a + num(r[k]), 0) >= f.min) }; virt.set(c.id, c); return c; })
-          .filter(x => x.rows.length);
-      }
+      for (const k of order) if (f[k] != null) shs = apply[k](shs);
       return { ...sl, sheets: shs };
     });
   }
@@ -287,6 +297,7 @@ function enter(entry, p) {
     sel = new Map(); const v = viewSlots()[0].sheets; active = (v[v.length - 1] || {}).id;
     Object.assign(camGoal, { tx: 0, ty: 0, tz: 0, dist: diveView === 'cube' ? 20 : 15 }); cam.dist = 8;
     viewChanged();
+    const rc = (S.recipes || {})[recipeKey(entry)]; if (rc && rc.auto && rc.steps.length) setTimeout(() => playRecipe(rc), 500);
   };
   if (p && !reduce) { Object.assign(camGoal, { tx: p.x, ty: p.y, tz: p.z, dist: 5 }); setTimeout(go, 380); } else go();
 }
@@ -319,19 +330,76 @@ function renderFilters() {
   const opt = (k, label, vals) => `<span class="lb">${esc(label)}で絞る:</span><select data-f="${k}" aria-label="${esc(label)}で絞る"><option value="">すべて</option>${vals.map(v => `<option${f[k] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
   if (ys.length > 1) h += opt('y', f0.cols[0], ys);
   if (zs.length > 1) h += opt('z', sl.stack.axis, zs);
+  const xs = f0 ? (f0.valueCols || f0.cols.map((_, i) => i).slice(1)).map(k => f0.cols[k]) : [];
+  if (xs.length > 1) h += opt('x', f0.xName || '列', xs);
   h += `<span class="lb">計が</span><input id="fMin" type="text" inputmode="numeric" placeholder="例 1,000,000" value="${f.min != null ? fmt(f.min) : ''}" aria-label="計の下限"><span class="lb">以上</span>`;
-  for (const k of ['y', 'z']) if (f[k]) h += `<button class="chip" data-x="${k}">${esc(k === 'y' ? f0.cols[0] : sl.stack.axis)} = ${esc(f[k])} ×</button>`;
+  const axName = k => k === 'y' ? f0.cols[0] : k === 'z' ? sl.stack.axis : k === 'x' ? (f0.xName || '列') : '計';
+  const stepTxt = (k, v) => k === 'min' ? `計 ≥ ${fmt(v)}` : `${axName(k)} = ${v}`;
+  for (const k of ['y', 'z', 'x']) if (f[k]) h += `<button class="chip" data-x="${k}">${esc(stepTxt(k, f[k]))} ×</button>`;
   if (f.min != null) h += `<button class="chip" data-x="min">計 ≥ ${fmt(f.min)} ×</button>`;
-  if (f.y || f.z || f.min != null) h += '<span class="lb">該当しないもの:</span>' + [['shrink', '省いて縮める'], ['ghost', '透明で残す'], ['hide', '隠す']]
+  if (f.y || f.z || f.x || f.min != null) h += '<span class="lb">該当しないもの:</span>' + [['shrink', '省いて縮める'], ['ghost', '透明で残す'], ['hide', '隠す']]
     .map(([k, t]) => `<button data-show="${k}"${(f.show || 'shrink') === k ? ' class="on"' : ''}>${t}</button>`).join('');
+  // 組み替えの手順:かけた順に並べ、登録しておくと、この種類のキューブを開いたときに同じ順で自動で絞る
+  const steps = curSteps(e), key = recipeKey(e), rc = (S.recipes || {})[key];
+  h += '<div class="recipe"><span class="lb">組み替えの手順:</span>' + (steps.length ? steps.map((st, i) => `<span class="step">${i + 1}. ${esc(stepTxt(st.k, st.v))}</span>`).join('<span class="lb">→</span>') : '<span class="lb">(絞るとここに順番に並びます)</span>');
+  if (steps.length) h += '<button id="rcSave">この手順を登録</button><button id="rcSheet">結果をシートにする</button>';
+  if (rc) h += `<button id="rcPlay">▶ 登録した手順で組み替える(${rc.steps.length}段)</button><label class="lb"><input type="checkbox" id="rcAuto"${rc.auto ? ' checked' : ''}> 開いたら自動で</label><button id="rcDel" title="登録した手順を消す">登録を消す</button>`;
+  if (e.note) h += `<span class="note">${esc(e.note)}</span>`;
+  h += '</div>';
   el.innerHTML = h;
+  e.note = '';
+  const on = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
+  on('rcSave', () => { S.recipes = S.recipes || {}; S.recipes[key] = { steps, show: f.show || 'shrink', auto: rc ? rc.auto : true }; save(); e.note = '登録しました。同じ種類のキューブ(' + key.replace('|', '・') + ')を開くと、この順で自動で組み替えます'; renderFilters(); });
+  on('rcPlay', () => playRecipe(rc));
+  on('rcDel', () => { delete S.recipes[key]; save(); renderFilters(); });
+  on('rcSheet', () => resultToSheet(e));
+  const au = document.getElementById('rcAuto'); if (au) au.onchange = () => { rc.auto = au.checked; save(); };
   el.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { f.show = b.dataset.show; selCell = null; viewChanged(); });
   el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMonth(+b.dataset.m));
-  el.querySelectorAll('select').forEach(x => x.onchange = () => { f[x.dataset.f] = x.value || null; sel = new Map(); selCell = null; viewChanged(); });
-  el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { f[b.dataset.x] = null; sel = new Map(); selCell = null; viewChanged(); });
+  el.querySelectorAll('select').forEach(x => x.onchange = () => { setFilter(e, x.dataset.f, x.value || null); });
+  el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { setFilter(e, b.dataset.x, null); });
   const mi = document.getElementById('fMin');
-  mi.onchange = () => { const v = mi.value.replace(/[^\d.]/g, ''); f.min = v === '' ? null : +v; sel = new Map(); selCell = null; viewChanged(); };
+  mi.onchange = () => { const v = mi.value.replace(/[^\d.]/g, ''); setFilter(e, 'min', v === '' ? null : +v); };
   mi.onkeydown = ev => { if (ev.key === 'Enter') mi.onchange(); };
+}
+// 絞りをかけた順を覚える(組み替えの手順になる)
+function setFilter(e, k, v) {
+  e.filters[k] = v; e.order = (e.order || []).filter(x => x !== k); if (v != null) e.order.push(k);
+  sel = new Map(); selCell = null; viewChanged();
+}
+const curSteps = e => (e.order || []).filter(k => e.filters[k] != null).map(k => ({ k, v: e.filters[k] }));
+// 手順は「どの種類のキューブか」(潜った先のシート名と重ねの軸)ごとに登録する。例: 売上の内訳・月、売上の内訳・ショップ
+const recipeKey = e => { const sl = e.slots[0]; return ((sl.sheets[0] || {}).name || '') + '|' + (sl.stack ? sl.stack.axis : ''); };
+let playing = 0;
+function playRecipe(rc) {
+  const e = path[path.length - 1]; if (!e || !rc) return;
+  const run = ++playing;
+  e.filters = { show: rc.show }; e.order = []; sel = new Map(); selCell = null; viewChanged();
+  const go = i => {
+    if (run !== playing || path[path.length - 1] !== e) return;   // 途中で別の操作をしたら止める
+    if (i >= rc.steps.length) { e.note = '組み替え完了(' + rc.steps.length + '段)'; renderFilters(); return; }
+    const st = rc.steps[i];
+    const sl = e.slots[0], f0 = sl.sheets[0] || { cols: [], rows: [] };
+    const ok = st.k === 'min' || (st.k === 'y' ? f0.rows.some(r => r[0] === st.v) : st.k === 'z' ? sl.sheets.some(x => x.member === st.v) : f0.cols.includes(st.v));
+    if (ok) { e.filters[st.k] = st.v; e.order.push(st.k); }
+    e.note = '手順 ' + (i + 1) + '/' + rc.steps.length + (ok ? '' : ':「' + st.v + '」がないので飛ばしました');
+    viewChanged();
+    setTimeout(() => go(i + 1), reduce ? 0 : 900);
+  };
+  setTimeout(() => go(0), reduce ? 0 : 500);
+}
+// 組み替えた結果を1枚のシートにして器に足す
+function resultToSheet(e) {
+  const sl = viewSlots()[0], shs = sl.sheets, f = shs[0];
+  if (!f) { e.note = '残っている行がないのでシートにできません'; renderFilters(); return; }
+  const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), multi = sl.stack && shs.length > 1;
+  const cols = [...(multi ? [sl.stack.axis] : []), f.cols[0], ...vc.map(c => f.cols[c]), ...(vc.length > 1 ? ['計'] : [])];
+  const rows = shs.flatMap(sh => sh.rows.map(r => [...(multi ? [sh.member] : []), r[0], ...vc.map(c => r[c]), ...(vc.length > 1 ? [fmt(vc.reduce((a, c) => a + num(r[c]), 0))] : [])]));
+  const id = 'sh-' + Date.now().toString(36);
+  const name = e.label + '・' + curSteps(e).map(st => st.k === 'min' ? '計' + fmt(st.v) + '以上' : st.v).join('・');
+  S.sheets.push({ id, name, cols, rows }); S.place[id] = 'in'; save();
+  e.note = '器に「' + name + '」(' + rows.length + '行)を足しました。パンくずの「器」で戻ると見えます';
+  renderList(); renderFilters();
 }
 function goUp(n) { path.length = n; sel = new Map(); selCell = null; const v = viewSlots(); active = (v[0] && v[0].sheets[0] || {}).id; viewChanged(); }
 function renderCrumbs() {
@@ -399,12 +467,13 @@ const sun = new THREE.DirectionalLight(0xffffff, .45); sun.position.set(4, 9, 6)
 function buildChildCube(slot) {
   const pe = path[path.length - 1] || {}, fl = pe.filters || {};
   // 該当しないものの見せ方:shrink=省いて最小の形(キューブ/面/線)に縮める、ghost=元の形のまま透明で残す、hide=元の形のまま描かない
-  const filtered = fl.y || fl.z || fl.min != null, mode = filtered ? (fl.show || 'shrink') : 'shrink';
+  const filtered = fl.y || fl.z || fl.x || fl.min != null, mode = filtered ? (fl.show || 'shrink') : 'shrink';
   const keep = mode === 'shrink' ? null : pe.slots[0];
   const shs = keep ? keep.sheets : slot.sheets, f = shs[0];
   if (!f || !slot.sheets.length) { const sp = textSprite('条件に合うものはありません', css('--muted'), .5); if (f) sp.position.set(0, 4.6, 0); world.add(sp); if (!f || mode === 'hide') return; }
   // 元の形で描くとき、絞った結果に残ったコマを (元のシート, 行の名前) → (絞ったシート, 行番号) で引く
-  const hit = (sh, name) => { const fs = slot.sheets.find(x => x.id === sh.id || x.id.startsWith(sh.id + '~')); const i = fs ? fs.rows.findIndex(r => r[0] === name) : -1; return i < 0 ? null : { sid: fs.id, r: i }; };
+  const hit = (sh, name, c) => { const fs = slot.sheets.find(x => x.id === sh.id || x.id.startsWith(sh.id + '~')); const i = fs ? fs.rows.findIndex(r => r[0] === name) : -1;
+    return i < 0 || (fs.valueCols && !fs.valueCols.includes(c)) ? null : { sid: fs.id, r: i }; };
   const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), ys = [...new Set(shs.flatMap(x => x.rows.map(r => r[0])))];
   // 絞って行が1つになったら、重ねの軸を縦に回して1枚の面に畳む(例:衣料だけ → ショップ×週)
   const fold = !keep && ys.length === 1 && shs.length > 1 && shs.every(x => x.rows.length === 1);
@@ -415,7 +484,7 @@ function buildChildCube(slot) {
   const g = new THREE.Group(); world.add(g);
   const lo = new THREE.Color(css('--paper')), hi = new THREE.Color(css('--accent'));
   shs.forEach((sh, k) => sh.rows.forEach((r, ri) => vc.forEach((c, xi) => {
-    const h = keep ? hit(sh, r[0]) : { sid: sh.id, r: ri };
+    const h = keep ? hit(sh, r[0], c) : { sid: sh.id, r: ri };
     if (!h && mode === 'hide') return;
     const t = max ? num(r[c]) / max : 0, col = lo.clone().lerp(hi, .12 + .88 * t);
     const m = new THREE.Mesh(new THREE.BoxGeometry(u * .78, u * .78, u * .78), h ? new THREE.MeshLambertMaterial({ color: col })
@@ -437,7 +506,7 @@ function buildChildCube(slot) {
   const dims = [nx, ny, nz].filter(n => n > 1).length;
   const how = mode === 'ghost' ? '(該当しないものは透明)' : mode === 'hide' ? '(該当しないものは隠す)'
     : dims >= 3 ? '(子のキューブ)' : dims === 2 ? (fold ? '(面に畳んだ)' : '(面)') : '(線)';
-  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fl.min != null ? '・計' + fmt(fl.min) + '以上' : '') + how, cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
+  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fl.x ? '・' + fl.x + 'だけ' : '') + (fl.min != null ? '・計' + fmt(fl.min) + '以上' : '') + how, cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
   styleBlocks();
 }
 function blockWorld(sid, r, c) {
