@@ -365,7 +365,8 @@ function adopt(x) {
 adopt(S);
 // 保存はまずこのブラウザに。アプリの中で Supabase がつながっていれば、少し待ってからまとめて Supabase にも送る
 let cloud = false, pushTimer = 0;
-const cloudMark = (t, err) => { const el = $('cloud'); el.hidden = false; el.textContent = t; el.classList.toggle('err', !!err); };
+// 右上にはうまくいかなかったときだけ出す(うまくいっているときは何も出さない)
+const cloudMark = (t, err) => { const el = $('cloud'); el.hidden = !err; el.textContent = err ? t : ''; el.classList.toggle('err', !!err); };
 const pushCloud = () => {
   if (!cloud) return;
   clearTimeout(pushTimer); cloudMark('保存中…');
