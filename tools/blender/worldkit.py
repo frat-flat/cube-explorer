@@ -43,8 +43,12 @@ class World:
         bg.inputs["Strength"].default_value = strength
 
     # ---- 組 ----
-    def group(self, name, size=1024, rough=0.8, metal=0.0, bake=True):
-        self.groups[name] = dict(objs=[], size=size, rough=rough, metal=metal, bake=bake)
+    def group(self, name, size=1024, rough=0.8, metal=0.0, bake=True, unlit=False, opacity=1.0):
+        """bake=False: 焼かない(光る物。GLB の emissive のまま)
+        unlit=True: 発光の色(空・ネオン・ホログラムの模様など)だけを画像に焼き、ブラウザでは光の計算をせずに貼る
+        metal>=0.5: 拡散光が無いので光の画像は焼かない(映り込みで見せる)
+        opacity<1: ブラウザで半透明にする(水面・ガラス)"""
+        self.groups[name] = dict(objs=[], size=size, rough=rough, metal=metal, bake=bake, unlit=unlit, opacity=opacity)
 
     def add(self, group, o, material):
         o.data.materials.clear()
@@ -155,7 +159,7 @@ class World:
         bpy.ops.object.mode_set(mode="OBJECT")
 
     def _bake(self, o, size, kind):
-        """kind: 'albedo'(色だけ) / 'light'(光だけ、色なし)"""
+        """kind: 'albedo'(色だけ) / 'light'(光だけ、色なし) / 'emit'(発光の色)"""
         img = bpy.data.images.new(f"{o.name}_{kind}", size, size, float_buffer=True)
         for slot in o.material_slots:
             nt = slot.material.node_tree
@@ -168,8 +172,8 @@ class World:
         b.use_pass_direct = kind == "light"
         b.use_pass_indirect = kind == "light"
         b.use_pass_color = kind == "albedo"
-        self.sc.cycles.samples = 1 if kind == "albedo" else self.samples
-        bpy.ops.object.bake(type="DIFFUSE")
+        self.sc.cycles.samples = 1 if kind in ("albedo", "emit") else self.samples
+        bpy.ops.object.bake(type="EMIT" if kind == "emit" else "DIFFUSE")
         self.sc.cycles.samples = self.samples
         return img
 
@@ -234,16 +238,24 @@ class World:
                 continue
             print(f"baking {name} {g['size']}px ...", flush=True)
             self._uv(o)
-            alb = self._bake(o, g["size"], "albedo")
-            lit = self._denoise(self._bake(o, g["size"], "light"))
-            apx = np.array(alb.pixels[:], dtype=np.float32).reshape(-1, 4)
-            lpx = np.array(lit.pixels[:], dtype=np.float32).reshape(-1, 4)
-            # 光の画像は明るい所(上位 0.5%)が 1 になるように縮め、その倍率を json に残す
-            peak = float(np.percentile(lpx[:, :3].max(axis=1), 99.5)) or 1.0
-            lpath = f"{base}_{name}_light.jpg"
-            self._save(lpx, g["size"], lpath, 1.0 / peak)
+            entry = {"rough": g["rough"], "metal": g["metal"]}
+            if g["opacity"] < 1:
+                entry["opacity"] = g["opacity"]
+            if g["unlit"]:
+                apx = np.array(self._bake(o, g["size"], "emit").pixels[:], dtype=np.float32).reshape(-1, 4)
+                entry["unlit"] = True
+            else:
+                apx = np.array(self._bake(o, g["size"], "albedo").pixels[:], dtype=np.float32).reshape(-1, 4)
+                if g["metal"] < 0.5:
+                    lit = self._denoise(self._bake(o, g["size"], "light"))
+                    lpx = np.array(lit.pixels[:], dtype=np.float32).reshape(-1, 4)
+                    # 光の画像は明るい所(上位 0.5%)が 1 になるように縮め、その倍率を json に残す
+                    peak = float(np.percentile(lpx[:, :3].max(axis=1), 99.5)) or 1.0
+                    lpath = f"{base}_{name}_light.jpg"
+                    self._save(lpx, g["size"], lpath, 1.0 / peak)
+                    entry.update(light=os.path.basename(lpath), lightScale=peak)
             aimg = self._save(apx, g["size"], os.path.join(bpy.app.tempdir, f"{name}_albedo.jpg"))  # 色は GLB の中に入る
-            info["groups"][name] = {"light": os.path.basename(lpath), "lightScale": peak, "rough": g["rough"], "metal": g["metal"]}
+            info["groups"][name] = entry
             # 書き出し用の材質:色の画像だけ。光は別の画像でブラウザが重ねる
             m = bpy.data.materials.new(f"{name}_baked")
             m.use_nodes = True
