@@ -391,6 +391,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .mu-fx.alarm { animation: none; opacity: 1; } }
 .mu-hud { position: absolute; top: 74px; right: 16px; font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; color: #f2eee6; background: rgba(10,10,12,.6); padding: 4px 10px; border-radius: 4px; pointer-events: none; font-variant-numeric: tabular-nums; }
 .mu-hud:empty { display: none; }
+.mu-fx.fade { background: #000; animation: mu-fade .7s ease-in-out; }
+@keyframes mu-fade { 0%, 100% { opacity: 0 } 45% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .mu-fx.fade { animation: none; } }
+.mu-rooms { display: inline-flex; gap: 4px; align-items: center; }
+.mu-rooms span { font-family: var(--font-mono); font-size: 12px; color: #f2eee6; padding: 0 4px; font-variant-numeric: tabular-nums; }
 .mu-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
 .mu-list button { flex: none; font-size: 12px; display: inline-flex; gap: 6px; align-items: baseline; }
 .mu-list button span { font-family: var(--font-mono); color: #c9c3b8; }
@@ -501,6 +506,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 展示の世界(Blender で作って光を焼き込んだもの、/worlds/)を読むための部品。読めなければ手作りの世界のまま -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Reflector.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="/worlds/blender-world.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -2816,6 +2826,84 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   const HALL_ORDER = ["modern", "european", "rpg", "heist", "game", "space", "zen", "underwater", "cyber", "city", "ruins"];
   const OLD_HALL = { skytower: "city", classic: "european", forest: "rpg", night: "heist", japanese: "zen", seaside: "underwater", warehouse: "modern", future: "cyber" }; // 前の版の展示場の名前
 
+  // -- Blender で作った世界(public/worlds/<名前>.glb・.json、作り方は tools/blender/)--
+  // 光と影を焼き込んだ世界を読み込んで使う。読み込み中と読み込めないとき(通信の失敗など)は、上の手作りの世界を見せる
+  // 1部屋に置ける作品の数は json の spots の数。キューブが増えて足りなくなったら、同じ世界を奥(-Z)へつないで展示室を増やす。
+  // 「＋ 展示室」で手でも増やせる(st.hallRooms[世界] = 足した部屋の数)
+  const BW = {}; // 世界の名前 -> { info, root, step, env } / 読み込み中 {} / 失敗 { err }
+  const BW_TIP = { heist: "月明かりのドームの下を、展示台の作品を順に見て回ります。", game: "草原の？ブロックの上にキューブが飛び出しています。" }; // 手作りの世界だけの仕掛け(光線・コイン)は Blender の世界には無い
+  function bwNeed(hk) { // 読み込みを始める。読み込み済みなら true。終わったら展示を描き直す
+    if (!window.BlenderWorld || !THREE.GLTFLoader) return false;
+    if (BW[hk]) return !!BW[hk].root;
+    BW[hk] = {};
+    BlenderWorld.load(hk, { base: "/worlds/" }).then(({ info, root }) => { BW[hk] = { info, root }; })
+      .catch((e) => { console.warn(`展示の世界 ${hk} を読み込めませんでした`, e); BW[hk] = { err: e }; })
+      .finally(() => { if (MU.hk === hk) { MU.hk = ""; render(); } }); // 今その世界を見ていれば、Blender の世界に差し替える
+    return false;
+  }
+  const bwReady = (hk) => !!BW[hk]?.root, bwLoading = (hk) => !!BW[hk] && !BW[hk].root && !BW[hk].err;
+  const bwRooms = (hk, n) => (bwReady(hk) ? Math.max(1, Math.ceil(n / BW[hk].info.spots.length)) + (st.hallRooms?.[hk] || 0) : 1);
+  const hallKey = (hk, n) => `${hk}|${n}|${bwRooms(hk, n)}|${bwReady(hk) ? "b" : ""}`;
+  function bwPrep(hk) { // 一度だけ:部屋の奥行き・空・まわりの景色(映り込み)
+    const b = BW[hk]; if (b.step) return b;
+    const { info, root } = b, box = new THREE.Box3(), walkBox = new THREE.Box3();
+    root.updateMatrixWorld(true);
+    b.sky = []; root.traverse((o) => { if (!o.isMesh) return; if (o.userData.group === "sky") { b.sky.push([o, o.position.clone()]); o.frustumCulled = false; } else box.expandByObject(o); });
+    for (const sh of info.walk || []) sh.t === "rect" ? walkBox.expandByPoint(V(sh.x0, 0, sh.z0)).expandByPoint(V(sh.x1, 0, sh.z1)) : walkBox.expandByPoint(V(sh.x, 0, sh.z - sh.r)).expandByPoint(V(sh.x, 0, sh.z + sh.r));
+    // 次の部屋は建物の奥行きだけ奥へ。外の世界(地面が広い)は、歩ける所の奥行き+余白にして、遠すぎないようにする
+    const depth = box.max.z - box.min.z, wd = walkBox.isEmpty() ? 2 * (info.limit || 40) : walkBox.max.z - walkBox.min.z;
+    b.step = info.extend || Math.ceil(depth < wd * 2.5 ? depth + 1 : wd * 1.6 + 20);
+    b.mid = walkBox.isEmpty() ? 0 : (walkBox.min.z + walkBox.max.z) / 2;
+    const tmp = new THREE.Scene(); tmp.background = new THREE.Color(info.bg || "#0b0d10"); tmp.add(root);
+    const s = info.start || { x: 0, z: 0 }; b.env = BlenderWorld.env(MU.r, tmp, s.x, (info.eye || EYE) + 0.5, s.z); tmp.remove(root);
+    return b;
+  }
+  function bwBuild(hk, { n, g }) {
+    const b = bwPrep(hk), { info, root, step } = b, rooms = bwRooms(hk, n), eye = info.eye || EYE, sy = info.shadowY ?? 0, big = (d) => Math.max(1, d.scale || 1);
+    const W = { spots: [], walk: [], floors: [], keep: [], start: { ...(info.start || { x: 0, z: 0 }) }, eye, bg: info.bg || "#0b0d10", exposure: info.exposure || 1, envRT: b.env };
+    W.start.pitch = W.start.pitch ?? -0.06; W.speed = (info.speed || 2.8) / 2.8;
+    if (info.fog) W.fog = new THREE.FogExp2(info.fog[0], info.fog[1]);
+    if (info.fly) W.fly = [info.minY ?? 0.6, info.maxY ?? 30];
+    const floorMat = basic({ visible: false });
+    for (let k = 0; k < rooms; k++) {
+      const dz = -step * k, part = k ? root.clone() : root;
+      if (k) { const sky = []; part.traverse((o) => { if (o.userData.group === "sky") sky.push(o); }); for (const o of sky) o.parent.remove(o); } // 空は1つだけ(歩く人について行く)
+      part.position.z = dz; g.add(part); W.keep.push(part);
+      for (const d of info.spots) W.spots.push({ ...d, z: d.z + dz, dist: (d.dist || 3.4) * big(d), near: 5 * big(d), r: d.r ?? 1.05 });
+      if (info.fly) { const L = info.limit || 60; W.walk.push({ t: "rect", x0: -L, x1: L, z0: dz - L, z1: dz + L }); continue; }
+      for (const sh of info.walk || []) {
+        const w = sh.t === "rect" ? { ...sh, z0: sh.z0 + dz, z1: sh.z1 + dz } : { ...sh, z: (sh.z || 0) + dz }; W.walk.push(w);
+        // 床をクリックして進むための見えない面(歩ける所だけ)
+        const f = w.t === "rect" ? mesh(new THREE.PlaneGeometry(w.x1 - w.x0, w.z1 - w.z0), floorMat) : mesh(new THREE.CircleGeometry(w.r, 40), floorMat);
+        f.rotation.x = -Math.PI / 2; f.position.set(w.t === "rect" ? (w.x0 + w.x1) / 2 : w.x || 0, sy + 0.01, w.t === "rect" ? (w.z0 + w.z1) / 2 : w.z); g.add(f); W.floors.push(f);
+      }
+    }
+    // 床の映り込みは全部の部屋に1枚で
+    const mir = BlenderWorld.mirror(info, info.reflect?.r ? info.reflect.r * 2 : info.reflect?.w, (info.reflect?.r ? info.reflect.r * 2 : info.reflect?.l) + step * (rooms - 1));
+    if (mir) { mir.position.z += -step * (rooms - 1) / 2; g.add(mir); BlenderWorld.glossFloor(info, root); }
+    // 作品の影を受ける面と、作品を照らす光(世界そのものの光は焼き込み済み)
+    if (!info.fly) { const sh = mesh(new THREE.PlaneGeometry(1200, 1200 + step * rooms), new THREE.ShadowMaterial({ opacity: 0.25, depthWrite: false })); sh.renderOrder = 1; sh.rotation.x = -Math.PI / 2; sh.position.set(0, sy + 0.003, -step * (rooms - 1) / 2); sh.receiveShadow = true; g.add(sh); }
+    const hm = info.hemi || ["#ffffff", "#555555", 0.5]; g.add(new THREE.HemisphereLight(hm[0], hm[1], hm[2]));
+    let sun = null;
+    if (info.sun) { // 太陽は歩く人について行く(どの部屋でも作品に影が落ちる)
+      const S = info.sun, B = S.box || 30; sun = new THREE.DirectionalLight(S.color || "#ffffff", S.intensity ?? 1.5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+      Object.assign(sun.shadow.camera, { left: -B, right: B, top: B, bottom: -B, near: 1, far: 400 }); sun.shadow.bias = -0.0004; sun.userData.dir = V(...(S.dir || [3, 8, 4])).multiplyScalar(10); g.add(sun, sun.target);
+    }
+    W.onItems = (items) => { if (!info.sun) items.forEach((it, i) => { // 太陽が無い世界は作品ごとに上から照らす
+      const sp = new THREE.SpotLight(info.spotColor || 0xfff0dc, info.spotIntensity ?? 1.6, 14 * it.sc, 0.45, 0.6, 1.2); sp.position.set(it.base.x, it.spot.y + 5 * it.sc, it.base.z + 0.5); sp.target.position.copy(it.base);
+      sp.castShadow = i < 8; sp.shadow.mapSize.set(512, 512); MU.mods.add(sp, sp.target);
+    }); };
+    const room = (p) => Math.max(0, Math.min(rooms - 1, Math.round((b.mid - p.z) / step)));
+    if (rooms > 1) { W.room = room; W.hud = () => `展示室 ${room(MU.pos) + 1} / ${rooms}`; }
+    W.tick = () => {
+      for (const [o, p0] of b.sky) o.position.set(p0.x + MU.pos.x, p0.y, p0.z + MU.pos.z);
+      if (sun) { sun.target.position.set(MU.pos.x, 0, MU.pos.z); sun.position.copy(sun.target.position).add(sun.userData.dir); }
+    };
+    W.mapDraw = rooms > 1 ? (x, tx, tz) => { x.fillStyle = "rgba(255,255,255,.55)"; x.font = "600 10px 'IBM Plex Mono', monospace"; x.textAlign = "left"; for (let k = 0; k < rooms; k++) x.fillText(`展示室 ${k + 1}`, 6, tz(b.mid - step * k)); } : null;
+    return W;
+  }
+  for (const hk of HALL_ORDER) { const H = HALLS[hk], build0 = H.build; H.build = (o) => (bwReady(hk) ? bwBuild(hk, o) : build0(o)); }
+
   // -- 歩く・泳ぐ --
   const MU = { r: null, scene: null, cam: null, mods: null, world: null, worldKey: "", hk: "", env: null, items: [], pos: V(0, 1.6, 4), yaw: 0, pitch: -0.06,
     tween: null, hover: null, drag: null, keys: new Set(), showAll: false, ring: null, ray: new THREE.Raycaster(), last: 0, cur: -1, popped: new Set(), xf: null };
@@ -2868,6 +2956,11 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   }
   function muWalk(fwd, side) { const f = MU.world?.fly ? muDir() : muDir(MU.yaw, 0), s = V(Math.cos(MU.yaw), 0, -Math.sin(MU.yaw)); const k = MU.world?.speed || 1; muGo(muClamp(MU.pos.clone().addScaledVector(f, fwd * k).addScaledVector(s, side * k)), MU.yaw, MU.pitch, 0.35); }
   function muGo(pos, yaw, pitch, dur = 1.1) {
+    const W = MU.world;
+    if (W?.room && W.room(pos) !== W.room(MU.pos)) { // 別の展示室へは、壁を抜けて見せず暗転して移る
+      MU.tween = null; muFx("fade", "", 700); clearTimeout(MU.jumpT);
+      MU.jumpT = setTimeout(() => { MU.pos.copy(pos); MU.yaw = yaw; MU.pitch = pitch; MU.tween = null; }, still.matches ? 0 : 300); return;
+    }
     let dy = yaw - MU.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); // 近い向きに回る
     MU.tween = { from: { p: MU.pos.clone(), yaw: MU.yaw, pitch: MU.pitch }, to: { p: pos, yaw: MU.yaw + dy, pitch }, t0: performance.now(), dur: still.matches ? 0.01 : dur * 1000 };
   }
@@ -2909,7 +3002,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   // -- 世界を組み立てる・片付ける --
   function dropWorld() {
     const W = MU.world; if (!W) return;
-    MU.scene.remove(W.g); disposeTree(W.g);
+    MU.scene.remove(W.g); for (const o of W.keep || []) W.g.remove(o); disposeTree(W.g); // keep は Blender の世界(使い回すので捨てない)
     for (const o of W.cam || []) { MU.cam.remove(o); disposeTree(o); }
     if (MU.env) { MU.env.dispose(); MU.env = null; } MU.scene.environment = null;
     MU.world = null; MU.worldKey = "";
@@ -2919,6 +3012,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     W.g = g; W.hk = hk; W.floors = W.floors || []; MU.scene.add(g);
     MU.scene.background = W.bg != null ? new THREE.Color(W.bg) : null; MU.scene.fog = W.fog || null;
     if (W.env) { MU.env = mkEnv(...W.env); MU.scene.environment = MU.env.texture; }
+    if (W.envRT) MU.scene.environment = W.envRT.texture; // Blender の世界:読み込んだときに写した景色(使い回すので MU.env には入れない)
     MU.r.toneMappingExposure = W.exposure || 1;
     for (const o of W.cam || []) MU.cam.add(o);
     if (!W.mapBox) {
@@ -2927,7 +3021,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
       else for (const sh of W.walk) { if (sh.t === "rect") { grow(sh.x0, sh.z0); grow(sh.x1, sh.z1); } else if (sh.t === "circ") grow(sh.x, sh.z, sh.r); else { grow(sh.ax, sh.az, sh.r); grow(sh.bx, sh.bz, sh.r); } }
       W.mapBox = B;
     }
-    MU.world = W; MU.worldKey = `${hk}|${n}`;
+    MU.world = W; MU.worldKey = hallKey(hk, n);
   }
   function muSet(order, hk, root) {
     muInit();
@@ -2935,7 +3029,7 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     stage.insertAdjacentHTML("beforeend", `<div class="mu-fx" id="mu-fx" role="status"></div><div class="mu-hud" id="mu-hud" aria-live="polite"></div>`);
     MU.fxEl = stage.querySelector("#mu-fx"); MU.hudEl = stage.querySelector("#mu-hud"); MU.hudTxt = null;
     const first = hk !== MU.hk;
-    if (`${hk}|${order.length}` !== MU.worldKey) { dropWorld(); buildWorld(hk, order.length); }
+    if (hallKey(hk, order.length) !== MU.worldKey) { dropWorld(); buildWorld(hk, order.length); }
     for (const m of [...MU.mods.children]) { MU.mods.remove(m); disposeTree(m); }
     const P = PAL[HALLS[hk].pal];
     MU.items = order.map((c, i) => {
@@ -3183,6 +3277,8 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
     const order = []; const walk = (pid) => kids(pid).forEach((c) => { order.push(c); walk(c.id); }); walk(null);
     if (hall) {
       const hk = HALLS[st.hallTheme] ? st.hallTheme : OLD_HALL[st.hallTheme] || "modern";
+      bwNeed(hk); // Blender の世界を読み込む(読み込めるまでは手作りの世界)
+      const rooms = bwRooms(hk, order.length), extra = st.hallRooms?.[hk] || 0;
       tagHtml = (c, i) => { const s = stats.get(c.id), p = cube(c.parent);
         return `<span class="no">No.${String(i + 1).padStart(2, "0")}${p ? ` ・ ${esc(p.name)}の下位` : ""}</span>
           <b class="ttl">${esc(c.name)}</b>
@@ -3191,12 +3287,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
           <span class="acts"><button type="button" data-open="${c.id}" data-v="cube">立体で見る</button>${c.synth ? "" : `<button type="button" data-open="${c.id}" data-v="data">値を入れる</button>`}<button type="button" data-cmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(c.name)}のメニュー">⋯</button></span>`; };
       $("dash").innerHTML = `${head}<section class="museum" aria-label="キューブの展示室">
         <div class="mu-stage" id="mu-stage"><div class="mu-tags" id="mu-tags"></div>
-          <div class="mu-top"><div class="mu-title"><span class="mu-kicker">CUBE COLLECTION</span><b>${esc(HALLS[hk].name)}</b><span>${all.length}点 ・ 入力済み ${fmt(filled)} コマ</span></div>
+          <div class="mu-top"><div class="mu-title"><span class="mu-kicker">CUBE COLLECTION</span><b>${esc(HALLS[hk].name)}</b><span>${all.length}点 ・ 入力済み ${fmt(filled)} コマ${rooms > 1 ? ` ・ 展示室 ${rooms}` : ""}${bwLoading(hk) ? " ・ 世界を読み込み中…" : ""}</span></div>
             <label class="mu-theme"><span>展示場</span><select id="mu-theme">${HALL_ORDER.map((k, i) => `<option value="${k}" ${k === hk ? "selected" : ""}>${i + 1}. ${esc(HALLS[k].name)}</option>`).join("")}</select></label></div>
           <canvas class="mu-map" id="mu-map" width="380" height="300" role="img" aria-label="館内の地図。番号を押すとその作品の前へ進みます"></canvas>
-          <div class="mu-nav"><button type="button" data-mu="prev">◀ 前の作品</button><button type="button" data-mu="entrance">入口へ</button><button type="button" data-mu="next">次の作品 ▶</button><button type="button" data-mu="tags" aria-pressed="${MU.showAll}">札をすべて表示</button></div>
+          <div class="mu-nav"><button type="button" data-mu="prev">◀ 前の作品</button><button type="button" data-mu="entrance">入口へ</button><button type="button" data-mu="next">次の作品 ▶</button><button type="button" data-mu="tags" aria-pressed="${MU.showAll}">札をすべて表示</button>${bwReady(hk) ? `<span class="mu-rooms" role="group" aria-label="展示室の数"><button type="button" data-mu="room-" ${extra ? "" : "disabled"} aria-label="展示室を減らす">−</button><span>展示室 ${rooms}</span><button type="button" data-mu="room+" aria-label="展示室を増やす">＋</button></span>` : ""}</div>
         </div>
-        <div class="mu-strip"><p class="mu-help"><b>${esc(HALLS[hk].tip)}</b> 床をクリックでそこへ進む ・ 作品をクリックで作品の前へ ・ ドラッグで見回す ・ 矢印キーか WASD で歩く ・ 作品の前に立つか指すと札が出ます</p>
+        <div class="mu-strip"><p class="mu-help"><b>${esc((bwReady(hk) && BW_TIP[hk]) || HALLS[hk].tip)}</b> 床をクリックでそこへ進む ・ 作品をクリックで作品の前へ ・ ドラッグで見回す ・ 矢印キーか WASD で歩く ・ 作品の前に立つか指すと札が出ます</p>
           <div class="mu-list">${order.map((c, i) => `<button type="button" data-mugo="${c.id}"><span>${String(i + 1).padStart(2, "0")}</span>${esc(c.name)}</button>`).join("")}</div></div>
       </section>`;
       muSet(order, hk, $("dash")); return;
@@ -3208,7 +3304,12 @@ details.long summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   $("dash").onclick = (e) => {
     const dm = e.target.closest("[data-dmode]"); if (dm) { st.dashMode = dm.dataset.dmode; render(); return; }
     const mu = e.target.closest("[data-mu]");
-    if (mu) { const a = mu.dataset.mu; if (a === "prev") muStep(-1); if (a === "next") muStep(1); if (a === "entrance") muEntrance(); if (a === "tags") { MU.showAll = !MU.showAll; mu.setAttribute("aria-pressed", MU.showAll); } return; }
+    if (mu) { const a = mu.dataset.mu; if (a === "prev") muStep(-1); if (a === "next") muStep(1); if (a === "entrance") muEntrance(); if (a === "tags") { MU.showAll = !MU.showAll; mu.setAttribute("aria-pressed", MU.showAll); }
+      if (a === "room+" || a === "room-") { // 展示室を手で増やす・減らす(キューブが増えたときは自動で増える)
+        const hk = MU.hk, R = (st.hallRooms ||= {}); R[hk] = Math.max(0, (R[hk] || 0) + (a === "room+" ? 1 : -1)); save(); render();
+        if (a === "room+" && MU.world?.room) { const s = MU.world.start, k = bwRooms(hk, MU.items.length) - 1; muGo(muClamp(V(s.x, MU.pos.y, s.z - BW[hk].step * k)), s.yaw || 0, s.pitch); } // 増やした部屋の入口へ
+      }
+      return; }
     const mg = e.target.closest("[data-mugo]"); if (mg) { const it = MU.items.find((x) => x.id === mg.dataset.mugo); if (it) muGoItem(it); return; }
     const o = e.target.closest("[data-open]"); if (o) { st.selected = o.dataset.open; st.view = o.dataset.v; render(); scrollTo(0, 0); return; }
     const a = e.target.closest("[data-act]"); if (!a) return;
