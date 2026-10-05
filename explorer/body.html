@@ -1,0 +1,116 @@
+<div class="wrap">
+  <header>
+    <div class="topbar">
+      <h1>入金キューブ</h1>
+      <nav aria-label="メニュー"><a href="/import">データの取り込み</a><a href="/auth/signout">ログアウト</a></nav>
+    </div>
+    <p>申込者 › 契約者 › 法人 › ショップ › 月別の入金 › 内訳(売上・システム利用料など)という構造で、ラベルやコマから中へ潜れます。閲覧範囲が狭まるのは、課税区分などのフィルターを自分でかけたときだけです。データそのものは消えません。「入れ子で見る」では、法人の基本情報のような1件で完結するカードや、ショップのように中にキューブを並べるだけの入れ物も、外側から順に開けます。</p>
+  </header>
+  <p class="app-status" id="app-status">データを読み込んでいます…</p>
+
+  <section class="panel" aria-label="場所とフィルター" style="display:grid;gap:10px">
+    <div class="tax">
+      <span class="eyebrow">課税区分</span>
+      <div class="seg" role="group" aria-label="課税区分">
+        <button type="button" data-tax="">すべて</button>
+        <button type="button" data-tax="課税">課税事業者</button>
+        <button type="button" data-tax="免税">免税事業者</button>
+      </div>
+      <span class="summary" id="summary"></span>
+    </div>
+    <div>
+      <div class="eyebrow">潜っている場所(ラベルやコマから潜れます。潜るだけでは閲覧範囲は狭まりません。クリックで戻れます)</div>
+      <div class="filters" id="path"></div>
+    </div>
+    <div>
+      <div class="eyebrow">フィルター(自分でかけたときだけ閲覧範囲が狭まります。× で外せます)</div>
+      <div class="filters" id="filters"></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="入れ子で見る" id="nest-panel">
+    <div class="nest-head">
+      <div>
+        <div class="eyebrow">入れ子で見る(キューブの中のキューブを外側から順に開きます)</div>
+        <nav class="crumbs" id="nest-crumbs" aria-label="いまいる場所"></nav>
+      </div>
+      <div class="kinds" aria-label="キューブの種類">
+        <span><i class="ki ki-box"></i>入れ物</span>
+        <span><i class="ki ki-card"></i>情報カード</span>
+        <span><i class="ki ki-cube"></i>データのキューブ(3軸)</span>
+      </div>
+    </div>
+    <p class="note" id="nest-note"></p>
+    <div class="tiles" id="nest-tiles"></div>
+    <div class="infocard" id="nest-card" hidden></div>
+  </section>
+
+  <section class="panel controls" aria-label="軸設定" id="controls">
+    <div class="ctl"><label>見せ方</label>
+      <div class="seg" role="group" aria-label="見せ方">
+        <button type="button" id="view-cube" aria-pressed="true">立体(3軸)</button>
+        <button type="button" id="view-sheet" aria-pressed="false">シート(2軸)</button>
+      </div>
+    </div>
+    <div class="ctl ax-row"><label for="ax-row">行</label><select id="ax-row"></select></div>
+    <button id="swap-rc" type="button">行 ⇄ 列</button>
+    <div class="ctl ax-col"><label for="ax-col">列</label><select id="ax-col"></select></div>
+    <button id="swap-cd" type="button" class="depth-only">列 ⇄ 奥行き</button>
+    <div class="ctl ax-depth depth-only"><label for="ax-depth">奥行き</label><select id="ax-depth"></select></div>
+    <div class="ctl depth-only"><label>奥行きの扱い</label>
+      <div class="seg" role="group" aria-label="奥行きの扱い">
+        <button type="button" id="mode-agg" aria-pressed="true">集約</button>
+        <button type="button" id="mode-slice" aria-pressed="false">断面</button>
+      </div>
+    </div>
+    <div class="ctl depth-only" id="slice-wrap" hidden><label for="slice-member">断面の値</label><select id="slice-member"></select></div>
+  </section>
+  <p class="note" id="unused-note"></p>
+
+  <div class="layout3">
+    <section class="panel" aria-label="構造">
+      <div class="eyebrow">構造(フィルターで外れたものは薄く、潜っている場所は色付きで表示)</div>
+      <div class="tree" id="tree"></div>
+    </section>
+
+    <section class="panel cube-panel" aria-label="立体" id="cube-panel">
+      <div class="cube-head">
+        <div class="eyebrow">立体(ドラッグで回転・コマをクリックで選択・ダブルクリックで中へ・軸のラベルをタップでその値へ)</div>
+        <div class="seg" role="group" aria-label="視点">
+          <button type="button" data-view="iso">斜め</button>
+          <button type="button" data-view="front">正面</button>
+          <button type="button" data-view="top">上面</button>
+          <button type="button" data-view="side">側面</button>
+        </div>
+      </div>
+      <p class="note sheet-note" id="sheet-note" hidden></p>
+      <p class="note focus-note" id="focus-note" hidden></p>
+      <div id="cube3d" class="cube3d"><div id="cube-tip" class="tip" hidden></div></div>
+      <div class="legend">
+        <span><i class="sw sw-row"></i>行</span>
+        <span><i class="sw sw-col"></i>列</span>
+        <span><i class="sw sw-depth"></i>奥行き</span>
+        <span><i class="sw sw-face"></i>表に出している面</span>
+        <span><i class="sw sw-sel"></i>選んだコマ</span>
+        <span class="note" id="legend-mode"></span>
+      </div>
+    </section>
+
+    <aside class="panel" id="cell-panel">
+      <div class="eyebrow">選んだコマ</div>
+      <p class="note" id="cell-empty">表か立体のコマをクリックしてください。</p>
+      <div id="cell-body" hidden style="display:grid;gap:8px">
+        <div class="coord" id="cell-coord"></div>
+        <div class="big" id="cell-value"></div>
+        <div class="note" id="cell-breakdown"></div>
+        <button type="button" class="drill" id="drill">このコマに潜る</button>
+        <p class="note">潜ると、このコマの中(内側の立体かシート)に切り替わります。閲覧範囲は狭まりません。</p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel" aria-label="面">
+    <div class="eyebrow" id="face-title"></div>
+    <div class="tablebox"><table class="face" id="face"></table></div>
+  </section>
+</div>

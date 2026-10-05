@@ -1,10 +1,16 @@
-export default function Home() {
+import Script from "next/script";
+import { redirect } from "next/navigation";
+import { currentUserEmail } from "@/lib/auth";
+import { explorerMarkup } from "./explorerMarkup";
+import "./explorer.css";
+
+// 入金キューブ。画面の HTML とスクリプトは explorer/ にあり、scripts/build-explorer.mjs でまとめている
+export default async function Home() {
+  if (!(await currentUserEmail())) redirect("/login");
   return (
-    <main style={{ padding: 32 }}>
-      <h1>立体テーブル管理システム</h1>
-      <p>
-        スプリント0(土台)。軸定義一覧: <a href="/api/meta/axes">/api/meta/axes</a>
-      </p>
-    </main>
+    <>
+      <div dangerouslySetInnerHTML={{ __html: explorerMarkup }} />
+      <Script src="/explorer/bundle.js" strategy="afterInteractive" />
+    </>
   );
 }

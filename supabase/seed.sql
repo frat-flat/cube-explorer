@@ -79,22 +79,22 @@ cross join lateral (select format('P%s', lpad(s.product_no::text, 3, '0')) as pr
 -- ─────────────────────────────────────────────
 -- メタデータ:サンプル用の軸定義(設計書 5.2)
 -- ─────────────────────────────────────────────
-insert into cube_meta.axes (key, label, kind, source_table, source_column, label_column, time_grain, master_key) values
-  ('store',            '店舗',             'entity',    'stores',               'id',       'name', null,    'stores'),
-  ('staff',            '担当者',           'entity',    'staff',                'id',       'name', null,    'staff'),
-  ('product',          '商品',             'entity',    'products',             'id',       'name', null,    'products'),
-  ('product_category', '商品カテゴリ',     'attribute', 'products',             'category', null,   null,    'product_category'),
-  ('note_category',    '引き継ぎカテゴリ', 'attribute', 'store_handover_notes', 'category', null,   null,    'note_category'),
-  ('day',              '日',               'time',      null,                   null,       null,   'day',   'calendar_day'),
-  ('week',             '週',               'time',      null,                   null,       null,   'week',  'calendar_week'),
-  ('month',            '月',               'time',      null,                   null,       null,   'month', 'calendar_month'),
-  ('year',             '年',               'time',      null,                   null,       null,   'year',  'calendar_year'),
-  ('store_item',       '項目',             'columns',   'stores',               null,       null,   null,    null);
+insert into cube_meta.axes (key, label, kind, source_table, source_column, label_column, key_column, time_grain, master_key) values
+  ('store',            '店舗',             'entity',    'stores',               'id',       'name', 'id', null,    'stores'),
+  ('staff',            '担当者',           'entity',    'staff',                'id',       'name', 'id', null,    'staff'),
+  ('product',          '商品',             'entity',    'products',             'id',       'name', 'id', null,    'products'),
+  ('product_category', '商品カテゴリ',     'attribute', 'products',             'category', null,   'id', null,    'product_category'),
+  ('note_category',    '引き継ぎカテゴリ', 'attribute', 'store_handover_notes', 'category', null,   null, null,    'note_category'),
+  ('day',              '日',               'time',      null,                   null,       null,   null, 'day',   'calendar_day'),
+  ('week',             '週',               'time',      null,                   null,       null,   null, 'week',  'calendar_week'),
+  ('month',            '月',               'time',      null,                   null,       null,   null, 'month', 'calendar_month'),
+  ('year',             '年',               'time',      null,                   null,       null,   null, 'year',  'calendar_year'),
+  ('store_item',       '項目',             'columns',   'stores',               null,       null,   null, null,    null);
 
 -- メタデータ:サンプル用の事実定義
 insert into cube_meta.facts (key, label, source_table, axis_columns, measures) values
   ('sales', '売上', 'sales',
-   '{"store":"store_id","product":"product_id","staff":"staff_id","day":"sold_at","week":"sold_at","month":"sold_at","year":"sold_at"}',
+   '{"store":"store_id","product":"product_id","product_category":"product_id","staff":"staff_id","day":"sold_at","week":"sold_at","month":"sold_at","year":"sold_at"}',
    '[{"key":"amount","label":"売上金額","column":"amount","type":"number","aggs":["sum","avg","count","min","max"]},
      {"key":"quantity","label":"数量","column":"quantity","type":"number","aggs":["sum","avg","count","min","max"]},
      {"key":"sold_at","label":"販売日時","column":"sold_at","type":"datetime","aggs":["min","max","count"]}]'),

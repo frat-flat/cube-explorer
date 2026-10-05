@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 入金キューブの画面(素の JS。scripts/build-explorer.mjs でまとめたものを含む)
+    "explorer/**",
+    "public/explorer/**",
+    "src/app/explorerMarkup.ts",
   ]),
 ]);
 
