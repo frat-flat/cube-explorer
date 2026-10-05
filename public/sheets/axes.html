@@ -185,6 +185,16 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #cal .axl{position:relative;height:14px;font-size:10px;color:var(--muted);margin:0 2px}
 #cal .axl span{position:absolute;transform:translateX(-50%);top:1px;white-space:nowrap}
 #cal .dsec{font-size:13px;margin-top:4px}
+/* 立体で見るときは上の帯だけ(下の 3D を押せるように) */
+#cal.bar{inset:0 0 auto 0;display:block;height:auto;max-height:40%;background:color-mix(in srgb,var(--panel) 88%,transparent);padding:8px 12px;border-bottom:1px solid var(--line)}
+#stage:has(#cal.bar:not([hidden])) #gizmo{top:62px}
+#cal.bar .ci dl{display:none}#cal.bar .ci{margin-top:6px}
+.dwrap{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px}
+@media (max-width:700px){.dwrap{grid-template-columns:minmax(0,1fr)}}
+#cal .vt{position:relative;margin:6px 0 12px;border-left:2px solid var(--muted);margin-left:48px}
+#cal .vt i{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+#cal .vt span{position:absolute;left:-48px;width:42px;text-align:right;font-size:11px;color:var(--muted);transform:translateY(-50%)}
+#cal .vt .chip{position:absolute;transform:translateY(-50%);font-size:12px;line-height:20px;padding:0 8px;max-width:140px}
 #cal .dl{display:flex;flex-direction:column;gap:4px}
 #cal .dl div{display:flex;gap:8px;align-items:center;font-size:12px}#cal .dl .chip{font-size:12px;padding:2px 8px}
 /* 世界の中の案内(探す欄と、選んだものの情報)。世界ごとに見た目を変える: 美術館=作品解説の札、街=案内図、庭=立て札、ゲーム=会話の窓、ネオン・宇宙・海=操作盤 */
@@ -1304,6 +1314,7 @@ function contentsOf(b, mode = showOf(levelOf(b))) {
 function paint() {
   scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = []; uprights = [];
   if (layoutMode()) { paintLayout(); return; }
+  if (calCubeMode()) { paintCal3D(); return; }
   const memo = {}, allFacts = facts();
   const natural = (b, mode) => {
     // 中身は 手前・上・左の角から X のプラス → Y のマイナス(下) → Z のマイナス(奥) の順に並べる
@@ -1415,7 +1426,7 @@ renderer.domElement.addEventListener('pointerup', () => {
   else if (drag && !drag.moved && drag.u && drag.u.id !== sel) select(drag.u.id);
   drag = null;
 });
-renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && exhibit()) { enterUnit(u); return; } if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
+renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && (exhibit() || calCubeMode() || layoutMode())) { enterUnit(u); return; } if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   // 固定するときは必ずどこかの面を正面にする。箱は必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
@@ -1565,7 +1576,7 @@ function renderWorldUi() {
   document.querySelectorAll('[data-wm]').forEach(b => { b.classList.toggle('on', b.dataset.wm === wmode); b.setAttribute('aria-selected', b.dataset.wm === wmode); });
   document.querySelectorAll('[data-center]').forEach(b => b.classList.toggle('on', b.dataset.center === curPref('center')));
   renderCal();
-  $('legend').hidden = exhibit() || layoutMode();
+  $('legend').hidden = exhibit() || layoutMode() || calCubeMode();
   $('wFindList').innerHTML = [...units().map(b => b.name), ...S.sheets.map(x => x.name)].filter((v, i, a) => a.indexOf(v) === i).map(v => `<option value="${esc(v)}">`).join('');
   $('wFindRow').hidden = exhibit() || layoutMode();
   const jOn = layoutMode() && wmode === 'japan'; $('jmap').hidden = !jOn; if (jOn && jm) jm.invalidateSize();
@@ -1633,6 +1644,7 @@ function renderGuide() {
 // タイムスリップ(宇宙): 宇宙に光の線を引き、その下に時間の目盛りを振って、日付の順に並べる。カレンダー: 月の暦に日付で置く。
 // 日本地図: 住所の項目を都道府県と市区町村の名前で照らし、その場所にピンを立てる(住所は外に送らない。地図データは /worlds/japan.json)
 let JP = null, calYM = null, calView = 'month', calDay = null;
+const DOW = '日月火水木金土';
 const layoutMode = () => !entered && (wmode === 'japan' || wmode === 'space' && !!env);
 const TOPC = ['#4e79a7', '#f28e2b', '#e15759', '#59a14f', '#b07aa1', '#edc948', '#76b7b2', '#ff9da7'];
 const topOf = u => { let b = u; while (b.parent && box(b.parent)) b = box(b.parent); return b; };
@@ -1667,7 +1679,7 @@ function geocode(addr) {
 }
 // 日本地図: 地理院タイル(淡色地図=白地図、全国最新写真=空撮)を Leaflet で重ね、住所の場所にピンを立てる。部品は日本地図を開いたときだけ読む
 const JTILES = { pale: ['白地図', 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', '淡色地図'], photo: ['空撮', 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', '全国最新写真(シームレス)'] };
-let jm = null, jTile = null, jPins = null, jStyle = 'pale', LP = null, JPP = null;
+let jm = null, jTile = null, jPins = null, jBorder = null, jStyle = 'pale', LP = null, JPP = null;
 try { jStyle = JTILES[localStorage.getItem('axis-boxes-v2:jmap')] ? localStorage.getItem('axis-boxes-v2:jmap') : 'pale'; } catch (e) {}
 function leaflet() {
   return LP = LP || new Promise((ok, ng) => {
@@ -1680,7 +1692,11 @@ const loadJP = () => JPP = JPP || fetch('/worlds/japan.json').then(r => { if (!r
 function setJStyle(k) {
   if (!JTILES[k]) return; jStyle = k;
   try { localStorage.setItem('axis-boxes-v2:jmap', k); } catch (e) {}
-  if (jm) { if (jTile) jm.removeLayer(jTile); const [, url, name] = JTILES[k]; jTile = L.tileLayer(url, { maxZoom: 18, maxNativeZoom: 18, attribution: `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>(${name})` }).addTo(jm); jTile.bringToBack(); }
+  if (jm) { if (jTile) jm.removeLayer(jTile); const [, url, name] = JTILES[k]; jTile = L.tileLayer(url, { maxZoom: 18, maxNativeZoom: 18, attribution: `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>(${name})` }).addTo(jm); jTile.bringToBack();
+    // 空撮には県境の線を重ねる(白地図には元から入っている)
+    if (jBorder) { jm.removeLayer(jBorder); jBorder = null; }
+    if (k === 'photo' && JP && JP.border) jBorder = L.polyline(JP.border.map(l => l.map(([lon, lat]) => [lat, lon])), { color: '#ffe066', weight: 1.6, opacity: .9, interactive: false }).addTo(jm);
+  }
   document.querySelectorAll('[data-js]').forEach(b => b.classList.toggle('on', b.dataset.js === k));
 }
 function japanPins(items) {
@@ -1789,40 +1805,56 @@ function layoutPanel() {
     <div class="lg">${tops.map(t => `<span><i style="background:${topColor(t)}"></i>${esc(t.name)}</span>`).join('')}</div>
     ${wmode === 'japan' ? `<div class="seg" role="group" aria-label="地図の見た目">${Object.entries(JTILES).map(([k, [t]]) => `<button data-js="${k}" class="${k === jStyle ? 'on' : ''}">${t}</button>`).join('')}</div>${JP ? `<div class="gd" style="font-size:11px">地図: 地理院タイル / ${esc(JP.src)}</div>` : ''}` : ''}`;
 }
-// タイムスリップ(カレンダー): 年(3×4 の月、各月の横軸が日付)・月(暦。日付の枠を押すとその日へ)・日(時刻のあるものは横軸が時間、無いものは縦のリスト)
-const DOW = '日月火水木金土';
-function renderCal() {
-  const el = $('cal'), show = wmode === 'cal' && !entered; el.hidden = !show; if (!show) return;
-  const f = getField('cal'), fs = fieldsFor('cal'), items = [];
+let calCube = false, calYS = null;
+try { calCube = !!localStorage.getItem('axis-boxes-v2:calCube'); } catch (e) {}
+const calCubeMode = () => wmode === 'cal' && !entered && calCube;
+const dayOf = t => { const d = new Date(t); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
+const inMonth = (i, y, m) => { const d = new Date(i.t); return d.getUTCFullYear() === y && d.getUTCMonth() === m; };
+const hm = t => { const d = new Date(t); return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
+// 並べる項目の日付と、今見ている年・月・日・年の並び(はじめは最後の日付のあたり)
+function calItems() {
+  const f = getField('cal'), items = [];
   for (const u of units()) { const w = u.info && parseWhen(u.info[f]); if (w) items.push({ u, t: w.t, p: w.p, v: u.info[f] }); }
   if (!calYM) { const last = items.length ? new Date(Math.max(...items.map(i => i.t))) : new Date(); calYM = [last.getUTCFullYear(), last.getUTCMonth()]; }
-  const [Y, M] = calYM, dayOf = t => { const d = new Date(t); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
-  if (calDay == null || new Date(calDay).getUTCFullYear() !== Y || new Date(calDay).getUTCMonth() !== M) { const hit = items.filter(i => i.p !== 'month' && new Date(i.t).getUTCFullYear() === Y && new Date(i.t).getUTCMonth() === M); calDay = hit.length ? dayOf(hit[0].t) : Date.UTC(Y, M, 1); }
-  const inMonth = (i, y, m) => { const d = new Date(i.t); return d.getUTCFullYear() === y && d.getUTCMonth() === m; };
+  const [Y, M] = calYM;
+  if (calDay == null || new Date(calDay).getUTCFullYear() !== Y || new Date(calDay).getUTCMonth() !== M) { const hit = items.filter(i => i.p !== 'month' && inMonth(i, Y, M)); calDay = hit.length ? dayOf(hit[0].t) : Date.UTC(Y, M, 1); }
+  if (calYS == null || Y < calYS || Y > calYS + 11) calYS = Y - 5;
+  return { f, items, Y, M };
+}
+// 日の時間軸の範囲(8時〜20時。外の時刻があれば広げる)
+function dayRange(tm) { const mins = tm.map(i => (i.t - calDay) / 6e4); return [Math.max(0, Math.min(8, ...mins.map(v => Math.floor(v / 60)))), Math.min(24, Math.max(20, ...mins.map(v => Math.ceil(v / 60) + 1)))]; }
+// タイムスリップ(カレンダー): 複数年(1年が1つの枠、横軸が月)・年(3×4 の月、各月の横軸が日付)・月(暦。日付の枠を押すとその日へ)・日(時刻のあるものは縦の時間軸、無いものはリスト)。
+// 「立体で見る」にすると、同じ並びのままキューブにして 3D で見せる(上の帯で操作する)
+function renderCal() {
+  const el = $('cal'), show = wmode === 'cal' && !entered; el.hidden = !show; if (!show) return;
+  const fs = fieldsFor('cal'), { f, items, Y, M } = calItems();
   const u = selUnits().length === 1 ? selUnits()[0] : null;
   const chip = (it, extra = '', label = it.u.name) => `<button class="chip${selUnits().includes(it.u) ? ' on' : ''}" style="background:${topColor(it.u)}${extra}" data-cu="${it.u.id}" title="${esc(it.u.name)} ${esc(it.v)}">${esc(label)}</button>`;
   // 横軸に置く: 近すぎるものは段を変える(gap は同じ段で空ける幅、軸の単位)
-  const lanes = (list, x, gap) => { const end = []; return list.map(it => { const v = x(it); let l = end.findIndex(e => v - e >= gap); if (l < 0) { l = end.length; end.push(0); } end[l] = v; return { it, v, l }; }); };
+  const lanes = (list, x, gap) => { const end = []; return list.map(it => { const v = x(it); let l = end.findIndex(e => v - e >= gap); if (l < 0) { l = end.length; end.push(-1e9); } end[l] = v; return { it, v, l }; }); };
+  // 1つの枠に横軸(月か日付)を引き、札を置く
+  const axisBox = (head, list, x, gap, ticks) => { const pl = lanes(list, x, gap), n = Math.max(1, ...pl.map(p => p.l + 1)), P = v => (v * 100).toFixed(2) + '%';
+    return `<div class="ym">${head}<div class="ax" style="height:${n * 20 + 6}px">${pl.map(p => chip(p.it, `;left:${P(p.v)};top:${p.l * 20 + 2}px`)).join('')}</div><div class="axl">${ticks.map(([v, t]) => `<span style="left:${P(v)}">${t}</span>`).join('')}</div></div>`; };
   let body = '', title = '';
-  if (calView === 'year') {
+  if (calView === 'years') {
+    title = `${calYS}〜${calYS + 11}年`;
+    body = `<div class="yg">${[...Array(12)].map((_, k) => { const yy = calYS + k, its = items.filter(i => new Date(i.t).getUTCFullYear() === yy).sort((a, b) => a.t - b.t);
+      const x = i => { const d = new Date(i.t), dim = new Date(Date.UTC(yy, d.getUTCMonth() + 1, 0)).getUTCDate(); return (d.getUTCMonth() + (i.p === 'month' ? .5 : (d.getUTCDate() - .5) / dim)) / 12; };
+      return axisBox(`<div class="ymh"><button class="small" data-yy="${yy}">${yy}年</button><span class="muted">${its.length ? its.length + ' 件' : ''}</span></div>`, its, x, .14, [1, 4, 7, 10, 12].map(m => [(m - .5) / 12, m + '月'])); }).join('')}</div>`;
+  } else if (calView === 'year') {
     title = `${Y}年`;
     body = `<div class="yg">${[...Array(12)].map((_, m) => {
       const dim = new Date(Date.UTC(Y, m + 1, 0)).getUTCDate(), its = items.filter(i => inMonth(i, Y, m)), mo = its.filter(i => i.p === 'month'), dd = its.filter(i => i.p !== 'month').sort((a, b) => a.t - b.t);
-      const pl = lanes(dd, i => new Date(i.t).getUTCDate(), 7), n = Math.max(1, ...pl.map(p => p.l + 1)), X = d => ((d - .5) / dim * 100).toFixed(2) + '%';
-      return `<div class="ym"><div class="ymh"><button class="small" data-ym="${m}">${m + 1}月</button><span class="muted">${its.length ? its.length + ' 件' : ''}</span>${mo.length ? `<span class="mo" title="何月まで(日付なし)">${mo.map(i => chip(i)).join('')}</span>` : ''}</div>
-        <div class="ax" style="height:${n * 20 + 6}px">${pl.map(p => chip(p.it, `;left:${X(p.v)};top:${p.l * 20 + 2}px`)).join('')}</div>
-        <div class="axl">${[1, 5, 10, 15, 20, 25, dim].map(d => `<span style="left:${X(d)}">${d}</span>`).join('')}</div></div>`; }).join('')}</div>`;
+      return axisBox(`<div class="ymh"><button class="small" data-ym="${m}">${m + 1}月</button><span class="muted">${its.length ? its.length + ' 件' : ''}</span>${mo.length ? `<span class="mo" title="何月まで(日付なし)">${mo.map(i => chip(i)).join('')}</span>` : ''}</div>`,
+        dd, i => (new Date(i.t).getUTCDate() - .5) / dim, 7 / dim, [1, 5, 10, 15, 20, 25, dim].map(d => [(d - .5) / dim, d])); }).join('')}</div>`;
   } else if (calView === 'day') {
     const D = new Date(calDay), its = items.filter(i => i.p !== 'month' && dayOf(i.t) === calDay), tm = its.filter(i => i.p === 'time').sort((a, b) => a.t - b.t), nt = its.filter(i => i.p === 'day');
     title = `${Y}年${M + 1}月${D.getUTCDate()}日(${DOW[D.getUTCDay()]})`;
-    const mins = tm.map(i => (i.t - calDay) / 6e4), h0 = Math.max(0, Math.min(8, ...mins.map(v => Math.floor(v / 60)))), h1 = Math.min(24, Math.max(20, ...mins.map(v => Math.ceil(v / 60) + 1)));
-    const X = mn => ((mn / 60 - h0) / (h1 - h0) * 100).toFixed(2) + '%', pl = lanes(tm, i => (i.t - calDay) / 6e4, (h1 - h0) * 60 / 6), n = Math.max(1, ...pl.map(p => p.l + 1));
-    const hm = t => { const d = new Date(t); return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
-    body = `<div class="dsec"><b>時刻のあるもの</b> <span class="muted">${tm.length} 件(横軸が時間)</span></div>
-      <div class="ax day" style="height:${n * 26 + 8}px">${[...Array(h1 - h0 + 1)].map((_, k) => `<i style="left:${X((h0 + k) * 60)}"></i>`).join('')}${pl.map(p => chip(p.it, `;left:${X(p.v)};top:${p.l * 26 + 4}px`, hm(p.it.t) + ' ' + p.it.u.name)).join('')}</div>
-      <div class="axl">${[...Array(h1 - h0 + 1)].map((_, k) => h0 + k).filter(h => (h1 - h0) <= 14 || h % 2 === 0).map(h => `<span style="left:${X(h * 60)}">${h}時</span>`).join('')}</div>
-      <div class="dsec"><b>時刻の書いていないもの</b> <span class="muted">${nt.length} 件</span></div>
-      <div class="dl">${nt.length ? nt.map(i => `<div>${chip(i)}<span class="muted">${esc(i.v)}</span></div>`).join('') : '<span class="muted">ありません</span>'}</div>`;
+    const [h0, h1] = dayRange(tm), HH = 40, pl = lanes(tm, i => (i.t - calDay) / 6e4, 45);
+    body = `<div class="dwrap"><div><div class="dsec"><b>時刻のあるもの</b> <span class="muted">${tm.length} 件(縦が時間)</span></div>
+      <div class="vt" style="height:${(h1 - h0) * HH}px">${[...Array(h1 - h0 + 1)].map((_, k) => `<i style="top:${k * HH}px"></i><span style="top:${k * HH}px">${h0 + k}時</span>`).join('')}${pl.map(p => chip(p.it, `;top:${((p.v / 60 - h0) * HH).toFixed(1)}px;left:${8 + p.l * 150}px`, hm(p.it.t) + ' ' + p.it.u.name)).join('')}</div></div>
+      <div><div class="dsec"><b>時刻の書いていないもの</b> <span class="muted">${nt.length} 件</span></div>
+      <div class="dl">${nt.length ? nt.map(i => `<div>${chip(i)}<span class="muted">${esc(i.v)}</span></div>`).join('') : '<span class="muted">ありません</span>'}</div></div></div>`;
   } else {
     title = `${Y}年${M + 1}月`;
     const first = new Date(Date.UTC(Y, M, 1)), start = Date.UTC(Y, M, 1 - first.getUTCDay()), mo = items.filter(i => i.p === 'month' && inMonth(i, Y, M));
@@ -1834,31 +1866,93 @@ function renderCal() {
     }
     body = `<div class="yr">${yr}</div>${mo.length ? `<div class="mo">この月(日付なし) ${mo.map(i => chip(i)).join('')}</div>` : ''}<div class="grid wk">${DOW.split('').map(w => `<div class="dw">${w}</div>`).join('')}</div><div class="grid">${grid}</div>`;
   }
+  el.classList.toggle('bar', calCube);
+  const hint = calCube ? 'キューブを押すと説明が出ます。ダブルクリックか上の欄で探すと中に入れます。' : `札を押すと説明が出ます。ダブルクリックか上の欄で探すと中に入れます。${calView === 'month' ? '日付の枠を押すとその日を開きます。' : calView === 'year' ? '月の名前を押すとその月を開きます。' : calView === 'years' ? '年を押すとその年を開きます。' : ''}`;
   el.innerHTML = `<div class="ch">${fs.length ? `<label>並べる項目 <select id="cField">${fs.map(k => `<option${k === f ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></label>` : '<span class="muted">日付の入った項目がありません</span>'}
-      <span class="cv" role="tablist" aria-label="カレンダーの単位">${[['year', '年'], ['month', '月'], ['day', '日']].map(([k, t]) => `<button class="small${calView === k ? ' on' : ''}" data-cv="${k}" role="tab" aria-selected="${calView === k}">${t}</button>`).join('')}</span>
+      <span class="cv" role="tablist" aria-label="カレンダーの単位">${[['years', '複数年'], ['year', '年'], ['month', '月'], ['day', '日']].map(([k, t]) => `<button class="small${calView === k ? ' on' : ''}" data-cv="${k}" role="tab" aria-selected="${calView === k}">${t}</button>`).join('')}</span>
+      <button class="small${calCube ? ' on' : ''}" id="calCube" aria-pressed="${calCube}" title="カレンダーの並びのまま、キューブにして立体で見る">${calCube ? '立体で見ている' : '立体で見る'}</button>
       <span class="sp" style="flex:1"></span><button class="small" data-cmv="-1" aria-label="前へ">‹</button><h3>${title}</h3><button class="small" data-cmv="1" aria-label="次へ">›</button></div>
-    ${body}
-    <div class="ci">${u ? `<b>${unitOf(u)} ${esc(u.name)}</b><dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><button class="small" id="calEnter">中に入る</button> <button class="small" id="calClose">閉じる</button>` : `<span class="muted">札を押すと説明が出ます。ダブルクリックか上の欄で探すと中に入れます。${calView === 'month' ? '日付の枠を押すとその日を開きます。' : calView === 'year' ? '月の名前を押すとその月を開きます。' : ''}</span>`}</div>`;
+    ${calCube ? '' : body}
+    <div class="ci">${u ? `<b>${unitOf(u)} ${esc(u.name)}</b><dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><button class="small" id="calEnter">中に入る</button> <button class="small" id="calClose">閉じる</button>` : `<span class="muted">${hint}</span>`}</div>`;
+  const redraw = () => calCube ? (fitted = 0, paint()) : renderCal();
   const mv = n => {
     if (calView === 'day') { calDay += n * 864e5; const d = new Date(calDay); calYM = [d.getUTCFullYear(), d.getUTCMonth()]; }
+    else if (calView === 'years') { calYS += 12 * n; calYM = [calYS + 5, calYM[1]]; }
     else { const d = new Date(Date.UTC(calYM[0], calYM[1] + n * (calView === 'year' ? 12 : 1), 1)); calYM = [d.getUTCFullYear(), d.getUTCMonth()]; }
-    renderCal();
+    redraw();
   };
   el.querySelectorAll('[data-cmv]').forEach(b => b.onclick = () => mv(+b.dataset.cmv));
-  el.querySelectorAll('[data-cv]').forEach(b => b.onclick = () => { calView = b.dataset.cv; renderCal(); });
+  el.querySelectorAll('[data-cv]').forEach(b => b.onclick = () => { calView = b.dataset.cv; calCam(); redraw(); });
   el.querySelectorAll('[data-cm]').forEach(b => b.onclick = () => { calYM = [Y, +b.dataset.cm]; renderCal(); });
   el.querySelectorAll('[data-ym]').forEach(b => b.onclick = () => { calYM = [Y, +b.dataset.ym]; calView = 'month'; renderCal(); });
+  el.querySelectorAll('[data-yy]').forEach(b => b.onclick = () => { calYM = [+b.dataset.yy, M]; calView = 'year'; renderCal(); });
   el.querySelectorAll('[data-day]').forEach(c => c.onclick = e => { if (e.target.closest('[data-cu]')) return; const t = +c.dataset.day, d = new Date(t); calYM = [d.getUTCFullYear(), d.getUTCMonth()]; calDay = t; calView = 'day'; renderCal(); });
   // ダブルクリックは click の回数で見る(1回目の再描画で札が置き換わっても入れるように)
   el.querySelectorAll('[data-cu]').forEach(b => { b.onclick = e => { if (e.detail >= 2) { enterUnit(box(b.dataset.cu)); return; } sel = b.dataset.cu; focused = null; renderTree(); renderCal(); }; });
-  if ($('cField')) $('cField').onchange = e => { setField('cal', e.target.value); calYM = null; calDay = null; renderCal(); };
-  if (u) { $('calEnter').onclick = () => enterUnit(u); $('calClose').onclick = () => { sel = null; renderTree(); renderCal(); }; }
+  if ($('cField')) $('cField').onchange = e => { setField('cal', e.target.value); calYM = null; calDay = null; calYS = null; redraw(); };
+  $('calCube').onclick = () => { calCube = !calCube; try { localStorage.setItem('axis-boxes-v2:calCube', calCube ? '1' : ''); } catch (e) {} calCam(); fitted = 0; paint(); };
+  if (u) { $('calEnter').onclick = () => enterUnit(u); $('calClose').onclick = () => { sel = null; renderTree(); calCube ? paint() : renderCal(); }; }
+}
+// 立体のカレンダーの視点: 日は横から(縦の時間軸を見る)、ほかは斜め上から
+function calCam() { if (!calCube) return; cam.th = 0; cam.ph = calView === 'day' ? .25 : .95; tgtGoal.copy(homeC); fitted = 0; }
+// カレンダーの並びのまま、札をキューブにして 3D に置く(床に暦の枠、日は縦の時間軸)
+function paintCal3D() {
+  const { items, Y, M } = calItems(), ink = '#1d2430';
+  const plate = (x, z, w, d, col, op = .9) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0, z); world.add(m);
+    const e = edges(w, .01, d, new THREE.Color('#9aa6b5'), false, .9); e.position.set(x, 0, z); world.add(e); };
+  const label = (t, x, y, z, h = .45, col = ink) => { const lb = textSprite(String(t), col, h); lb.position.set(x, y, z); world.add(lb); return lb; };
+  const put = (it, x, y, z, h) => { const tk = token(it.u, h, topColor(it.u)); tk.position.set(x, y + h / 2, z); world.add(tk);
+    if (selUnits().includes(it.u)) { const lb = textSprite(`${it.u.name} ${String(it.v)}`, ink, .5); lb.position.set(0, h / 2 + .6, 0); tk.add(lb); }
+    groups.push({ g: tk, u: it.u, box: true, home: tk.position.clone() }); };
+  // 横軸(月か日付)のある枠を並べる(複数年・年)
+  const panels = (n, head, list, xOf, ticks) => { const PW = 10, PD = 3, G = 1.2;
+    for (let k = 0; k < n; k++) { const c = k % 3, r = Math.floor(k / 3), px = (c - 1) * (PW + G), pz = (r - 1.5) * (PD + G);
+      plate(px, pz, PW, PD, '#ffffff'); label(head(k), px - PW / 2 + 1, .05, pz - PD / 2 + .45, .55);
+      const az = pz + PD / 2 - .55; world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(px - PW / 2 + .2, .02, az), new THREE.Vector3(px + PW / 2 - .2, .02, az)]), new THREE.LineBasicMaterial({ color: 0x6b7686 })));
+      ticks(k).forEach(([v, t]) => label(t, px - PW / 2 + v * PW, .02, az + .3, .3, '#5b6676'));
+      const stack = []; list(k).forEach(it => { const v = xOf(k, it), x = px - PW / 2 + v * PW, lv = stack.filter(s => Math.abs(s - x) < .65).length; stack.push(x); put(it, x, lv * .65, pz - .1, .55); }); }
+    return 3 * PW + 2 * G + 2; };
+  let span = 24;
+  if (calView === 'years') {
+    span = panels(12, k => `${calYS + k}年`, k => items.filter(i => new Date(i.t).getUTCFullYear() === calYS + k).sort((a, b) => a.t - b.t),
+      (k, i) => { const d = new Date(i.t), dim = new Date(Date.UTC(calYS + k, d.getUTCMonth() + 1, 0)).getUTCDate(); return (d.getUTCMonth() + (i.p === 'month' ? .5 : (d.getUTCDate() - .5) / dim)) / 12; },
+      () => [1, 4, 7, 10, 12].map(m => [(m - .5) / 12, m + '月']));
+  } else if (calView === 'year') {
+    const dim = m => new Date(Date.UTC(Y, m + 1, 0)).getUTCDate();
+    span = panels(12, m => `${Y}年${m + 1}月`, m => items.filter(i => inMonth(i, Y, m)).sort((a, b) => (a.p === 'month') - (b.p === 'month') || a.t - b.t),
+      (m, i) => i.p === 'month' ? .02 : (new Date(i.t).getUTCDate() - .5) / dim(m), m => [1, 10, 20, dim(m)].map(d => [(d - .5) / dim(m), d]));
+  } else if (calView === 'day') {
+    const its = items.filter(i => i.p !== 'month' && dayOf(i.t) === calDay), tm = its.filter(i => i.p === 'time').sort((a, b) => a.t - b.t), nt = its.filter(i => i.p === 'day');
+    const [h0, h1] = dayRange(tm), HU = 1.2, H = (h1 - h0) * HU, D = new Date(calDay);
+    world.position.y = -H / 2;
+    plate(0, 0, 16, 6, '#ffffff', .6);
+    label(`${D.getUTCMonth() + 1}月${D.getUTCDate()}日(${DOW[D.getUTCDay()]})`, -5, .05, 2.4, .6);
+    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, H, 0)]), new THREE.LineBasicMaterial({ color: 0x4b5563 })));
+    for (let h = h0; h <= h1; h++) { const y = (h - h0) * HU; world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-.3, y, 0), new THREE.Vector3(.3, y, 0)]), new THREE.LineBasicMaterial({ color: 0x4b5563 }))); label(`${h}時`, -1.1, y, 0, .4); }
+    const lane = []; tm.forEach(it => { const y = ((it.t - calDay) / 36e5 - h0) * HU, l = lane.filter(v => Math.abs(v - y) < .9).length; lane.push(y); put(it, 1.2 + l * 1.4, y - .35, 0, .7); label(hm(it.t), 1.2 + l * 1.4, y + .65, 0, .32); });
+    label('時刻なし', -5, .05, -1.6, .45); nt.forEach((it, k) => put(it, -6.5 + (k % 5) * 1.3, 0, -.6 + Math.floor(k / 5) * 1.3, .8));
+    span = Math.max(16, H + 4);
+  } else {
+    const CS = 3.2, first = new Date(Date.UTC(Y, M, 1)), start = Date.UTC(Y, M, 1 - first.getUTCDay());
+    DOW.split('').forEach((w, c) => label(w, (c - 3) * CS, .05, -3 * CS - .2, .5, c === 0 ? '#c0392b' : ink));
+    label(`${Y}年${M + 1}月`, 0, .05, -3 * CS - 1.3, .8);
+    for (let i = 0; i < 42; i++) {
+      const t = start + i * 864e5, d = new Date(t), c = i % 7, r = Math.floor(i / 7), x = (c - 3) * CS, z = (r - 2.5) * CS, out = d.getUTCMonth() !== M;
+      plate(x, z, CS - .2, CS - .2, out ? '#e3e8ee' : '#ffffff', out ? .6 : .92); label(d.getUTCDate(), x - CS / 2 + .5, .05, z - CS / 2 + .5, .45, out ? '#9aa3ad' : ink);
+      items.filter(it => it.p !== 'month' && dayOf(it.t) === t).sort((a, b) => a.t - b.t).forEach((it, k) => put(it, x + (k % 2 ? .6 : -.6) + .3, Math.floor(k / 4) * .9, z + (k % 4 < 2 ? -.3 : .6), .8));
+    }
+    const mo = items.filter(i => i.p === 'month' && inMonth(i, Y, M));
+    if (mo.length) { label('この月(日付なし)', -3 * CS - .5, .05, 3 * CS + .2, .45); mo.forEach((it, k) => put(it, -3 * CS + 2.4 + k * 1.3, 0, 3 * CS + .2, .8)); }
+    span = 7 * CS + 2;
+  }
+  setHome(new THREE.Vector3(), { x: span / 2 + 1, y: span / 3, z: span / 2.5 });
+  extent = { span, bottom: 0 }; fitLayout(); renderWorldUi();
 }
 function setWMode(m) {
   if (!WMODES[m]) m = 'world';
-  wmode = m; entered = null; calYM = null; calDay = null; focused = null;
+  wmode = m; entered = null; calYM = null; calDay = null; calYS = null; focused = null;
   try { localStorage.setItem('axis-boxes-v2:wmode', m); } catch (e) {}
-  if (m === 'japan') { cam.th = 0; cam.ph = 1.0; } else if (m === 'space') { cam.th = 0; cam.ph = .22; }
+  if (m === 'japan') { cam.th = 0; cam.ph = 1.0; } else if (m === 'space') { cam.th = 0; cam.ph = .22; } else if (m === 'cal') calCam();
   tgtGoal.copy(homeC); fitted = 0;
   setWorld(activeWorld()); paint(); renderPinBar();
 }

@@ -2,7 +2,7 @@
 //   npm i --no-save jpn-atlas @b4moss/jp-local-gov-id-data && node tools/japan-map/build.mjs
 // 位置: jpn-atlas(BSD-3-Clause)に入っている国土地理院「地球地図日本」2016 の shapefile(経度・緯度)
 // 名前: @b4moss/jp-local-gov-id-data(元は総務省「全国地方公共団体コード」)
-// 出力: 都道府県と市区町村ごとの代表点(経度・緯度)。地図そのものは画面で地理院タイルを読む
+// 出力: 都道府県と市区町村ごとの代表点(経度・緯度)と県境の線。地図そのものは画面で地理院タイルを読む
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -39,6 +39,36 @@ const cityOut = munis.map((m) => {
   const ll = geo.get(c5) || (city && geo.get(city.code.slice(0, 5))), pf = prefOut.find((p) => p.c === m.prefectureCode);
   return [m.prefectureCode, m.name, ...(ll ? [r4(ll.c[0]), r4(ll.c[1])] : [pf.lon, pf.lat])];
 });
-const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」", pref: prefOut, city: cityOut };
+// 県境(空撮に重ねる線): 市区町村の輪郭の辺のうち、違う都道府県どうしが共有する辺だけをつないで線にする
+const E = new Map(); let nE = 0;
+const key = (p) => p[0].toFixed(6) + "," + p[1].toFixed(6);
+for (let o = 100, i = 0; o < shp.length; i++) {
+  const len = shp.readInt32BE(o + 4) * 2, b = o + 8; o = b + len;
+  if (shp.readInt32LE(b) !== 5) continue;
+  const np = shp.readInt32LE(b + 36), nv = shp.readInt32LE(b + 40), parts = [...Array(np)].map((_, k) => shp.readInt32LE(b + 44 + 4 * k)), pts = b + 44 + 4 * np;
+  const pf = admAt(i).slice(0, 2);
+  for (let k = 0; k < np; k++) {
+    const ring = []; for (let j = parts[k]; j < (k + 1 < np ? parts[k + 1] : nv); j++) ring.push([shp.readDoubleLE(pts + 16 * j), shp.readDoubleLE(pts + 16 * j + 8)]);
+    for (let j = 0; j + 1 < ring.length; j++) { const a = key(ring[j]), c = key(ring[j + 1]), kk = a < c ? a + "|" + c : c + "|" + a; const e = E.get(kk) || { p: new Set(), a: ring[j], b: ring[j + 1] }; e.p.add(pf); E.set(kk, e); nE++; }
+  }
+}
+const segs = [...E.values()].filter((e) => e.p.size > 1);
+// chain
+const adj = new Map(); const K = key;
+segs.forEach((s, i) => { for (const p of [s.a, s.b]) { const k = K(p); (adj.get(k) || adj.set(k, []).get(k)).push(i); } });
+const used = new Uint8Array(segs.length), lines = [];
+for (let i = 0; i < segs.length; i++) {
+  if (used[i]) continue; used[i] = 1; const line = [segs[i].a, segs[i].b];
+  for (const dir of [1, 0]) {
+    for (;;) { const end = dir ? line[line.length - 1] : line[0], nx = (adj.get(K(end)) || []).find((j) => !used[j]); if (nx == null) break; used[nx] = 1; const s = segs[nx], o = K(s.a) === K(end) ? s.b : s.a; if (dir) line.push(o); else line.unshift(o); }
+  }
+  lines.push(line);
+}
+function simplify(pts, tol) { if (pts.length < 3) return pts; const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1; const st = [[0, pts.length - 1]];
+  while (st.length) { const [a, b] = st.pop(); let md = 0, mi = -1; const [ax, ay] = pts[a], [bx, by] = pts[b], dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+    for (let i = a + 1; i < b; i++) { const d = L > 1e-12 ? Math.abs(dy * pts[i][0] - dx * pts[i][1] + bx * ay - by * ax) / L : Math.hypot(pts[i][0] - ax, pts[i][1] - ay); if (d > md) { md = d; mi = i; } }
+    if (md > tol) { keep[mi] = 1; st.push([a, mi], [mi, b]); } } return pts.filter((_, i) => keep[i]); }
+const border = lines.map((l) => simplify(l, 0.002).map(([x, y]) => [r4(x), r4(y)]));
+const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」", pref: prefOut, city: cityOut, border };
 writeFileSync(new URL("../../public/worlds/japan.json", import.meta.url), JSON.stringify(out));
-console.log("prefectures", prefOut.length, "cities", cityOut.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
+console.log("prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
