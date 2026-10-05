@@ -312,7 +312,7 @@ tfoot td{font-weight:700}
 </div>
 <div class="view" data-view="world" hidden>
   <div class="vhead"><h1>World</h1><p class="lead">箱とキューブを立体で並べます。まわりの世界は <button class="small" data-go="settings">設定</button> で選べます。<span id="worldNow" style="white-space:nowrap"></span></p>
-    <div class="wmodes" role="tablist" aria-label="World の見せ方"><button class="small" data-wm="world" role="tab">いつもの世界</button><span class="wsp">特別枠</span><button class="small" data-wm="japan" role="tab">日本地図</button><button class="small" data-wm="cal" role="tab">タイムスリップ(カレンダー)</button><button class="small" data-wm="space" role="tab">タイムスリップ(宇宙)</button><span class="cmode" role="group" aria-label="軸の中心">軸の中心 <button class="small" data-center="origin" title="X=0・Y=0・Z=0 を中心にする">原点(0,0,0)</button><button class="small" data-center="median" title="並んでいるものの中央値を中心にする">中央値</button></span></div>
+    <div class="wmodes" role="tablist" aria-label="World の見せ方"><button class="small" data-wm="world" role="tab">いつもの世界</button><span class="wsp">特別枠</span><button class="small" data-wm="japan" role="tab">日本地図</button><button class="small" data-wm="cal" role="tab">タイムスリップ(カレンダー)</button><button class="small" data-wm="space" role="tab">タイムスリップ(宇宙)</button><span class="cmode" role="group" aria-label="軸の中心">軸の中心 <button class="small" data-center="origin" title="これまで通りの並び方">ふだん</button><button class="small" data-center="median" title="並んでいるものの中央値を原点(0,0,0)に重ねる">中央値を原点に</button></span></div>
     <div class="row wfind" id="wFindRow"><input id="wFind" list="wFindList" placeholder="箱・キューブ・シートの名前で探して中に入る(選んでいれば空のまま Enter)" aria-label="探して中に入る"><datalist id="wFindList"></datalist><button class="small" id="wFindGo">中に入る</button><span class="muted" id="wFindMsg"></span></div></div>
     <section class="stagecard"><div class="stagewrap" id="stageWrap">
   <div id="stage"><div id="jmap" hidden></div><div id="worldMsg" hidden></div><div id="worldBar" hidden><span id="worldBarT"></span> <button class="small" id="worldBack"></button></div><div id="guide" hidden></div><div id="cal" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
@@ -1163,10 +1163,9 @@ function runCmd(text) {
   return `${lv ? lv + '単位の ' : ''}${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${isBox ? '中のキューブの' : ''}${faceOf(targets[0].pin.face).name}を正面にしました${isBox ? '(箱は置き場所も向きもそのまま)' : ''}`;
 }
 const cam = { th: .45, ph: .34, dist: 24 };   // 最初は X・Y・Z のプラス側が見える向き
-// 軸の中心(原点か中央値)。見る中心もここに合わせ、X・Y・Z のプラスとマイナスの軸と名前を出す
+// 原点(0,0,0)に X・Y・Z のプラスとマイナスの軸と名前を出す。c は world の中での原点の位置(中央値で中身をずらしたとき)
 const homeC = new THREE.Vector3();
 function setHome(c, half, names = {}) {
-  tgtGoal.add(c.clone().sub(homeC)); homeC.copy(c);
   const g = new THREE.Group(); g.position.copy(c);
   ['x', 'y', 'z'].forEach((k, i) => {
     const col = new THREE.Color(css(['--ax', '--ay', '--az'][i]) || '#888'), e = new THREE.Vector3(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, k === 'z' ? 1 : 0), H = half[k];
@@ -1387,6 +1386,8 @@ function paint() {
   const span = Math.max(total, ...tops.map(sizeOf));
   world.updateMatrixWorld(true);
   const pts = groups.filter(x => !x.box).map(x => x.g.getWorldPosition(new THREE.Vector3())), c = curPref('center') === 'median' && pts.length ? new THREE.Vector3(median(pts.map(p => p.x)), median(pts.map(p => p.y)), median(pts.map(p => p.z))) : new THREE.Vector3();
+  // 中央値のときは中身をずらし、キューブの位置の中央値を原点(0,0,0)に重ねる。軸はいつも原点
+  world.position.copy(c).negate();
   const h = Math.max(span / 2, ...tops.map(sizeOf)) + 2; setHome(c, { x: h + Math.abs(c.x), y: h, z: h + Math.abs(c.z) });
   extent = { span, bottom: -Math.max(1, ...tops.map(sizeOf)) / 2 - .2 }; placeEnv(); renderWorldUi();
   if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
@@ -1720,12 +1721,11 @@ function paintLayout() {
     japanPins(items); renderWorldUi(); return;
   }
   // タイムスリップ(宇宙): X は日付で、光の線とその下の時間の目盛り。Y・Z にも項目を選べる(日付・数・区分)。
-  // 中心は「原点」(日付は今日、数は 0、区分は最初のもの)か「中央値」。X・Y・Z ともプラスとマイナスの軸を出す
+  // 「原点」はこれまで通り(並んだものの幅の真ん中を原点に)、「中央値」は並んだものの中央値を原点(0,0,0)に重ねる。X・Y・Z ともプラスとマイナスの軸を出す
   items.sort((a, b) => a.k - b.k);
-  const useMed = curPref('center') === 'median', now = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-  const cX = useMed && items.length ? median(items.map(i => i.k)) : now;
-  const lo = Math.min(cX, ...items.map(i => i.k)), hi = Math.max(cX, ...items.map(i => i.k));
-  const d0 = new Date(lo), d1 = new Date(hi), t0 = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1), t1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth() + 1, 1);
+  const useMed = curPref('center') === 'median', ks = items.length ? items.map(i => i.k) : [Date.now()];
+  const d0 = new Date(Math.min(...ks)), d1 = new Date(Math.max(...ks)), t0 = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1), t1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth() + 1, 1);
+  const cX = useMed && items.length ? median(ks) : (t0 + t1) / 2;
   const L = Math.max(24, Math.min(90, items.length * 4)), sX = L / (t1 - t0), X = t => (t - cX) * sX, xa = X(t0), xb = X(t1);
   const beamAt = (len, mid) => { const g = new THREE.Group(); g.position.x = mid;
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, len, 8), new THREE.MeshBasicMaterial({ color: 0xd8f4ff })); beam.rotation.z = Math.PI / 2; g.add(beam);
@@ -1738,8 +1738,8 @@ function paintLayout() {
     world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, -.15, 0), new THREE.Vector3(x, big ? -1.1 : -.6, 0)]), tick));
     if (i % every === 0 || big) { const lb = textSprite(big ? `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月` : `${d.getUTCMonth() + 1}月`, '#cfeeff', big ? .6 : .45); lb.position.set(x, big ? -1.7 : -1.2, 0); world.add(lb); }
   }
-  // 中心(今日か中央値)の印
-  { const lb = textSprite(useMed ? '中央値' : '今日', '#ffe9a8', .5); lb.position.set(0, -2.4, 0); world.add(lb);
+  // 中央値の印(中央値を原点にしたとき)
+  if (useMed && items.length) { const d = new Date(cX), lb = textSprite(`中央値 ${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`, '#ffe9a8', .5); lb.position.set(0, -2.4, 0); world.add(lb);
     world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -.15, 0), new THREE.Vector3(0, -2, 0)]), new THREE.LineBasicMaterial({ color: 0xffe9a8 }))); }
   const fy = slipAxis('y'), fz = slipAxis('z'), SY = fy ? axisScale(fy, items, 16, useMed) : null, SZ = fz ? axisScale(fz, items, 16, useMed) : null;
   const tickOn = (S2, k) => S2.ticks.forEach(([p, t]) => { const lb = textSprite(t, k === 'y' ? '#d9c8ff' : '#ffc8e0', .42); if (k === 'y') lb.position.set(xa - 1.6, p, 0); else lb.position.set(xa - 1.6, -.6, p); world.add(lb); });
@@ -1769,13 +1769,12 @@ function axisScale(f, items, len, useMed) {
   const vals = items.map(it => val(it.u)).filter(has), numOf = v => +String(v).replace(/[,円]/g, '');
   const dates = vals.length && vals.every(v => parseDate(v) != null), nums = !dates && vals.length && vals.every(v => isFinite(numOf(v)));
   if (dates || nums) {
-    const n = v => dates ? parseDate(v) : numOf(v), xs = vals.map(n), today = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
-    const c = useMed ? median(xs) : dates ? today : 0, lo = Math.min(c, ...xs), hi = Math.max(c, ...xs), sc = len / ((hi - lo) || 1);
+    const n = v => dates ? parseDate(v) : numOf(v), xs = vals.map(n), lo = Math.min(...xs), hi = Math.max(...xs), c = useMed ? median(xs) : (lo + hi) / 2, sc = len / ((hi - lo) || 1);
     const fmt = v => dates ? (d => `${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`)(new Date(v)) : String(Math.round(v * 100) / 100);
-    const ticks = [...new Set([lo, c, hi])].map(v => [(v - c) * sc, (v === c ? (useMed ? '中央値 ' : dates ? '今日 ' : '0 ') : '') + fmt(v)]);
+    const ticks = [...new Set(useMed ? [lo, c, hi] : [lo, hi])].map(v => [(v - c) * sc, (useMed && v === c ? '中央値 ' : '') + fmt(v)]);
     return { pos: u => has(val(u)) ? (n(val(u)) - c) * sc : null, ticks, half: Math.max(Math.abs(lo - c), Math.abs(hi - c)) * sc };
   }
-  const cats = [...new Set(vals.map(String))], ix = items.map(it => cats.indexOf(String(val(it.u)))).filter(i => i >= 0), c = useMed ? median(ix) : 0;
+  const cats = [...new Set(vals.map(String))], ix = items.map(it => cats.indexOf(String(val(it.u)))).filter(i => i >= 0), c = useMed ? median(ix) : (cats.length - 1) / 2;
   return { pos: u => has(val(u)) ? (cats.indexOf(String(val(u))) - c) * 3 : null, ticks: cats.map((t, i) => [(i - c) * 3, t]), half: Math.max(c, cats.length - 1 - c) * 3 };
 }
 function fitLayout() { if (fitted !== extent.span) { fitted = extent.span; cam.dist = Math.min(envLimit, fitDist(extent.span)); } }
