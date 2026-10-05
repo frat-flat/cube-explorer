@@ -6,7 +6,9 @@ import { isState, loadWorkspace, saveWorkspace, supabaseConfig, WorkspaceError }
 const unauthorized = () => Response.json({ error: "ログインが必要です" }, { status: 401 });
 const fail = (e: unknown) => {
   if (e instanceof WorkspaceError) return Response.json({ error: e.message }, { status: e.status });
-  throw e;
+  // Supabase 以外のものが返ってきた(JSON でない)などは、落とさずに理由を返す
+  console.error(e);
+  return Response.json({ error: `Supabase の応答を読めません: ${(e as Error).message}` }, { status: 502 });
 };
 
 export async function GET() {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { headers, isState, loadWorkspace, saveWorkspace, supabaseConfig, WorkspaceError } from "./workspace";
+import { headers, isState, urlProblem, loadWorkspace, saveWorkspace, supabaseConfig, WorkspaceError } from "./workspace";
 
 const cfg = { url: "https://abc.supabase.co", key: "sb_secret_x" };
 const state = { axes: [], boxes: [], sheets: [], saved: [], dict: [], history: [] };
@@ -56,6 +56,19 @@ describe("loadWorkspace / saveWorkspace", () => {
 
   it("Supabase がエラーを返したら WorkspaceError", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("no", { status: 401 })));
+    await expect(loadWorkspace(cfg, "a")).rejects.toBeInstanceOf(WorkspaceError);
+  });
+});
+
+describe("urlProblem", () => {
+  it("https://<ref>.supabase.co だけ通す", () => {
+    expect(urlProblem("https://abc.supabase.co")).toBeNull();
+    expect(urlProblem("abc.supabase.co")).toContain("https://");
+    expect(urlProblem("https://supabase.com/dashboard/project/abc")).toContain("管理画面");
+  });
+
+  it("つながらないときは落ちずに WorkspaceError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
     await expect(loadWorkspace(cfg, "a")).rejects.toBeInstanceOf(WorkspaceError);
   });
 });

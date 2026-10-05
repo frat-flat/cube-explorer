@@ -32,10 +32,33 @@ export function headers(key: string): Record<string, string> {
 
 export type Saved = { state: unknown; updatedAt: string } | null;
 
+/** SUPABASE_URL が https://<ref>.supabase.co の形か。違えば何が違うかを返す(値そのものは返さない) */
+export function urlProblem(url: string): string | null {
+  if (!/^https:\/\//.test(url)) return "SUPABASE_URL が https:// で始まっていません";
+  if (/supabase\.com\/dashboard/.test(url)) return "SUPABASE_URL が管理画面のアドレスになっています。https://<ref>.supabase.co の形にしてください";
+  try {
+    new URL(url);
+  } catch {
+    return "SUPABASE_URL がアドレスの形になっていません";
+  }
+  return null;
+}
+
+/** 問い合わせが届かない(アドレス違い・名前が引けない)ときも、落ちずに理由を返す */
+async function call(cfg: SupabaseConfig, path: string, init: RequestInit): Promise<Response> {
+  const bad = urlProblem(cfg.url);
+  if (bad) throw new WorkspaceError(bad, 500);
+  try {
+    return await fetch(`${cfg.url}${path}`, init);
+  } catch (e) {
+    throw new WorkspaceError(`Supabase(${new URL(cfg.url).host})につながりません: ${(e as Error).cause ?? (e as Error).message}`, 502);
+  }
+}
+
 export async function loadWorkspace(cfg: SupabaseConfig, owner: string): Promise<Saved> {
   const q = new URLSearchParams({ owner: `eq.${owner}`, select: "state,updated_at" });
-  const res = await fetch(`${cfg.url}/rest/v1/${TABLE}?${q}`, { headers: headers(cfg.key), cache: "no-store" });
-  if (!res.ok) throw new WorkspaceError(`Supabase から読めませんでした(${res.status})`, 502);
+  const res = await call(cfg, `/rest/v1/${TABLE}?${q}`, { headers: headers(cfg.key), cache: "no-store" });
+  if (!res.ok) throw new WorkspaceError(`Supabase から読めませんでした(${res.status}${res.status === 401 ? "、SUPABASE_SECRET_KEY を確かめてください" : ""})`, 502);
   const rows = (await res.json()) as { state: unknown; updated_at: string }[];
   return rows[0] ? { state: rows[0].state, updatedAt: rows[0].updated_at } : null;
 }
@@ -43,7 +66,7 @@ export async function loadWorkspace(cfg: SupabaseConfig, owner: string): Promise
 export async function saveWorkspace(cfg: SupabaseConfig, owner: string, state: unknown): Promise<string> {
   const body = JSON.stringify([{ owner, state, updated_at: new Date().toISOString() }]);
   if (body.length > MAX_STATE_BYTES) throw new WorkspaceError("保存する中身が大きすぎます", 413);
-  const res = await fetch(`${cfg.url}/rest/v1/${TABLE}?on_conflict=owner&select=updated_at`, {
+  const res = await call(cfg, `/rest/v1/${TABLE}?on_conflict=owner&select=updated_at`, {
     method: "POST",
     headers: { ...headers(cfg.key), prefer: "resolution=merge-duplicates,return=representation" },
     body,
