@@ -1097,8 +1097,9 @@ function facePivot(g, f, W, H, D, gap) {
   pv.position.set(nx * (W / 2 + gap), ny * (H / 2 + gap), nz * (D / 2 + gap)); pv.rotation.set(f.rot[0], f.rot[1], 0);
   pv.userData.base = pv.quaternion.clone(); g.add(pv); return pv;
 }
-// k が奇数(90度・270度)のときは横と縦の軸が入れ替わる
-const hvAt = (f, k) => { const [h, v] = BASE_HV[f.id]; return k % 2 ? { ...f, h: v, v: h } : { ...f, h, v }; };
+// k が奇数(90度・270度)のときは横と縦の軸が入れ替わる。
+// ただし②④⑥(縦横を入れ替えた目、半透明)は、上向きに起こしても軸は合わせず、指定した横・縦の軸のまま見せる
+const hvAt = (f, k) => { if (f.adv) return f; const [h, v] = BASE_HV[f.id]; return k % 2 ? { ...f, h: v, v: h } : { ...f, h, v }; };
 function addDice(g, u, W, H, D) {
   FACES.filter(f => f.n).forEach(f => {
     const len = { W, H, D }, aw = len[f.dims[0]], ah = len[f.dims[1]], pv = facePivot(g, f, W, H, D, .01);
