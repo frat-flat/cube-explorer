@@ -795,11 +795,11 @@ function renderPinBar() {
   if (!u) return;
   const allPinned = us.every(b => b.pin);
   $('selPin').textContent = allPinned ? '固定を外す' : us.length > 1 ? `${us.length}個とも固定する` : '固定する'; $('selPin').classList.toggle('on', allPinned);
-  $('selFace').innerHTML = FACES.filter(f => (faceUsable(f) || (u.pin && u.pin.face === f.id))).map(f => `<option value="${f.id}">${esc(us.length > 1 ? f.name : faceOpt(f, u))}</option>`).join('');
+  $('selFace').innerHTML = (allPinned ? '' : '<option value="">(目を選ぶと固定)</option>') + FACES.filter(f => (faceUsable(f) || (u.pin && u.pin.face === f.id))).map(f => `<option value="${f.id}">${esc(us.length > 1 ? f.name : faceOpt(f, u))}</option>`).join('');
   $('advFaces').checked = advOn();
   $('selFacePre').textContent = us.some(b => b.kind === 'box') ? '中のキューブの' : 'サイコロの';
   const pf = u.pin && faceOf(u.pin.face); $('faceSheet').hidden = !(us.length === 1 && u.kind === 'cube' && pf && pf.h != null);
-  $('selFace').value = u.pin ? u.pin.face || 'd1' : 'd1';
+  $('selFace').value = allPinned ? u.pin.face || 'd1' : '';
 }
 // 指示を読む: 「箱1を固定して②を正面」「法人Aは③」「全部①にそろえる」「キューブ2を外す」
 function runCmd(text) {
@@ -887,25 +887,26 @@ const cubeW = 2.2, cubeSlot = cubeW * Math.sqrt(3) + .1;   // 1マスはキュ�
 const childBoxes = b => S.boxes.filter(x => x.parent === b.id && x.kind === 'box');
 const descCubes = b => S.boxes.filter(x => x.parent === b.id).flatMap(x => x.kind === 'cube' ? [x] : descCubes(x));
 // 箱の中身(マス目に並べるもの)
-function contentsOf(b) {
-  const mode = showOf(levelOf(b)), own = S.sheets.filter(x => x.cube === b.id);
+// 見せるものはプルダウンと必ず一致させる: キューブだけ=シートを入れずにキューブだけ、シートだけ=中のキューブのシートも出す(キューブの枠は出さない)
+function contentsOf(b, mode = showOf(levelOf(b))) {
+  const own = S.sheets.filter(x => x.cube === b.id);
   const cubes = S.boxes.filter(x => x.parent === b.id && x.kind === 'cube'), boxes = childBoxes(b);
   if (mode === 'count') return [];
   if (mode === 'cube') return descCubes(b).map(u => ({ u }));
   if (mode === 'box') return boxes.map(u => ({ u }));
-  if (mode === 'sheet') return own.length ? [{ sheets: own }] : [];
+  if (mode === 'sheet') return [...(own.length ? [{ sheets: own }] : []), ...descCubes(b).map(c => S.sheets.filter(x => x.cube === c.id)).filter(l => l.length).map(l => ({ sheets: l }))];
   return [...boxes.map(u => ({ u })), ...cubes.map(u => ({ u })), ...(own.length ? [{ sheets: own }] : [])];
 }
 // 同じ単位の箱は同じ大きさ(その段でいちばん大きい箱に合わせる)
 function paint() {
   scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = [];
   const memo = {};
-  const natural = b => {
-    const items = contentsOf(b), n = Math.max(1, items.length), cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
+  const natural = (b, mode) => {
+    const items = contentsOf(b, mode), n = Math.max(1, items.length), cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
     const slot = Math.max(cubeSlot, ...items.filter(it => it.u && it.u.kind === 'box').map(it => sizeOf(it.u) + .5));
     return { items, cols, rows, slot, size: Math.max(cols, rows) * slot + .3 };
   };
-  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) memo[L] = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).map(x => natural(x).size)); return memo[L]; };
+  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) memo[L] = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); return memo[L]; };
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
     const bg = new THREE.Group(); bg.position.set(...pos); parent.add(bg);
@@ -919,6 +920,7 @@ function paint() {
       const t = textSprite([nb ? `箱 ${nb}` : '', `キューブ ${nc}`, `シート ${ns}`].filter(Boolean).join('・'), css('--muted'), .6); bg.add(t);
       return;
     }
+    if (!lay.items.length) { const NONE = { box: '中に箱はありません', cube: '中にキューブはありません', sheet: '中にシートはありません' }[showOf(levelOf(b))] || '空です'; bg.add(textSprite(NONE, css('--muted'), .5)); }
     lay.items.forEach((it, k) => {
       const c = k % lay.cols, r = Math.floor(k / lay.cols), p = [(c - (lay.cols - 1) / 2) * lay.slot, ((lay.rows - 1) / 2 - r) * lay.slot, 0];
       if (it.sheets) it.sheets.forEach((sh, i) => {   // 箱にじかに入れたシート(店舗をまたぐシートなど)
@@ -926,10 +928,10 @@ function paint() {
         m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); bg.add(m);
       });
       else if (it.u.kind === 'box') drawBox(it.u, bg, p, false);
-      else drawCube(it.u, bg, p);
+      else drawCube(it.u, bg, p, showOf(levelOf(b)) === 'cube');
     });
   };
-  const drawCube = (c, bg, pos) => {
+  const drawCube = (c, bg, pos, noSheets) => {
       const cg = new THREE.Group(); cg.position.set(...pos); bg.add(cg);
       const s = cubeW;
       // 触る判定用の見えない箱。固定したキューブはここをドラッグするとそれだけ回る
@@ -946,7 +948,7 @@ function paint() {
       const t3 = textSprite(names[2], css('--az'), .26); t3.position.set(-h - .1, -h - .25, 0); cg.add(t3);
       addDice(cg, c, s, s, s);
       const cl = textSprite(unitOf(c) + ' ' + c.name + (c.pin ? '(固定 ' + faceOf(c.pin.face).name + ')' : ''), css(c.pin ? '--hl' : '--accent'), .32); cl.position.set(0, h + .3, 0); cg.add(cl);
-      const shs = S.sheets.filter(x => x.cube === c.id);
+      const shs = noSheets ? [] : S.sheets.filter(x => x.cube === c.id);
       shs.forEach((sh, i) => {
         const on = used.has(sh.id);
         const m = new THREE.Mesh(new THREE.PlaneGeometry(s * .78, s * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, on), side: THREE.DoubleSide }));
@@ -1013,7 +1015,7 @@ $('save').onclick = saveQuery;
 $('selUnit').onchange = e => select(e.target.value || null);
 $('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
 $('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
-$('selFace').onchange = e => { selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
+$('selFace').onchange = e => { if (!e.target.value) return; selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
 $('advFaces').onchange = e => { S.advFaces = e.target.checked; save(); paint(); renderPinBar(); };
 // 固定した面をそのままシートにする: 縦の軸を行、横の軸を列に、奥行きの軸は手前の1枚(最初の値)、そのキューブの持ち主で絞る
 $('faceSheet').onclick = () => {
