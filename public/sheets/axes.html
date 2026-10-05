@@ -744,7 +744,7 @@ const faceOf = id => FACES.find(f => f.id === id) || FACES[0];
 const faceAxes = (f, c) => f.h == null || c.kind !== 'cube' ? '' : `横${ax(c.axes[f.h]).name}・縦${ax(c.axes[f.v]).name}`;
 const faceOpt = (f, c) => f.name + (faceAxes(f, c) ? '(' + faceAxes(f, c) + ')' : '');
 const pinTo = id => { const f = faceOf(id); return { yaw: f.yaw, pitch: f.pitch, roll: f.roll, face: f.id }; };
-const pinQ = new THREE.Quaternion(), pinE = new THREE.Euler(), invQ = new THREE.Quaternion();
+const pinQ = new THREE.Quaternion(), pinE = new THREE.Euler(), invQ = new THREE.Quaternion(), boxV = new THREE.Vector3();
 const units = () => S.boxes.filter(b => b.kind === 'box' || b.kind === 'cube');
 const levels = () => [...new Set(units().map(levelOf))];
 // sel は箱・キューブの id か、段ごとまとめて選ぶときの 'lv:法人'
@@ -871,7 +871,7 @@ function paint() {
     const W = boxW(b), H = 4.6, D = 4.6, cx = x0 + W / 2; x0 += W + gap;
     const bg = new THREE.Group(); bg.position.set(cx, 0, 0); world.add(bg);
     const fill = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: .05, depthWrite: false })); bg.add(fill);
-    fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, top: true }); addDice(bg, b, W, H, D);
+    fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, top: true, home: bg.position.clone() }); addDice(bg, b, W, H, D);
     if (b.pin) bg.add(edges(W + .16, H + .16, D + .16, new THREE.Color(css('--hl')), true, .9));
     if (selUnits().includes(b)) bg.add(edges(W + .3, H + .3, D + .3, new THREE.Color(css('--mine')), false, 1));
     bg.add(edges(W, H, D, new THREE.Color(css('--box')), true));
@@ -936,10 +936,11 @@ function loop() {
   camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
   camera.lookAt(0, 0, 0);
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
-  for (const { g, u, top, parentG } of groups) {
-    if (!u.pin) { g.quaternion.identity(); continue; }
+  for (const { g, u, top, parentG, home } of groups) {
+    if (!u.pin) { g.quaternion.identity(); if (top) g.position.copy(home); continue; }
     pinQ.setFromEuler(pinE.set(u.pin.pitch, u.pin.yaw, u.pin.roll || 0, 'ZXY'));
-    if (top) g.quaternion.copy(camera.quaternion);   // 箱は場所そのまま、正面をこちらに向けるだけ
+    // 固定した箱は画面に貼りつける: 最初の並び(左右の位置)のまま正面から見た所に置き、画面を回しても並びも向きも変わらない
+    if (top) { g.quaternion.copy(camera.quaternion); g.position.copy(boxV.set(home.x, home.y, -cam.dist).applyQuaternion(camera.quaternion).add(camera.position)); }
     else g.quaternion.copy(invQ.copy(parentG.quaternion).invert()).multiply(camera.quaternion).multiply(pinQ);
   }
   renderer.render(scene, camera); requestAnimationFrame(loop);
