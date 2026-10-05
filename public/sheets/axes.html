@@ -883,8 +883,46 @@ function sheetTex(sh, on) {
   x.font = '16px ' + css('--mono'); sh.rows.slice(0, 6).forEach((r, i) => x.fillText(r.slice(0, 3).join('  '), 12, 64 + i * 22));
   const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; return t;
 }
+// キューブの面にはその面の軸で並べたデータの表を貼る(横の軸=列、縦の軸=行)。
+// 奥行きの軸は、その面に近い側の1枚(表の面①③②は最初の値、裏の面④⑤⑥は最後の値)。表の面の値は「この面をシートにする」と同じ
+const short = v => Math.abs(v) >= 10000 ? (v / 10000).toFixed(1) + '万' : fmt(v);
+function faceData(c, f, fs) {
+  const mine = fs.filter(x => Object.entries(c.own).every(([a, v]) => x.k[a] === v));
+  const ha = c.axes[f.h], va = c.axes[f.v], da = c.axes.find((a, i) => i !== f.h && i !== f.v);
+  const hv = valuesOf(ha, mine), vv = valuesOf(va, mine), dv = valuesOf(da, mine);
+  const d = ['d4', 'd5', 'd6'].includes(f.id) ? dv[dv.length - 1] : dv[0];
+  const cell = (h, v) => mine.filter(x => x.k[ha] === h && x.k[va] === v && x.k[da] === d).reduce((a, x) => a + x.v, 0);
+  return { ha, va, da, hv, vv, d, cell };
+}
+function tableTex(c, f, fs, on) {
+  const D = faceData(c, f, fs), W = 512, H = 400, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  x.fillStyle = on ? css('--hlSoft') : css('--paper'); x.fillRect(0, 0, W, H);
+  x.strokeStyle = on ? css('--hl') : css('--paperLine'); x.lineWidth = on ? 10 : 4; x.strokeRect(2, 2, W - 4, H - 4);
+  x.fillStyle = css('--muted'); x.font = '26px ' + css('--sans'); x.textBaseline = 'middle';
+  x.fillText(`${ax(D.da).name}=${D.d ?? '-'}`, 16, 28);
+  const cols = D.hv.length, rows = D.vv.length; if (!cols || !rows) { x.fillText('データなし', 16, H / 2); }
+  else {
+    const top = 56, left = 120, cw = (W - left - 12) / cols, rh = (H - top - 12) / (rows + 1), ink = css('--paperInk');
+    x.font = '700 24px ' + css('--sans'); x.fillStyle = css('--ax');
+    D.hv.forEach((h, i) => { x.textAlign = 'center'; x.fillText(String(h).slice(-7), left + cw * (i + .5), top + rh / 2); });
+    D.vv.forEach((v, j) => { x.textAlign = 'left'; x.fillStyle = css('--ay'); x.fillText(String(v).slice(0, 6), 14, top + rh * (j + 1.5)); });
+    x.font = '26px ' + css('--mono'); x.fillStyle = ink; x.textAlign = 'right';
+    D.vv.forEach((v, j) => D.hv.forEach((h, i) => { const val = D.cell(h, v); x.fillText(val ? short(val) : '—', left + cw * (i + 1) - 10, top + rh * (j + 1.5)); }));
+    x.strokeStyle = css('--paperLine'); x.lineWidth = 2; x.beginPath(); x.moveTo(left, top + rh); x.lineTo(W - 12, top + rh); x.moveTo(left - 6, top); x.lineTo(left - 6, H - 12); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(cv); t.minFilter = THREE.LinearFilter; return t;
+}
+function addTables(g, c, s, fs) {
+  FACES.filter(f => f.n).forEach(f => {
+    const [nx, ny, nz] = f.n, m = new THREE.Mesh(new THREE.PlaneGeometry(s * .94, s * .7), new THREE.MeshBasicMaterial({ map: tableTex(c, f, fs, c.pin && c.pin.face === f.id), side: THREE.FrontSide, transparent: true, opacity: f.adv && !advOn() ? .55 : .97 }));
+    m.position.set(nx * (s / 2 + .005), ny * (s / 2 + .005), nz * (s / 2 + .005)); m.rotation.set(f.rot[0], f.rot[1], 0);
+    if (f.roll) m.rotateZ(LABEL_ROLL);
+    m.translateY(-s * .1);   // 上の端はサイコロの札
+    g.add(m);
+  });
+}
 // 箱の中に見せるもの(箱の段ごとに選ぶ)
-const SHOW = [['all', 'すべて(箱・キューブ・シート)'], ['box', '中の箱だけ(この箱の中に)'], ['cube', 'キューブだけ(この箱の中に。中の箱のキューブも並べる)'], ['sheet', 'シートだけ(キューブの中に。箱の枠は出さない)'], ['count', '名前と数だけ']];
+const SHOW = [['all', 'すべて(中の箱とキューブ。キューブの面に軸で並べたデータ)'], ['box', '中の箱だけ(この箱の中に)'], ['cube', 'キューブだけ(この箱の中に。中の箱のキューブも並べる)'], ['sheet', 'シートだけ(キューブの中の元のシート。箱の枠は出さない)'], ['count', '名前と数だけ']];
 const showOf = L => (S.boxShow || {})[L] || 'all';
 const cubeW = 2.2, cubeSlot = cubeW * Math.sqrt(3) + .1;   // 1マスはキューブがどの向きに回ってもはみ出ない広さ
 const childBoxes = b => S.boxes.filter(x => x.parent === b.id && x.kind === 'box');
@@ -903,7 +941,7 @@ function contentsOf(b, mode = showOf(levelOf(b))) {
 // 同じ単位の箱は同じ大きさ(その段でいちばん大きい箱に合わせる)
 function paint() {
   scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = [];
-  const memo = {};
+  const memo = {}, allFacts = facts();
   const natural = (b, mode) => {
     const items = contentsOf(b, mode), n = Math.max(1, items.length), cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
     const slot = Math.max(cubeSlot, ...items.filter(it => it.u && it.u.kind === 'box').map(it => sizeOf(it.u) + .5));
@@ -935,10 +973,10 @@ function paint() {
         m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); bg.add(m);
       });
       else if (it.u.kind === 'box') drawBox(it.u, bg, p, false);
-      else drawCube(it.u, bg, p, showOf(levelOf(b)) === 'cube');
+      else drawCube(it.u, bg, p, showOf(levelOf(b)) === 'sheet');
     });
   };
-  const drawCube = (c, bg, pos, noSheets) => {
+  const drawCube = (c, bg, pos, showSheets) => {
       const cg = new THREE.Group(); cg.position.set(...pos); bg.add(cg);
       const s = cubeW;
       // 触る判定用の見えない箱。固定したキューブはここをドラッグするとそれだけ回る
@@ -953,9 +991,11 @@ function paint() {
       const t1 = textSprite(names[0], css('--ax'), .26); t1.position.set(0, -h - .25, h); cg.add(t1);
       const t2 = textSprite(names[1], css('--ay'), .26); t2.position.set(-h - .1 - t2.scale.x / 2, 0, h); cg.add(t2);
       const t3 = textSprite(names[2], css('--az'), .26); t3.position.set(-h - .1, -h - .25, 0); cg.add(t3);
+      if (!showSheets) addTables(cg, c, s, allFacts);
       addDice(cg, c, s, s, s);
       const cl = textSprite(unitOf(c) + ' ' + c.name + (c.pin ? '(固定 ' + faceOf(c.pin.face).name + ')' : ''), css(c.pin ? '--hl' : '--accent'), .32); cl.position.set(0, h + .3, 0); cg.add(cl);
-      const shs = noSheets ? [] : S.sheets.filter(x => x.cube === c.id);
+      // シートは「シートだけ」のときだけキューブの中に出す。ふだんはキューブの面に軸で並べたデータを出す
+      const shs = showSheets ? S.sheets.filter(x => x.cube === c.id) : [];
       shs.forEach((sh, i) => {
         const on = used.has(sh.id);
         const m = new THREE.Mesh(new THREE.PlaneGeometry(s * .78, s * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, on), side: THREE.DoubleSide }));
