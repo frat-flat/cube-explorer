@@ -62,6 +62,10 @@ input[type=text]{min-width:0}
 .stagebar .sp{flex:1}
 #stage{position:relative;flex:1;min-height:340px;border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
 #stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#crumbs{position:absolute;left:10px;top:10px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;max-width:calc(100% - 20px)}
+#crumbs button{font-size:12.5px;padding:2px 8px;background:var(--panel)}
+#crumbs button.cur{border-color:var(--hl);background:var(--hlSoft)}
+#crumbs span{color:var(--muted);font-size:12px}
 #hint{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);pointer-events:none}
 #chain{font-size:13px;min-height:22px}
 #chain .step{display:inline-block;background:var(--hlSoft);border-radius:4px;padding:0 6px;margin:2px 2px 2px 0}
@@ -141,10 +145,10 @@ T-03	渡辺 陸	H-03</textarea>
     <button data-view="top">上から</button>
     <button data-view="side">横から</button>
     <span class="sp"></span>
-    <button id="lineMode">線: すべて</button>
+    <button id="lineMode">線: シートどうし</button>
     <button id="clearSel">選択を外す</button>
   </div>
-  <div id="stage"><div id="hint">ドラッグで回す・ホイールで寄る・シートの行を押すとつながる行が光る</div></div>
+  <div id="stage"><div id="crumbs" hidden></div><div id="hint">ドラッグで回す・ホイールで寄る・行を押すとつながる行が光る・▸のマスはダブルクリックで潜る</div></div>
   <div id="chain"></div>
   <div class="tablewrap"><table id="table"></table></div>
 </main>
@@ -169,7 +173,7 @@ const SAMPLE = () => ({
     { id:'shop', name:'ショップ', cols:['ショップID','法人ID','モール','店名'], rows:[
       ['S-01','H-01','楽天','みどり堂 本店'],['S-02','H-01','Yahoo','みどり堂 Yahoo店'],['S-03','H-02','楽天','すずらん'],
       ['S-04','H-03','楽天','山田商店'],['S-05','H-04','Yahoo','こばやし雑貨'],['S-06','H-05','楽天','カトウ公式'],['S-07','H-05','Yahoo','カトウ Yahoo店']]},
-    ...['2026-07','2026-08','2026-09'].map((m,mi) => ({ id:'pay'+mi, name:'入金 '+m, member:m, cols:['ショップID','売上','システム費用'],
+    ...['2026-07','2026-08','2026-09'].map((m,mi) => ({ id:'pay'+mi, name:'入金 '+m, member:m, cols:['ショップID','売上','システム費用'], drill:{ 1:'sales', 2:'fee' },
       rows:['S-01','S-02','S-03','S-04','S-05','S-06','S-07'].map((s,i) => {
         const v = Math.round((180 + i*47 + mi*23 + (i*mi*13)%40) * 1000);
         return [s, v.toLocaleString(), Math.round(v*0.08).toLocaleString()];
@@ -184,17 +188,19 @@ const SAMPLE = () => ({
   ],
   place: { app:'in', con:'in', corp:'in', shop:'in', 'st-pay':'in' }
 });
-const KEY = 'sheet-vessel-v1';
+const KEY = 'sheet-vessel-v2';
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || SAMPLE(); } catch(e) { S = SAMPLE(); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
 
 let active = S.sheets[0].id;          // 下の表に出すシート
 let sel = new Map();                 // sheetId -> Set(行)
-let lineMode = 'all';                // all | sel
+let lineMode = 'schema';             // schema(シートどうし+選んだ行) | rows(行もすべて) | none
+let path = [];                       // 潜った場所のたどり [{label, slots}]
+const virt = new Map();              // 潜った先で作ったシート
 const checked = new Set();
 
-const sheet = id => S.sheets.find(s => s.id === id);
+const sheet = id => S.sheets.find(s => s.id === id) || virt.get(id);
 const stackOf = sid => S.stacks.find(st => st.members.includes(sid));
 const slotSheets = slotId => { const st = S.stacks.find(s => s.id === slotId); return st ? st.members.map(sheet).filter(Boolean) : [sheet(slotId)].filter(Boolean); };
 const slotName = slotId => { const st = S.stacks.find(s => s.id === slotId); return st ? st.name + '(' + st.axis + 'で重ね)' : (sheet(slotId)||{}).name; };
@@ -208,6 +214,57 @@ function slots() {
   return out;
 }
 const placeOf = slotId => S.place[slotId] || 'in';
+// 今見ている枠の一覧。潜っていなければ器の一番上、潜っていればその場所の中身
+function viewSlots() {
+  if (path.length) return path[path.length - 1].slots;
+  return slots().map(id => { const st = S.stacks.find(s => s.id === id); return { id, sheets: slotSheets(id), stack: st ? { name: st.name, axis: st.axis } : null, place: placeOf(id) }; });
+}
+const viewLinks = () => path.length ? [] : S.links;
+
+// ---------- 潜る(セルの内訳) ----------
+const num = v => +String(v).replace(/[^\d.-]/g, '') || 0;
+const fmt = n => Math.round(n).toLocaleString();
+function rnd(seed) { let h = 2166136261; for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return () => ((h = Math.imul(h ^ (h >>> 13), 1597334677)) >>> 0) / 4294967296; }
+function split(total, n, r) { const w = Array.from({ length: n }, () => .4 + r()), sum = w.reduce((a, b) => a + b); const out = w.map(x => Math.round(total * x / sum / 10) * 10); out[n - 1] += total - out.reduce((a, b) => a + b); return out; }
+// 試作なので内訳は値から作る。本番では潜った先のシートを持つ(設計書「潜る」)
+const DRILLS = {
+  sales: (v, seed) => { const r = rnd(seed), cats = ['衣料', '雑貨', '食品', 'コスメ'], tot = split(num(v), 4, r);
+    return { name: '売上の内訳', cols: ['カテゴリ', '第1週', '第2週', '第3週', '第4週', '計'], drill: { 1: 'days', 2: 'days', 3: 'days', 4: 'days' },
+      rows: cats.map((c, i) => [c, ...split(tot[i], 4, r).map(fmt), fmt(tot[i])]) }; },
+  fee: (v, seed) => { const r = rnd(seed), items = ['決済手数料', '出店料', 'ポイント原資', '広告費'];
+    return { name: 'システム費用の内訳', cols: ['項目', '金額'], rows: split(num(v), 4, r).map((x, i) => [items[i], fmt(x)]) }; },
+  days: (v, seed) => { const r = rnd(seed), d = ['月', '火', '水', '木', '金', '土', '日'], amt = split(num(v), 7, r);
+    return { name: '日別', cols: ['曜日', '注文数', '売上'], rows: d.map((x, i) => [x, String(Math.max(1, Math.round(amt[i] / 4800))), fmt(amt[i])]) }; }
+};
+let vid = 0;
+function dive(sh, r, c) {
+  const kind = sh.drill && sh.drill[c]; if (!kind) return false;
+  const slot = viewSlots().find(s => s.sheets.includes(sh));
+  const members = slot && slot.stack && slot.sheets.length > 1 ? slot.sheets : [sh];
+  const key = sh.rows[r][0];
+  const inner = members.map(m => {
+    const rr = m === sh ? r : m.rows.findIndex(x => x[0] === key); if (rr < 0) return null;
+    const g = DRILLS[kind](m.rows[rr][c], m.id + ':' + rr + ':' + c);
+    g.id = 'v' + (++vid); g.member = m.member; virt.set(g.id, g); return g;
+  }).filter(Boolean);
+  const label = key + ' の' + sh.cols[c] + (members.length > 1 ? '(' + slot.stack.axis + 'ごと)' : sh.member ? '(' + sh.member + ')' : '');
+  const go = () => {
+    path.push({ label, slots: [{ id: 'd' + vid, sheets: inner, stack: members.length > 1 ? { name: inner[0].name, axis: slot.stack.axis } : null, place: 'in' }] });
+    sel = new Map(); active = inner[inner.length - 1].id;
+    Object.assign(camGoal, { tx: 0, ty: 0, tz: 0, dist: 15 }); cam.dist = 8;
+    viewChanged();
+  };
+  const p = cellWorld(sh.id, r, c);
+  if (p && !reduce) { Object.assign(camGoal, { tx: p.x, ty: p.y, tz: p.z, dist: 5 }); setTimeout(go, 380); } else go();
+  return true;
+}
+function goUp(n) { path.length = n; sel = new Map(); const v = viewSlots(); active = (v[0] && v[0].sheets[0] || {}).id; viewChanged(); }
+function renderCrumbs() {
+  const el = document.getElementById('crumbs'); el.hidden = !path.length; if (!path.length) return;
+  el.innerHTML = '<button data-n="0">器</button>' + path.map((p, i) => `<span>›</span><button data-n="${i + 1}"${i === path.length - 1 ? ' class="cur"' : ''}>${esc(p.label)}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => goUp(+b.dataset.n));
+}
+function viewChanged() { build(); renderList(); renderTable(); renderChain(); renderCrumbs(); }
 
 // ---------- つながりをたどる ----------
 function pairs(link) {
@@ -221,7 +278,7 @@ function pairs(link) {
 }
 function select(sid, row) {
   sel = new Map([[sid, new Set([row])]]);
-  const all = S.links.flatMap(pairs);
+  const all = viewLinks().flatMap(pairs);
   // 上へ(参照先へ)と下へ(参照元へ)を別々にたどる。兄弟の行までは広げない
   for (const dir of ['up', 'down']) {
     const seen = new Set([sid + ':' + row]), q = [[sid, row]];
@@ -250,23 +307,26 @@ stage.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
 const world = new THREE.Group(); scene.add(world);
-let cam = { yaw: -0.62, pitch: 0.38, dist: 21 }, camGoal = { ...cam };
+let cam = { yaw: -0.62, pitch: 0.38, dist: 21, tx: 0, ty: 0, tz: 0 }, camGoal = { ...cam };
 
 const COLW = 120, ROWH = 28, TITLEH = 38, HEADH = 30, PAD = 10;
 const meshes = [];   // {mesh, sh, cw, ch, s, canvas, tex}
-let lineObjs = [];   // {p, line, dots}
+let lineObjs = [];   // {type, p, obj}
+const hlGroup = new THREE.Group();
+const viewStack = new Map();   // sheetId -> 重ね(今の見え方)
+let cam2 = null;
 
 function drawSheet(o) {
   const { sh, canvas, cw, ch } = o, g = canvas.getContext('2d');
   g.setTransform(2, 0, 0, 2, 0, 0);
   g.fillStyle = css('--paper'); g.fillRect(0, 0, cw, ch);
   g.strokeStyle = css('--paperLine'); g.lineWidth = 1.5; g.strokeRect(1, 1, cw - 2, ch - 2);
-  const st = stackOf(sh.id);
+  const st = viewStack.get(sh.id);
   g.fillStyle = css('--paperInk'); g.font = '700 17px ' + css('--sans'); g.textBaseline = 'middle';
   g.fillText(sh.name, PAD, TITLEH / 2 + 2);
   if (st) { g.fillStyle = css('--stack'); g.font = '500 12px ' + css('--sans'); g.textAlign = 'right'; g.fillText(st.axis + ' = ' + (sh.member || sh.name), cw - PAD, TITLEH / 2 + 2); g.textAlign = 'left'; }
-  const keyCols = new Set(S.links.filter(l => slotSheets(l.to).includes(sh)).map(l => l.tcol));
-  const fkCols = new Map(S.links.filter(l => slotSheets(l.from).includes(sh)).map(l => [l.fcol, slotName(l.to)]));
+  const keyCols = new Set(viewLinks().filter(l => slotSheets(l.to).includes(sh)).map(l => l.tcol));
+  const fkCols = new Map(viewLinks().filter(l => slotSheets(l.from).includes(sh)).map(l => [l.fcol, slotName(l.to)]));
   g.fillStyle = css('--paper2'); g.fillRect(PAD, TITLEH, cw - PAD * 2, HEADH);
   sh.cols.forEach((c, i) => {
     const x = PAD + i * COLW;
@@ -276,7 +336,7 @@ function drawSheet(o) {
       g.fillStyle = fkCols.has(i) ? css('--accent') : css('--hl');
       g.font = '700 10px ' + css('--sans');
       g.fillText(fkCols.has(i) ? '→' : '鍵', x + COLW - 18, TITLEH + HEADH / 2);
-    }
+    } else if (sh.drill && sh.drill[i]) { g.fillStyle = css('--stack'); g.font = '700 12px ' + css('--sans'); g.fillText('▸', x + COLW - 16, TITLEH + HEADH / 2); }
   });
   sh.rows.forEach((r, ri) => {
     const y = TITLEH + HEADH + ri * ROWH;
@@ -324,8 +384,9 @@ const FACES = {
 };
 
 // 1つの枠(シート1枚か、重ねた束)を、local の +z を外向きに置く
-function buildSlot(slotId, parent, maxW, maxH, gap, outward) {
-  const shs = slotSheets(slotId), st = S.stacks.find(s => s.id === slotId);
+function buildSlot(slot, parent, maxW, maxH, gap, outward) {
+  const shs = slot.sheets, st = slot.stack && shs.length > 1 ? slot.stack : null;
+  if (st) shs.forEach(sh => viewStack.set(sh.id, st));
   const objs = shs.map((sh, k) => {
     const o = makeSheetMesh(sh, maxW, maxH);
     o.mesh.position.z = outward ? k * gap : (k - (shs.length - 1) / 2) * gap;
@@ -344,7 +405,7 @@ function buildSlot(slotId, parent, maxW, maxH, gap, outward) {
 
 function build() {
   while (world.children.length) { const c = world.children.pop(); c.traverse?.(n => { n.geometry?.dispose(); n.material?.map?.dispose(); n.material?.dispose?.(); }); }
-  meshes.length = 0;
+  meshes.length = 0; viewStack.clear(); lineObjs = []; hlGroup.clear();
   const frameCol = new THREE.Color(css('--frame'));
   if (S.shape === 'cube') {
     const box = new THREE.BoxGeometry(10, 10, 10);
@@ -357,16 +418,16 @@ function build() {
     world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(v), new THREE.LineBasicMaterial({ color: frameCol, transparent: true, opacity: .35 })));
     world.add(new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 10, 48, 1, true), new THREE.MeshBasicMaterial({ color: frameCol, transparent: true, opacity: .05, side: THREE.BackSide, depthWrite: false })));
   }
-  const all = slots();
+  const all = viewSlots();
   if (S.shape === 'cube') {
-    const ins = all.filter(id => placeOf(id) === 'in'), n = ins.length;
+    const ins = all.filter(sl => sl.place === 'in'), n = ins.length;
     ins.forEach((id, i) => {
       const g = new THREE.Group(), t = n === 1 ? 0 : i / (n - 1) - .5;
       g.position.set(t * 2.6, -t * 1.6, n === 1 ? 0 : t * 7.2);
       world.add(g); buildSlot(id, g, 6.2, 5.2, .7, false);
     });
     for (const [f, F] of Object.entries(FACES)) {
-      const on = all.filter(id => placeOf(id) === f); if (!on.length) continue;
+      const on = all.filter(sl => sl.place === f); if (!on.length) continue;
       const k = on.length;
       on.forEach((id, j) => {
         const g = new THREE.Group();
@@ -378,36 +439,55 @@ function build() {
   } else {
     const n = all.length;
     all.forEach((id, i) => {
-      const a = i / n * Math.PI * 2 + Math.PI / 2, r = placeOf(id) === 'in' ? 3.0 : 5.06;
+      const a = i / n * Math.PI * 2 + Math.PI / 2, r = id.place === 'in' ? 3.0 : 5.06;
       const g = new THREE.Group(); g.position.set(r * Math.cos(a), 0, r * Math.sin(a)); g.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
       world.add(g); buildSlot(id, g, Math.min(4.6, 30 / n * (r / 5.06)), 7.5, .35, true);
     });
   }
+  world.add(hlGroup);
   world.updateMatrixWorld(true);
   buildLines();
 }
 
+// 線は表の上を通さず、シートの左の外側を回す(どの角度から見ても文字に重ならない)
+function anchor(sid, r) {
+  const o = meshes.find(m => m.sh.id === sid); if (!o) return null;
+  const y = (o.ch / 2 - (r < 0 ? TITLEH + HEADH / 2 : TITLEH + HEADH + r * ROWH + ROWH / 2)) * o.s;
+  return { p: o.mesh.localToWorld(new THREE.Vector3(-(o.cw / 2 - PAD) * o.s, y, .01)), d: new THREE.Vector3(-1, 0, 0).transformDirection(o.mesh.matrixWorld) };
+}
+function route(a, b) {
+  const k = .45 + a.p.distanceTo(b.p) * .1;
+  return new THREE.CubicBezierCurve3(a.p, a.p.clone().addScaledVector(a.d, k), b.p.clone().addScaledVector(b.d, k), b.p);
+}
 function buildLines() {
-  for (const l of lineObjs) { world.remove(l.line); l.line.geometry.dispose(); l.line.material.dispose(); }
-  lineObjs = [];
-  for (const link of S.links) for (const p of pairs(link)) {
-    const a = cellWorld(p.fs, p.fr, link.fcol), b = cellWorld(p.ts, p.tr, link.tcol); if (!a || !b) continue;
-    const mid = a.clone().add(b).multiplyScalar(.5); mid.y += a.distanceTo(b) * .18;
-    const pts = new THREE.QuadraticBezierCurve3(a, mid, b).getPoints(24);
-    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ transparent: true }));
-    line.renderOrder = 5; world.add(line); lineObjs.push({ p, line });
+  for (const link of viewLinks()) {
+    // シートどうしのつながりは1本(ER図の線にあたる)。見出しの高さで結ぶ
+    const fs = slotSheets(link.from)[0], ts = slotSheets(link.to)[0];
+    const a = fs && anchor(fs.id, -1), b = ts && anchor(ts.id, -1);
+    if (a && b) {
+      const obj = new THREE.Mesh(new THREE.TubeGeometry(route(a, b), 40, .04, 6), new THREE.MeshBasicMaterial({ transparent: true }));
+      world.add(obj); lineObjs.push({ type: 'schema', obj });
+    }
+    for (const p of pairs(link)) {
+      const a2 = anchor(p.fs, p.fr), b2 = anchor(p.ts, p.tr); if (!a2 || !b2) continue;
+      const obj = new THREE.Line(new THREE.BufferGeometry().setFromPoints(route(a2, b2).getPoints(28)), new THREE.LineBasicMaterial({ transparent: true }));
+      world.add(obj); lineObjs.push({ type: 'row', p, obj, a: a2, b: b2 });
+    }
   }
   styleLines();
 }
 function styleLines() {
   const hl = new THREE.Color(css('--hl')), base = new THREE.Color(css('--accent'));
-  const any = sel.size > 0;
-  for (const { p, line } of lineObjs) {
-    const on = isSel(p.fs, p.fr) && isSel(p.ts, p.tr);
-    line.material.color.copy(on ? hl : base);
-    line.material.opacity = on ? 1 : (any ? .12 : .35);
-    line.material.depthTest = !on;
-    line.visible = on || lineMode === 'all';
+  hlGroup.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); }); hlGroup.clear();
+  for (const l of lineObjs) {
+    l.obj.material.color.copy(base);
+    if (l.type === 'schema') { l.obj.visible = lineMode !== 'none'; l.obj.material.opacity = sel.size ? .3 : .7; continue; }
+    const on = isSel(l.p.fs, l.p.fr) && isSel(l.p.ts, l.p.tr);
+    l.obj.visible = lineMode === 'rows' && !on; l.obj.material.opacity = .25;
+    if (on && lineMode !== 'none') {   // 選んだ行のつながりだけ、太く手前に描く
+      const t = new THREE.Mesh(new THREE.TubeGeometry(route(l.a, l.b), 32, .03, 6), new THREE.MeshBasicMaterial({ color: hl, depthTest: false, transparent: true }));
+      t.renderOrder = 6; hlGroup.add(t);
+    }
   }
 }
 
@@ -420,9 +500,9 @@ new ResizeObserver(resize).observe(stage);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function tick() {
   const k = reduce ? 1 : .15;
-  for (const key of ['yaw', 'pitch', 'dist']) cam[key] += (camGoal[key] - cam[key]) * k;
-  camera.position.set(cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw), cam.dist * Math.sin(cam.pitch), cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw));
-  camera.lookAt(0, 0, 0);
+  for (const key of ['yaw', 'pitch', 'dist', 'tx', 'ty', 'tz']) cam[key] += (camGoal[key] - cam[key]) * k;
+  camera.position.set(cam.tx + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw), cam.ty + cam.dist * Math.sin(cam.pitch), cam.tz + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw));
+  camera.lookAt(cam.tx, cam.ty, cam.tz);
   renderer.render(scene, camera); requestAnimationFrame(tick);
 }
 const cv = renderer.domElement; let drag = null;
@@ -431,15 +511,25 @@ cv.addEventListener('pointermove', e => {
   if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
   camGoal.yaw = drag.yaw - dx * .008; camGoal.pitch = Math.max(-1.5, Math.min(1.5, drag.pitch + dy * .008));
 });
-cv.addEventListener('pointerup', e => { if (drag && drag.moved < 5) pick(e); drag = null; });
+let lastUp = { t: 0, x: 0, y: 0 };
+cv.addEventListener('pointerup', e => {
+  if (drag && drag.moved < 5) {
+    const now = performance.now(), dbl = now - lastUp.t < 400 && Math.hypot(e.clientX - lastUp.x, e.clientY - lastUp.y) < 10;
+    lastUp = { t: dbl ? 0 : now, x: e.clientX, y: e.clientY };
+    pick(e, dbl);
+  }
+  drag = null;
+});
 cv.addEventListener('wheel', e => { e.preventDefault(); camGoal.dist = Math.max(8, Math.min(60, camGoal.dist * (1 + Math.sign(e.deltaY) * .1))); }, { passive: false });
 const ray = new THREE.Raycaster();
-function pick(e) {
+function pick(e, dbl) {
   const r = cv.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
   const hit = ray.intersectObjects(meshes.map(m => m.mesh))[0];
   if (!hit) { sel = new Map(); refreshSelection(); return; }
   const o = hit.object.userData.o, py = (1 - hit.uv.y) * o.ch, row = Math.floor((py - TITLEH - HEADH) / ROWH);
+  const col = Math.floor((hit.uv.x * o.cw - PAD) / COLW);
+  if (dbl && row >= 0 && row < o.sh.rows.length && dive(o.sh, row, col)) return;
   active = o.sh.id; renderList();
   if (row >= 0 && row < o.sh.rows.length) select(o.sh.id, row); else renderTable();
 }
@@ -447,7 +537,8 @@ document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => {
   document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b));
   Object.assign(camGoal, VIEWS[b.dataset.view]);
 });
-document.getElementById('lineMode').onclick = e => { lineMode = lineMode === 'all' ? 'sel' : 'all'; e.target.textContent = lineMode === 'all' ? '線: すべて' : '線: 選んだ行だけ'; styleLines(); };
+const LINE_MODES = { schema: ['rows', '線: シートどうし'], rows: ['none', '線: 行もすべて'], none: ['schema', '線: なし'] };
+document.getElementById('lineMode').onclick = e => { lineMode = LINE_MODES[lineMode][0]; e.target.textContent = LINE_MODES[lineMode][1]; styleLines(); };
 document.getElementById('clearSel').onclick = () => { sel = new Map(); refreshSelection(); };
 
 // ---------- 左の設定 ----------
@@ -554,15 +645,19 @@ $('shapeCyl').onclick = () => { S.shape = 'cyl'; save(); renderAll(); };
 // ---------- 下の表とつながりの説明 ----------
 function renderTable() {
   const sh = sheet(active), t = $('table'); if (!sh) { t.innerHTML = ''; return; }
-  const keyCols = new Set(S.links.filter(l => slotSheets(l.to).includes(sh)).map(l => l.tcol));
-  const fk = new Map(S.links.filter(l => slotSheets(l.from).includes(sh)).map(l => [l.fcol, slotName(l.to)]));
-  t.innerHTML = `<thead><tr><th>${esc(sh.name)}</th>${sh.cols.map((c, i) => `<th>${esc(c)}${fk.has(i) ? `<span class="tag">→ ${esc(fk.get(i))}</span>` : keyCols.has(i) ? '<span class="tag">鍵</span>' : ''}</th>`).join('')}</tr></thead>
+  const keyCols = new Set(viewLinks().filter(l => slotSheets(l.to).includes(sh)).map(l => l.tcol));
+  const fk = new Map(viewLinks().filter(l => slotSheets(l.from).includes(sh)).map(l => [l.fcol, slotName(l.to)]));
+  const title = sh.name + (sh.member && path.length ? ' ' + sh.member : '');
+  t.innerHTML = `<thead><tr><th>${esc(title)}</th>${sh.cols.map((c, i) => `<th>${esc(c)}${fk.has(i) ? `<span class="tag">→ ${esc(fk.get(i))}</span>` : keyCols.has(i) ? '<span class="tag">鍵</span>' : sh.drill && sh.drill[i] ? '<span class="tag">▸ 潜れる</span>' : ''}</th>`).join('')}</tr></thead>
     <tbody>${sh.rows.map((r, ri) => `<tr class="${isSel(sh.id, ri) ? 'hl' : ''}" data-r="${ri}"><td>${ri + 1}</td>${r.map((v, ci) => `<td data-c="${ci}" tabindex="0">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>`;
 }
 $('table').addEventListener('click', e => {
   const tr = e.target.closest('tbody tr'), sh = sheet(active); if (!tr || !sh) return;
   const td = e.target.closest('td[data-c]');
-  if (e.detail >= 2 && td) { td.contentEditable = 'true'; td.focus(); return; }   // 1回目の再描画で要素が替わっても直せるよう、回数で判定
+  if (e.detail >= 2 && td) {   // 1回目の再描画で要素が替わっても効くよう、回数で判定。▸の列は潜る、それ以外は直す
+    if (dive(sh, +tr.dataset.r, +td.dataset.c)) return;
+    td.contentEditable = 'true'; td.focus(); return;
+  }
   if (!td || !td.isContentEditable) select(sh.id, +tr.dataset.r);
 });
 $('table').addEventListener('keydown', e => {
@@ -576,17 +671,17 @@ $('table').addEventListener('focusout', e => {
 });
 function renderChain() {
   const el = $('chain');
-  if (!sel.size) { el.innerHTML = '<span class="note">行を押すと、その行がどのシートのどの行とつながっているかを上から順に出します。表のマスはダブルクリックで直せます。</span>'; return; }
-  const order = S.sheets.filter(s => sel.has(s.id));
+  if (!sel.size) { el.innerHTML = path.length ? '<span class="note">潜った先です。上のパンくずで戻れます。▸の列はさらに潜れます。</span>' : '<span class="note">行を押すと、つながる行をたどって順に出します。▸の付いた列(売上・システム費用)はダブルクリックで内訳に潜れます。ほかのマスはダブルクリックで直せます。</span>'; return; }
+  const order = viewSlots().flatMap(s => s.sheets).filter(s => sel.has(s.id));
   el.innerHTML = order.map(s => {
     const nc = s.cols.findIndex(c => /名$/.test(c)), rows = [...sel.get(s.id)].map(r => s.rows[r][nc >= 0 ? nc : 0]);
-    return `<span class="step">${esc(s.name)} ${esc(rows.join('・'))}</span>`;
+    return `<span class="step">${esc(s.name)}${s.member && path.length ? ' ' + esc(s.member) : ''} ${esc(rows.join('・'))}</span>`;
   }).join(' › ');
 }
 
 function renderAll() {
   $('shapeCube').classList.toggle('on', S.shape === 'cube'); $('shapeCyl').classList.toggle('on', S.shape !== 'cube');
-  renderList(); renderLinks(); build(); renderTable(); renderChain();
+  renderList(); renderLinks(); build(); renderTable(); renderChain(); renderCrumbs();
 }
 function applyTheme() { scene.background = new THREE.Color(css('--stage')); build(); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
