@@ -29,8 +29,8 @@ w.sky((0.004, 0.005, 0.012), 1.0)  # ごく弱い環境光(夜側が真っ黒に
 
 w.group("sky", A.size, unlit=True)            # 天の川・星雲・太陽(空の球)
 w.group("planet", A.size, rough=0.9)          # 惑星と環
-w.group("moon", A.size // 2, rough=0.95)
-w.group("rock", A.size, rough=0.92)           # 小惑星と作品の台
+w.group("moon", A.size // 2, rough=0.95, vcol=True)
+w.group("rock", A.size, rough=0.92, vcol=True)           # 小惑星と作品の台
 w.group("metal", A.size // 4, rough=0.35, metal=1.0)
 w.group("halo", A.size // 4, unlit=True, opacity=0.85)  # 惑星の大気の縁
 w.group("glow", bake=False)                   # 星・台の光の輪

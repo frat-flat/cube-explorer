@@ -15,6 +15,7 @@
   .title b { display: block; font-size: 15px; }
   .title span { color: var(--muted); font-size: 12px; }
   .btns { position: fixed; right: 16px; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  #pick { pointer-events: auto; margin-left: auto; align-self: flex-start; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 45vw; }
   button { font: inherit; font-size: 13px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; backdrop-filter: blur(8px); }
   button:hover, button:focus-visible { border-color: var(--accent); outline: none; }
   #load { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); pointer-events: none; padding: 0 16px; text-align: center; }
@@ -37,8 +38,17 @@
    json の主な項目: groups(組ごとの光の画像・倍率・ざらつき・unlit・opacity)/ spots(作品の場所)/ start / walk / fly /
    bg / fog / exposure / hemi / sun / reflect / palette / title / tip */
 (async () => {
+  // 公開ページ(WORLD_LIST あり)では、世界ごとのデータを <w>.data.js(GLB と json を埋め込んだスクリプト)で読む
+  const LIST = window.WORLD_LIST || null;
+  const W = window.WORLD_NAME || location.hash.slice(1) || new URLSearchParams(location.search).get("w") || (LIST ? LIST[0].id : "rpg");
+  if (LIST) {
+    const sel = document.createElement("select"); sel.id = "pick"; sel.setAttribute("aria-label", "世界を選ぶ");
+    sel.innerHTML = LIST.map((w) => `<option value="${w.id}"${w.id === W ? " selected" : ""}>${w.title}</option>`).join("");
+    sel.onchange = () => { location.hash = sel.value; location.reload(); };
+    document.querySelector(".top").appendChild(sel);
+    await new Promise((ok, ng) => { const sc = document.createElement("script"); sc.src = `${W}.data.js`; sc.onload = ok; sc.onerror = () => ng(new Error(`${W}.data.js`)); document.head.appendChild(sc); });
+  }
   const FILES = window.WORLD_FILES || {};
-  const W = window.WORLD_NAME || new URLSearchParams(location.search).get("w") || "rpg";
   const src = (name) => FILES[name] || name;
   const info = FILES[`${W}.json`] ? JSON.parse(decodeURIComponent(escape(atob(FILES[`${W}.json`].split(",")[1])))) : await (await fetch(`${W}.json`)).json();
   if (info.title) { document.getElementById("name").textContent = info.title; document.title = `${info.title} Blender版`; }
