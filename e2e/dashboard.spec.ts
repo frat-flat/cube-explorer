@@ -111,6 +111,10 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   await page.route("**/GLTFLoader.js", (r) => r.fulfill({ path: "node_modules/three/examples/js/loaders/GLTFLoader.js", contentType: "text/javascript" }));
   await page.route("**/meshopt_decoder.js", (r) => r.fulfill({ path: "node_modules/three/examples/js/libs/meshopt_decoder.js", contentType: "text/javascript" }));
+  await page.route("**/leaflet/1.9.4/leaflet.js", (r) => r.fulfill({ path: "node_modules/leaflet/dist/leaflet.js", contentType: "text/javascript" }));
+  await page.route("**/leaflet/1.9.4/leaflet.css", (r) => r.fulfill({ path: "node_modules/leaflet/dist/leaflet.css", contentType: "text/css" }));
+  // 地図のタイルは外に取りに行かず、1 ドットの画像で代わりにする
+  await page.route("https://cyberjapandata.gsi.go.jp/**", (r) => r.fulfill({ body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"), contentType: "image/png" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
@@ -126,15 +130,34 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await expect(page.locator("#worldBar")).toContainText("法人A の中");
   await page.keyboard.press("Escape");
   await expect(page.locator("#cal")).toBeVisible();
-  // 日本地図: 登録住所のある5つにピン
+  // 日付の枠を押すとその日: 時刻のあるもの(面談日時)は時間の横軸、無いものは縦のリスト
+  await page.locator(`#cal .day[data-day="${Date.UTC(2026, 3, 12)}"] .dn`).click();
+  await expect(page.locator("#cal h3")).toHaveText("2026年4月12日(日)");
+  await page.locator("#cField").selectOption("面談日時");
+  await expect(page.locator("#cal .ax.day .chip")).toHaveCount(2);
+  await expect(page.locator("#cal .ax.day")).toContainText("10:30 法人A");
+  await expect(page.locator("#cal .dl")).toContainText("法人C");
+  // 年: 3×4 の月。何月までのもの(開始予定)は月の見出しに
+  await page.locator("#cField").selectOption("開始予定");
+  await page.locator('#cal [data-cv="year"]').click();
+  await expect(page.locator("#cal h3")).toHaveText("2026年");
+  await expect(page.locator("#cal .ym")).toHaveCount(12);
+  await expect(page.locator("#cal .ym").nth(6).locator(".mo")).toContainText("法人A");
+  // 日本地図: 地理院タイルの地図に、登録住所のある5つのピン。案内は枠の外
   await page.locator('[data-wm="japan"]').click();
-  await expect(page.locator("#worldMsg")).toBeHidden({ timeout: 30_000 });
-  await expect(page.locator("#guide")).toContainText("ピン 5 件");
+  await expect(page.locator("#jmap .leaflet-interactive")).toHaveCount(5, { timeout: 30_000 });
+  await expect(page.locator("#stageWrap > #guide")).toContainText("ピン 5 件");
+  await page.locator('#guide [data-js="photo"]').click();
+  await expect(page.locator("#jmap .leaflet-tile").first()).toHaveAttribute("src", /seamlessphoto/);
+  await page.locator("#jmap .leaflet-interactive").first().dblclick();
+  await expect(page.locator("#worldBar")).toContainText("の中");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#jmap")).toBeVisible();
   // 宇宙: 申込日で並べる
   await page.locator('[data-wm="space"]').click();
   await expect(page.locator("#worldMsg")).toBeHidden({ timeout: 60_000 });
   await expect(page.locator("#guide")).toContainText("時間航行");
   await page.locator("#lField").selectOption("申込日");
-  await expect(page.locator("#guide")).toContainText("並んだもの 4 件");
+  await expect(page.locator("#stageWrap > #guide")).toContainText("並んだもの 4 件");
   expect(errors).toEqual([]);
 });

@@ -25,6 +25,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "leaflet": "^1.9.4",
     "supabase": "^2.119.0",
     "three": "^0.128.0",
     "tsx": "^4.23.15",
