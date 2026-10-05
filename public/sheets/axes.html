@@ -170,7 +170,7 @@ tfoot td{font-weight:700}
   </section>
 </aside>
 <main>
-  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span><button class="small" id="pinAlign">向きをそろえる</button><button class="small" id="pinAll">全部固定</button><button class="small" id="pinNone">固定を外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
+  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span><select id="pinFace" aria-label="そろえる面"></select><button class="small" id="pinAlign">この面にそろえる</button><button class="small" id="pinAll">全部固定</button><button class="small" id="pinNone">固定を外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
     <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
   <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
@@ -306,7 +306,7 @@ function renderTree() {
   const kids = p => S.boxes.filter(b => b.parent === p);
   const walk = (p, d) => kids(p).forEach(b => {
     const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
-    h += `<div class="node ind${d}${isUsed ? ' used' : ''}"><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span><button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回してもこのキューブは向きを変えない">${b.pin ? '固定中' : '固定'}</button>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}</div>`;
+    h += `<div class="node ind${d}${isUsed ? ' used' : ''}"><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span><button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回してもこのキューブは向きを変えない">${b.pin ? '固定中' : '固定'}</button>${b.pin ? `<select class="small" data-face="${b.id}" aria-label="こちらに向ける面">${FACES.map(f => `<option value="${f.id}"${(b.pin.face || 'naname') === f.id ? ' selected' : ''}>${esc(faceLabel(f, b))}</option>`).join('')}</select>` : ''}` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}</div>`;
     S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
@@ -314,6 +314,7 @@ function renderTree() {
   walk(null, 0);
   el.innerHTML = h;
   el.querySelectorAll('[data-pin]').forEach(n => n.onclick = () => togglePin(n.dataset.pin));
+  el.querySelectorAll('[data-face]').forEach(n => n.onchange = () => setFace(n.dataset.face, n.value));
   el.querySelectorAll('[data-addcube]').forEach(n => n.onclick = () => addCube(n.dataset.addcube));
   el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
 }
@@ -700,16 +701,33 @@ scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.Directio
 let world = new THREE.Group(); scene.add(world);
 let hits = [], cubeGroups = [];
 // キューブの固定: 固定したキューブは画面(カメラ)に対して同じ向きを保つ。全部同じ向きにそろえれば X軸どうしが横に並ぶ
-const PIN0 = { yaw: -.45, pitch: .34 };
+const PIN0 = { yaw: -.45, pitch: .34, face: 'naname' };
+// 面の名前。向ける面を選ぶと、その面がまっすぐこちらを向く。h=横の軸、v=縦の軸(キューブの軸 0=X,1=Y,2=Z)
+const FACES = [
+  { id: 'naname', name: '斜め', yaw: -.45, pitch: .34 },
+  { id: 'front', name: '正面', yaw: 0, pitch: 0, h: 0, v: 1, n: [0, 0, 1] },
+  { id: 'top', name: '上面', yaw: 0, pitch: Math.PI / 2, h: 0, v: 2, n: [0, 1, 0] },
+  { id: 'right', name: '右面', yaw: -Math.PI / 2, pitch: 0, h: 2, v: 1, n: [1, 0, 0] },
+  { id: 'back', name: '背面', yaw: Math.PI, pitch: 0, h: 0, v: 1, n: [0, 0, -1] },
+  { id: 'left', name: '左面', yaw: Math.PI / 2, pitch: 0, h: 2, v: 1, n: [-1, 0, 0] },
+  { id: 'bottom', name: '底面', yaw: 0, pitch: -Math.PI / 2, h: 0, v: 2, n: [0, -1, 0] },
+];
+const faceOf = id => FACES.find(f => f.id === id) || FACES[0];
+const faceLabel = (f, c) => f.h == null ? f.name : `${f.name}(${ax(c.axes[f.h]).name}×${ax(c.axes[f.v]).name})`;
+const pinTo = id => { const f = faceOf(id); return { yaw: f.yaw, pitch: f.pitch, face: f.id }; };
+function setFace(id, face) { const c = box(id); c.pin = pinTo(face); save(); renderTree(); paint(); renderPinBar(); }
 const pinQ = new THREE.Quaternion(), pinE = new THREE.Euler();
 function togglePin(id) { const c = box(id); if (c.pin) delete c.pin; else c.pin = { ...PIN0 }; save(); renderTree(); paint(); renderPinBar(); }
 function renderPinBar() {
   const cubes = S.boxes.filter(b => b.kind === 'cube'), n = cubes.filter(b => b.pin).length;
-  $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。キューブをドラッグでそれだけ回る、ダブルクリックで元の向き` : 'キューブを固定すると、画面を回しても向きが変わりません';
-  $('pinAlign').hidden = n < 2; $('pinNone').hidden = !n; $('pinAll').hidden = n === cubes.length;
+  $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。キューブをドラッグでそれだけ回る、ダブルクリックで選んだ面に戻る` : 'キューブを固定すると、画面を回しても向きが変わりません';
+  const pf = $('pinFace').value || 'front';
+  $('pinFace').innerHTML = FACES.map(f => `<option value="${f.id}">${f.h == null ? f.name : f.name + '(' + ['X', 'Y', 'Z'][f.h] + '×' + ['X', 'Y', 'Z'][f.v] + ')'}</option>`).join('');
+  $('pinFace').value = pf;
+  $('pinAlign').hidden = $('pinFace').hidden = !n; $('pinNone').hidden = !n; $('pinAll').hidden = n === cubes.length;
 }
 function pinAll(on) { S.boxes.filter(b => b.kind === 'cube').forEach(b => { if (on && !b.pin) b.pin = { ...PIN0 }; if (!on) delete b.pin; }); save(); renderTree(); paint(); renderPinBar(); }
-function pinAlign() { S.boxes.filter(b => b.pin).forEach(b => b.pin = { ...PIN0 }); save(); }
+function pinAlign() { const f = $('pinFace').value; S.boxes.filter(b => b.pin).forEach(b => b.pin = pinTo(f)); save(); renderTree(); paint(); }
 const cam = { th: -.45, ph: .34, dist: 19 };
 function textSprite(t, color, h) {
   const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 44px ' + css('--sans');
@@ -721,6 +739,13 @@ function edges(w, h, d, color, dashed, op = 1) {
   const g = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
   const m = dashed ? new THREE.LineDashedMaterial({ color, dashSize: .35, gapSize: .2, transparent: true, opacity: op }) : new THREE.LineBasicMaterial({ color, transparent: true, opacity: op });
   const l = new THREE.LineSegments(g, m); if (dashed) l.computeLineDistances(); return l;
+}
+function faceTex(t, on) {
+  const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 30px ' + css('--sans');
+  c.width = Math.ceil(x.measureText(t).width) + 24; c.height = 46; x.font = '700 30px ' + css('--sans');
+  x.fillStyle = on ? css('--hl') : css('--accent'); x.globalAlpha = on ? .95 : .7; x.beginPath(); x.roundRect ? x.roundRect(0, 0, c.width, 46, 10) : x.rect(0, 0, c.width, 46); x.fill();
+  x.globalAlpha = 1; x.fillStyle = '#fff'; x.textBaseline = 'middle'; x.fillText(t, 12, 24);
+  const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter; return tx;
 }
 function sheetTex(sh, on) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 200; const x = c.getContext('2d');
@@ -760,6 +785,16 @@ function paint() {
       const t1 = textSprite(names[0], css('--ax'), .26); t1.position.set(0, -h - .25, h); cg.add(t1);
       const t2 = textSprite(names[1], css('--ay'), .26); t2.position.set(-h - .1 - t2.scale.x / 2, 0, h); cg.add(t2);
       const t3 = textSprite(names[2], css('--az'), .26); t3.position.set(-h - .1, -h - .25, 0); cg.add(t3);
+      // 面の名前(外から見たときだけ読める。上の端に寄せてシートと重ねない)
+      const ROT = { front: [0, 0], back: [0, Math.PI], right: [0, Math.PI / 2], left: [0, -Math.PI / 2], top: [-Math.PI / 2, 0], bottom: [Math.PI / 2, 0] };
+      FACES.filter(f => f.n).forEach(f => {
+        const t = faceTex(faceLabel(f, c), c.pin && c.pin.face === f.id), lh = .42;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(s * .92, lh * t.image.width / t.image.height), lh), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+        const [nx, ny, nz] = f.n, e = s / 2 + .01, up = s / 2 - .3;
+        m.position.set(nx * e, ny * e, nz * e); m.rotation.set(ROT[f.id][0], ROT[f.id][1], 0);
+        if (ny > 0) m.position.z -= up; else if (ny < 0) m.position.z += up; else m.position.y += up;
+        cg.add(m);
+      });
       if (c.pin) cg.add(edges(s + .14, s + .14, s + .14, new THREE.Color(css('--hl')), true, .9));
       const cl = textSprite(c.name + (c.pin ? '(キューブ・固定)' : '(キューブ)'), css(c.pin ? '--hl' : '--accent'), .32); cl.position.set(0, h + .3, 0); cg.add(cl);
       const shs = S.sheets.filter(x => x.cube === c.id);
@@ -782,11 +817,11 @@ renderer.domElement.addEventListener('pointerdown', e => { const c = cubeAt(e); 
 renderer.domElement.addEventListener('pointermove', e => {
   if (!drag) { const c = cubeAt(e); renderer.domElement.style.cursor = c && c.pin ? 'move' : ''; return; }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
-  if (drag.cube) { drag.cube.pin.yaw += dx * .01; drag.cube.pin.pitch = Math.max(-1.5, Math.min(1.5, drag.cube.pin.pitch + dy * .01)); drag.moved = true; return; }
+  if (drag.cube) { drag.cube.pin.yaw += dx * .01; drag.cube.pin.pitch = Math.max(-1.58, Math.min(1.58, drag.cube.pin.pitch + dy * .01)); drag.moved = true; return; }
   cam.th -= dx * .006; cam.ph = Math.max(-.2, Math.min(1.3, cam.ph + dy * .005));
 });
 renderer.domElement.addEventListener('pointerup', () => { if (drag && drag.moved) save(); drag = null; });
-renderer.domElement.addEventListener('dblclick', e => { const c = cubeAt(e); if (c && c.pin) { c.pin = { ...PIN0 }; save(); } });
+renderer.domElement.addEventListener('dblclick', e => { const c = cubeAt(e); if (c && c.pin) { c.pin = pinTo(c.pin.face); save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(50, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
