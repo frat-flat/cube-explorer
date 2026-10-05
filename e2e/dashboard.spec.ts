@@ -91,6 +91,10 @@ test("World で設定した世界の中に立体を並べる", async ({ page }) 
   // 名前で探すと、そのキューブの中(無地)に入り、戻るボタンで世界に戻る
   // 和の庭では探す欄は立て札の中
   await expect(page.locator("#guide.sign")).toBeVisible();
+  // 検索・フィルターは 3D の枠の外。枠の中は右上の小さな案内図だけ
+  await expect(page.locator("#stageWrap > #guide")).toBeVisible();
+  await expect(page.locator("#stage input, #stage select")).toHaveCount(0);
+  await expect(page.locator("#miniMap svg")).toBeVisible();
   await page.locator("#gFind").fill("S-01");
   await page.locator("#gFind").press("Enter");
   await expect(page.locator("#worldBar")).toContainText("S-01 の中");
@@ -152,6 +156,7 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   // 立体で見る: カレンダーの並びのままキューブにする(上の帯だけ残る)
   await page.locator("#calCube").click();
   await expect(page.locator("#cal")).toHaveClass(/bar/);
+  await expect(page.locator("#stage #cal")).toHaveCount(0);
   await expect(page.locator("#cal .yg")).toHaveCount(0);
   await page.locator("#calCube").click();
   await expect(page.locator("#cal .yg")).toHaveCount(1);
@@ -175,8 +180,8 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await page.locator("#lFieldY").selectOption("@top");
   await page.locator("#lFieldZ").selectOption("契約日");
   await expect(page.locator("#stageWrap > #guide")).toContainText("並んだもの 4 件");
-  await page.locator('[data-center="median"]').click();
-  await expect(page.locator('[data-center="median"]')).toHaveClass(/on/);
+  await page.locator('[data-center="corner"]').click();
+  await expect(page.locator('[data-center="corner"]')).toHaveClass(/on/);
   await page.locator("#gHide").click();
   await expect(page.locator("#guide")).toHaveClass(/gc/);
   await page.locator("#gShow").click();
