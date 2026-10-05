@@ -683,6 +683,98 @@ create table cube_meta.built_presets (          -- 軸のプリセットと自�
 | 削除と履歴 | コマの削除を論理削除にするか、変更履歴を残すか(スプリント6の履歴と合わせる) |
 | 編集の権限 | 当面はログインできる人全員が組み立て・編集できる。分けるかは権限の検討時に決める |
 
+### シートを主役にする(2026-10-05 提案中)
+
+ユーザーの依頼(2026-10-05)「シートを組んでキューブ内に入れる、もしくは当て込む。そこにX軸が必要なら組み込むという形に大きく路線変更したい。シートのリレーションを見える化するのが目的。キューブである必要もない。ただし展示物は作品や建造物である必要があるので、外枠は3Dのキューブにしておく。途中で円形など形を変えるかも」。試作:https://claude.ai/artifact/4zvaWEvTpURbGzZUDUSVQb(リポジトリでは `public/sheets/index.html`、`/sheets` で開く)
+
+#### 位置づけの変更
+
+- **主役はシート(行×列の2軸の表)**。今までは「X・Y・Z の3軸のキューブ」を先に作っていたが、これからはシートを作り、シートどうしをつなぐ
+- **目的はシートどうしのつながり(リレーション)を見える化すること**。1章の「どこからどこへ引っ張ってきているのかが分からなくなる」への直接の答えにする
+- **3本目の軸は必要なときだけ足す**。列が同じシートを重ねると、重ねた方向が軸になり、1枚1枚が目盛りになる(例:「入金 2026-07」「2026-08」「2026-09」を重ねると「月」の軸)。ユーザーの言う「X軸を組み込む」はこの重ねる方向の軸と読む(今のビルダーの X・Y・Z の名前とは別)
+- **外枠(器)は3Dの立体のまま**。展示では器が作品・建造物になる。器の形は差し替えられるようにし、今は立方体、試しに円柱も用意する
+
+#### 用語(2章に追加)
+
+| 用語 | コード上の名前 | 意味 |
+|---|---|---|
+| シート | `Sheet` | 行×列の表。列の名前と行を持つ。1つの列を鍵にできる |
+| つながり | `SheetLink` | 元のシートの列 → 先のシートの列。値が同じ行どうしがつながる(外部キーと同じ考え方)。例:契約者.申込者ID → 申込者.申込者ID |
+| 重ね | `SheetStack` | 列が同じシートの束。重ねた方向が軸(名前を付ける。例:月)で、各シートが目盛り。つながりは束ごとに張れる |
+| 器 | `Vessel` | シートを入れる外枠。形(`shape`:今は `cube`、試しに `cylinder`)を持ち、展示ではこれが作品になる |
+| 置き方 | `Placement` | シートか重ねを器のどこに置くか。「中に入れる」か「面に当てる」(立方体なら正面・背面・左右・上・底の6面) |
+
+#### 見え方と操作
+
+- 器の中に入れたシートは、奥へ層のように並べ(少しずつずらして見出しが見えるようにする)、面に当てたシートは面に貼る。同じ面に複数あれば横に並べる
+- つながりは、元の行のマスと先の行のマスを曲線で結ぶ。普段は薄く全部描き、「線: 選んだ行だけ」にすると選んだ行のつながりだけ残る
+- 行を押すと(立体のシートでも下の表でも)、その行から**参照先へ上る方向**と**参照元へ下る方向**を別々にたどり、つながる行だけ光らせる。兄弟の行(同じ法人の別のショップなど)までは広げない。たどった順に「申込者 佐藤 健 › 契約者 K-01 › 法人 株式会社みどり堂 › ショップ みどり堂 本店 › 入金 2026-07 …」と出す
+- 重ねは束の横にピンクの軸の線と目盛りの点、軸の名前を出す。シートの見出しにも「月 = 2026-07」と出す
+- シートの左の設定で、置き方の切り替え、重ねる・ほどく、つながりの追加・削除、Excel の範囲を貼ってシートを作る、ができる
+- 形を変えてもシートとつながりのデータは変わらない。形ごとに「置き場所の一覧」を返す仕組みにして、形を足すときはそこだけ足す(円柱では「面に当てる」は壁沿い、「中に入れる」は内側の輪に並べる)
+
+#### 今までの仕組みとの関係
+
+- 今のキューブ(`BuiltCube`)は「Z の目盛りごとに X×Y のシートを重ねたもの」と読み替えられる。Z を使わないキューブはシート1枚。今のデータはこの読み替えで引き継ぐ
+- 上位・下位(`via`)は、つながりの1つの形(上位の軸の目盛り → 下位のシートの鍵の列)として表す
+- 目盛りの登録・表記・計算の目盛り・版・プリセット・大きな表の取り寄せは、シート単位でそのまま使う
+- 展示の世界(展示のダッシュボード)はそのまま使い、飾るものをキューブから器に替える
+
+#### データの持ち方(案)
+
+```sql
+create table cube_meta.sheets (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  stack_id uuid,                 -- 重ねに入っていれば束の id
+  stack_member text,             -- 重ねの中での目盛り(例 '2026-07')
+  position int not null
+);
+create table cube_meta.sheet_columns (
+  sheet_id uuid not null references cube_meta.sheets(id) on delete cascade,
+  col int not null, name text not null, value_type text not null default 'text',
+  primary key (sheet_id, col)
+);
+create table cube_data.sheet_rows (
+  sheet_id uuid not null references cube_meta.sheets(id) on delete cascade,
+  row_pos int not null,          -- 並び順の番号(大きな表は番号で取り寄せる)
+  cells jsonb not null,          -- 列の番号順の値
+  primary key (sheet_id, row_pos)
+);
+create table cube_meta.sheet_stacks (
+  id uuid primary key default gen_random_uuid(),
+  name text not null, axis_name text not null
+);
+create table cube_meta.sheet_links (   -- 元・先はシートか重ね
+  id uuid primary key default gen_random_uuid(),
+  from_ref uuid not null, from_col int not null,
+  to_ref uuid not null, to_col int not null
+);
+create table cube_meta.vessels (
+  id uuid primary key default gen_random_uuid(),
+  name text not null, shape text not null default 'cube'   -- 'cube' | 'cylinder' | …
+);
+create table cube_meta.placements (
+  vessel_id uuid not null references cube_meta.vessels(id) on delete cascade,
+  ref uuid not null,             -- シートか重ね
+  mode text not null,            -- 'in' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'
+  position int not null,
+  primary key (vessel_id, ref)
+);
+```
+
+- つながりの線は、表示するときに鍵の値で行を突き合わせて作る(線そのものは保存しない)
+- 行が多いシート(数万行以上)は、全部の線を描かず、見えている行と選んだ行のつながりだけ取り寄せて描く
+
+#### 未決(13章に追加)
+
+| 項目 | 内容 |
+|---|---|
+| 1つのシートを複数の器に置くか | 同じシートを別の器(作品)にも置けるようにするか |
+| 多対多のつながり | 鍵が重複する列どうしをつないだときの線の出し方(今は全部の組を結ぶ) |
+| 器の形 | 円柱の次に足す形と、形ごとの「面に当てる」の意味 |
+| 今のビルダーからの移り方 | `/builder` をシート方式に作り替えるか、`/sheets` を育てて置き換えるか |
+
 ### スプリント5：実DBへの接続
 
 - 既存DBのスキーマ(外部キー)を読み取り、軸・事実定義の**候補を自動生成**する機能
