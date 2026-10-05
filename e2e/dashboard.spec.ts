@@ -159,5 +159,17 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await expect(page.locator("#guide")).toContainText("時間航行");
   await page.locator("#lField").selectOption("申込日");
   await expect(page.locator("#stageWrap > #guide")).toContainText("並んだもの 4 件");
+  // Y・Z にも項目を選べる。軸の中心は原点か中央値。案内とメニューは閉じられる
+  await page.locator("#lFieldY").selectOption("@top");
+  await page.locator("#lFieldZ").selectOption("契約日");
+  await expect(page.locator("#stageWrap > #guide")).toContainText("並んだもの 4 件");
+  await page.locator('[data-center="median"]').click();
+  await expect(page.locator('[data-center="median"]')).toHaveClass(/on/);
+  await page.locator("#gHide").click();
+  await expect(page.locator("#guide")).toHaveClass(/gc/);
+  await page.locator("#gShow").click();
+  await expect(page.locator("#gFind")).toBeVisible();
+  await page.locator("#navToggle").click();
+  await expect(page.locator(".shell")).toHaveClass(/navc/);
   expect(errors).toEqual([]);
 });
