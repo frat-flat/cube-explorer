@@ -11,7 +11,7 @@
   --bg:#eef0f3; --panel:#ffffff; --ink:#1d2430; --muted:#5f6b7c; --line:#d5dae2;
   --paper:#fbfbf8; --paper2:#f1f2ee; --paperInk:#222a35; --paperLine:#c9ced6;
   --accent:#2d5bd7; --hl:#f2a516; --hlSoft:#fde7b6;
-  --stack:#d6338a; --frame:#7d8899; --stage:#e3e7ed;
+  --stack:#d6338a; --frame:#7d8899; --stage:#e3e7ed; --ax:#7a4fd0; --ay:#23935a;
   --sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   color-scheme:light;
@@ -20,12 +20,12 @@
   --bg:#141922; --panel:#1b222d; --ink:#e6eaf0; --muted:#98a3b3; --line:#2c3543;
   --paper:#243042; --paper2:#1f2938; --paperInk:#e6eaf0; --paperLine:#3a475a;
   --accent:#7ea2ff; --hl:#ffb938; --hlSoft:#5a4316;
-  --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; color-scheme:dark}}
+  --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; --ax:#b393ff; --ay:#5fd393; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141922; --panel:#1b222d; --ink:#e6eaf0; --muted:#98a3b3; --line:#2c3543;
   --paper:#243042; --paper2:#1f2938; --paperInk:#e6eaf0; --paperLine:#3a475a;
   --accent:#7ea2ff; --hl:#ffb938; --hlSoft:#5a4316;
-  --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; color-scheme:dark}
+  --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; --ax:#b393ff; --ay:#5fd393; color-scheme:dark}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding:0 16px;box-sizing:border-box;-webkit-user-select:none;user-select:none}
 *{box-sizing:border-box}
@@ -65,6 +65,7 @@ input[type=text]{min-width:0}
 #crumbs{position:absolute;left:10px;top:10px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;max-width:calc(100% - 20px)}
 #crumbs button{font-size:12.5px;padding:2px 8px;background:var(--panel)}
 #crumbs button.cur{border-color:var(--hl);background:var(--hlSoft)}
+#crumbs .tg{margin-left:10px;border-color:var(--stack);color:var(--stack)}
 #crumbs span{color:var(--muted);font-size:12px}
 #hint{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);pointer-events:none}
 #chain{font-size:13px;min-height:22px}
@@ -233,14 +234,16 @@ function split(total, n, r) { const w = Array.from({ length: n }, () => .4 + r()
 // 試作なので内訳は値から作る。本番では潜った先のシートを持つ(設計書「潜る」)
 const DRILLS = {
   sales: (v, seed) => { const r = rnd(seed), cats = ['衣料', '雑貨', '食品', 'コスメ'], tot = split(num(v), 4, r);
-    return { name: '売上の内訳', cols: ['カテゴリ', '第1週', '第2週', '第3週', '第4週', '計'], drill: { 1: 'days', 2: 'days', 3: 'days', 4: 'days' },
+    return { name: '売上の内訳', xName: '週', valueCols: [1, 2, 3, 4], cols: ['カテゴリ', '第1週', '第2週', '第3週', '第4週', '計'], drill: { 1: 'days', 2: 'days', 3: 'days', 4: 'days' },
       rows: cats.map((c, i) => [c, ...split(tot[i], 4, r).map(fmt), fmt(tot[i])]) }; },
   fee: (v, seed) => { const r = rnd(seed), items = ['決済手数料', '出店料', 'ポイント原資', '広告費'];
-    return { name: 'システム費用の内訳', cols: ['項目', '金額'], rows: split(num(v), 4, r).map((x, i) => [items[i], fmt(x)]) }; },
+    return { name: 'システム費用の内訳', xName: '金額', valueCols: [1], cols: ['項目', '金額'], rows: split(num(v), 4, r).map((x, i) => [items[i], fmt(x)]) }; },
   days: (v, seed) => { const r = rnd(seed), d = ['月', '火', '水', '木', '金', '土', '日'], amt = split(num(v), 7, r);
-    return { name: '日別', cols: ['曜日', '注文数', '売上'], rows: d.map((x, i) => [x, String(Math.max(1, Math.round(amt[i] / 4800))), fmt(amt[i])]) }; }
+    return { name: '日別', xName: '売上', valueCols: [2], cols: ['曜日', '注文数', '売上'], rows: d.map((x, i) => [x, String(Math.max(1, Math.round(amt[i] / 4800))), fmt(amt[i])]) }; }
 };
 let vid = 0;
+let diveView = 'cube';   // 潜った先を 子のキューブ(cube) か シート(sheet) で見る
+let selCell = null;      // 子のキューブで選んだコマ
 function dive(sh, r, c) {
   const kind = sh.drill && sh.drill[c]; if (!kind) return false;
   const slot = viewSlots().find(s => s.sheets.includes(sh));
@@ -253,20 +256,23 @@ function dive(sh, r, c) {
   }).filter(Boolean);
   const label = key + ' の' + sh.cols[c] + (members.length > 1 ? '(' + slot.stack.axis + 'ごと)' : sh.member ? '(' + sh.member + ')' : '');
   const go = () => {
+    selCell = null;
     path.push({ label, slots: [{ id: 'd' + vid, sheets: inner, stack: members.length > 1 ? { name: inner[0].name, axis: slot.stack.axis } : null, place: 'in' }] });
     sel = new Map(); active = inner[inner.length - 1].id;
-    Object.assign(camGoal, { tx: 0, ty: 0, tz: 0, dist: 15 }); cam.dist = 8;
+    Object.assign(camGoal, { tx: 0, ty: 0, tz: 0, dist: diveView === 'cube' ? 20 : 15 }); cam.dist = 8;
     viewChanged();
   };
-  const p = cellWorld(sh.id, r, c);
+  const p = cellWorld(sh.id, r, c) || blockWorld(sh.id, r, c);
   if (p && !reduce) { Object.assign(camGoal, { tx: p.x, ty: p.y, tz: p.z, dist: 5 }); setTimeout(go, 380); } else go();
   return true;
 }
-function goUp(n) { path.length = n; sel = new Map(); const v = viewSlots(); active = (v[0] && v[0].sheets[0] || {}).id; viewChanged(); }
+function goUp(n) { path.length = n; sel = new Map(); selCell = null; const v = viewSlots(); active = (v[0] && v[0].sheets[0] || {}).id; viewChanged(); }
 function renderCrumbs() {
   const el = document.getElementById('crumbs'); el.hidden = !path.length; if (!path.length) return;
   el.innerHTML = '<button data-n="0">器</button>' + path.map((p, i) => `<span>›</span><button data-n="${i + 1}"${i === path.length - 1 ? ' class="cur"' : ''}>${esc(p.label)}</button>`).join('');
-  el.querySelectorAll('button').forEach(b => b.onclick = () => goUp(+b.dataset.n));
+  el.innerHTML += `<button class="tg" id="dvToggle">${diveView === 'cube' ? 'シートで見る' : '子のキューブで見る'}</button>`;
+  el.querySelectorAll('button[data-n]').forEach(b => b.onclick = () => goUp(+b.dataset.n));
+  document.getElementById('dvToggle').onclick = () => { diveView = diveView === 'cube' ? 'sheet' : 'cube'; build(); renderCrumbs(); };
 }
 function viewChanged() { build(); renderList(); renderTable(); renderChain(); renderCrumbs(); }
 
@@ -318,7 +324,52 @@ const meshes = [];   // {mesh, sh, cw, ch, s, canvas, tex}
 let lineObjs = [];   // {type, p, obj}
 const hlGroup = new THREE.Group();
 const viewStack = new Map();   // sheetId -> 重ね(今の見え方)
-let cam2 = null;
+const blocks = [];   // 子のキューブのコマ
+scene.add(new THREE.AmbientLight(0xffffff, .78));
+const sun = new THREE.DirectionalLight(0xffffff, .45); sun.position.set(4, 9, 6); scene.add(sun);
+
+// 潜った先の重ねを、子のキューブとして描く。X=値の列(週など)、Y=行(カテゴリなど)、Z=重ねの軸(月)
+function buildChildCube(slot) {
+  const shs = slot.sheets, f = shs[0];
+  const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), ys = f.rows.map(r => r[0]);
+  const nx = vc.length, ny = ys.length, nz = shs.length;
+  const u = Math.min(6.4 / nx, 6.4 / ny, 6.4 / nz, 1.5), W = nx * u, H = ny * u, D = nz * u;
+  let max = 0; shs.forEach(sh => sh.rows.forEach(r => vc.forEach(c => { max = Math.max(max, num(r[c])); })));
+  const g = new THREE.Group(); world.add(g);
+  const lo = new THREE.Color(css('--paper')), hi = new THREE.Color(css('--accent'));
+  shs.forEach((sh, k) => sh.rows.forEach((r, ri) => vc.forEach((c, xi) => {
+    const t = max ? num(r[c]) / max : 0, col = lo.clone().lerp(hi, .12 + .88 * t);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(u * .78, u * .78, u * .78), new THREE.MeshLambertMaterial({ color: col }));
+    m.position.set(-W / 2 + (xi + .5) * u, H / 2 - (ri + .5) * u, D / 2 - (k + .5) * u);
+    m.userData.cell = { sid: sh.id, r: ri, c, base: col };
+    g.add(m); blocks.push(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--frame')), transparent: true, opacity: .55 }));
+    e.position.copy(m.position); g.add(e);
+  })));
+  g.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W + .3, H + .3, D + .3)), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--stack')) })));
+  const cx = css('--ax'), cy = css('--ay'), cz = css('--stack');
+  vc.forEach((c, xi) => { const sp = textSprite(f.cols[c], cx, .3); sp.position.set(-W / 2 + (xi + .5) * u, -H / 2 - .45, D / 2 + .2); g.add(sp); });
+  ys.forEach((y, ri) => { const sp = textSprite(y, cy, .3); sp.position.set(-W / 2 - .35 - sp.scale.x / 2, H / 2 - (ri + .5) * u, D / 2 + .2); g.add(sp); });
+  if (nz > 1) shs.forEach((sh, k) => { const sp = textSprite(sh.member || sh.name, cz, .28); sp.position.set(W / 2 + .35 + sp.scale.x / 2, -H / 2 - .25, D / 2 - (k + .5) * u); g.add(sp); });
+  const names = [[`X: ${f.xName || '値'}`, cx, [0, -H / 2 - 1.0, D / 2 + .2]], [`Y: ${f.cols[0]}`, cy, [-W / 2 - 1.6, H / 2 + .55, D / 2 + .2]]];
+  if (nz > 1) names.push([`Z: ${slot.stack.axis}`, cz, [W / 2 + 1.2, -H / 2 - .8, 0]]);
+  names.forEach(([t, c, pos]) => { const sp = textSprite(t, c, .38); sp.position.set(...pos); g.add(sp); });
+  const ttl = textSprite((path[path.length - 1] || {}).label + '(子のキューブ)', cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
+  styleBlocks();
+}
+function blockWorld(sid, r, c) {
+  const b = blocks.find(m => m.userData.cell.sid === sid && m.userData.cell.r === r && m.userData.cell.c === c);
+  return b ? b.getWorldPosition(new THREE.Vector3()) : null;
+}
+function styleBlocks() {
+  const hl = new THREE.Color(css('--hl'));
+  for (const b of blocks) {
+    const { sid, r, c, base } = b.userData.cell;
+    const exact = selCell && selCell.sid === sid && selCell.r === r && selCell.c === c;
+    b.material.color.copy(exact ? hl : isSel(sid, r) ? base.clone().lerp(hl, .45) : base);
+    b.scale.setScalar(exact ? 1.12 : 1);
+  }
+}
 
 function drawSheet(o) {
   const { sh, canvas, cw, ch } = o, g = canvas.getContext('2d');
@@ -409,7 +460,7 @@ function buildSlot(slot, parent, maxW, maxH, gap, outward) {
 
 function build() {
   while (world.children.length) { const c = world.children.pop(); c.traverse?.(n => { n.geometry?.dispose(); n.material?.map?.dispose(); n.material?.dispose?.(); }); }
-  meshes.length = 0; viewStack.clear(); lineObjs = []; hlGroup.clear();
+  meshes.length = 0; blocks.length = 0; viewStack.clear(); lineObjs = []; hlGroup.clear();
   const frameCol = new THREE.Color(css('--frame'));
   if (S.shape === 'cube') {
     const box = new THREE.BoxGeometry(10, 10, 10);
@@ -423,7 +474,8 @@ function build() {
     world.add(new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 10, 48, 1, true), new THREE.MeshBasicMaterial({ color: frameCol, transparent: true, opacity: .05, side: THREE.BackSide, depthWrite: false })));
   }
   const all = viewSlots();
-  if (S.shape === 'cube') {
+  if (path.length && diveView === 'cube') buildChildCube(all[0]);
+  else if (S.shape === 'cube') {
     const ins = all.filter(sl => sl.place === 'in'), n = ins.length;
     ins.forEach((id, i) => {
       const g = new THREE.Group(), t = n === 1 ? 0 : i / (n - 1) - .5;
@@ -495,7 +547,7 @@ function styleLines() {
   }
 }
 
-function refreshSelection() { meshes.forEach(drawSheet); styleLines(); renderTable(); renderChain(); }
+function refreshSelection() { meshes.forEach(drawSheet); styleLines(); styleBlocks(); renderTable(); renderChain(); }
 
 // ---------- カメラと操作 ----------
 const VIEWS = { oblique: { yaw: -0.62, pitch: 0.38 }, front: { yaw: 0, pitch: 0 }, top: { yaw: 0, pitch: 1.45 }, side: { yaw: -Math.PI / 2, pitch: 0.05 } };
@@ -529,8 +581,13 @@ const ray = new THREE.Raycaster();
 function pick(e, dbl) {
   const r = cv.getBoundingClientRect();
   ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
-  const hit = ray.intersectObjects(meshes.map(m => m.mesh))[0];
-  if (!hit) { sel = new Map(); refreshSelection(); return; }
+  const hit = ray.intersectObjects([...meshes.map(m => m.mesh), ...blocks])[0];
+  if (!hit) { sel = new Map(); selCell = null; refreshSelection(); return; }
+  if (hit.object.userData.cell) {
+    const { sid, r, c } = hit.object.userData.cell;
+    if (dbl && dive(sheet(sid), r, c)) return;
+    active = sid; selCell = { sid, r, c }; renderList(); select(sid, r); return;
+  }
   const o = hit.object.userData.o, py = (1 - hit.uv.y) * o.ch, row = Math.floor((py - TITLEH - HEADH) / ROWH);
   const col = Math.floor((hit.uv.x * o.cw - PAD) / COLW);
   if (dbl && row >= 0 && row < o.sh.rows.length && dive(o.sh, row, col)) return;
@@ -659,6 +716,7 @@ $('table').addEventListener('click', e => {
   const tr = e.target.closest('tbody tr'), sh = sheet(active); if (!tr || !sh) return;
   const td = e.target.closest('td[data-c]');
   if (e.target.closest('.dv')) { dive(sh, +tr.dataset.r, +td.dataset.c); return; }
+  selCell = td && sh.valueCols && sh.valueCols.includes(+td.dataset.c) ? { sid: sh.id, r: +tr.dataset.r, c: +td.dataset.c } : null;
   if (e.detail >= 2 && td) {   // 1回目の再描画で要素が替わっても効くよう、回数で判定。▸の列は潜る、それ以外は直す
     if (dive(sh, +tr.dataset.r, +td.dataset.c)) return;
     td.contentEditable = 'true'; td.focus(); return;
@@ -680,7 +738,7 @@ function renderChain() {
   const el = $('chain');
   if (!sel.size) {
     const ex = !path.length && S.sheets.find(x => x.drill && x.rows.length);
-    el.innerHTML = (path.length ? '<span class="note">潜った先です。立体の左上のパンくずで戻れます。「▸ 内訳」のマスはさらに潜れます。</span>'
+    el.innerHTML = (path.length ? '<span class="note">潜った先です。立体の左上のパンくずで戻れます。子のキューブのコマを押すと表の行が光り、ダブルクリックするとさらに潜れます(表の「▸ 内訳」でも潜れます)。</span>'
       : '<span class="note">行を押すと、つながる行をたどって順に出します。「▸ 内訳」の付いたマスは押すと内訳へ潜れます。</span>')
       + (ex ? `<br><button class="go" data-s="${ex.id}" data-r="0" data-c="${Object.keys(ex.drill)[0]}">例: ${esc(ex.rows[0][0])} の${esc(ex.cols[Object.keys(ex.drill)[0]])}へ潜る ▸</button>` : '');
     return;
@@ -694,7 +752,7 @@ function renderChain() {
   el.innerHTML = order.map(s => {
     const nc = s.cols.findIndex(c => /名$/.test(c)), rows = [...sel.get(s.id)].map(r => s.rows[r][nc >= 0 ? nc : 0]);
     return `<span class="step">${esc(s.name)}${s.member && path.length ? ' ' + esc(s.member) : ''} ${esc(rows.join('・'))}</span>`;
-  }).join(' › ') + (gos.size ? '<br>' + [...gos.values()].join('') : '');
+  }).join(' › ') + (selCell && sheet(selCell.sid) ? (() => { const sc = sheet(selCell.sid); return `<br><span class="step">選んだコマ: ${esc(sc.member || '')} ${esc(sc.rows[selCell.r][0])} × ${esc(sc.cols[selCell.c])} = ${esc(sc.rows[selCell.r][selCell.c])}</span>`; })() : '') + (gos.size ? '<br>' + [...gos.values()].join('') : '');
 }
 $('chain').addEventListener('click', e => { const b = e.target.closest('.go'); if (b) dive(sheet(b.dataset.s), +b.dataset.r, +b.dataset.c); });
 
