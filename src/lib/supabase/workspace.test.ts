@@ -16,6 +16,9 @@ describe("supabaseConfig", () => {
     expect(supabaseConfig()).toBeNull();
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_x");
     expect(supabaseConfig()).toEqual(cfg);
+    // 貼り付けで紛れ込んだ改行や空白は取り除く
+    vi.stubEnv("SUPABASE_SECRET_KEY", " sb_sec\nret_x\n");
+    expect(supabaseConfig()).toEqual(cfg);
   });
 });
 

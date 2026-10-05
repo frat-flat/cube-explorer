@@ -18,8 +18,9 @@ export class WorkspaceError extends Error {
 export type SupabaseConfig = { url: string; key: string };
 
 export function supabaseConfig(): SupabaseConfig | null {
-  const url = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
-  const key = (process.env.SUPABASE_SECRET_KEY ?? "").trim();
+  const url = (process.env.SUPABASE_URL ?? "").replace(/\s+/g, "").replace(/\/+$/, "");
+  // 鍵に空白や改行は入らないので、貼り付けで紛れ込んだ分は取り除く
+  const key = (process.env.SUPABASE_SECRET_KEY ?? "").replace(/\s+/g, "");
   return url && key ? { url, key } : null;
 }
 
@@ -51,7 +52,9 @@ async function call(cfg: SupabaseConfig, path: string, init: RequestInit): Promi
   try {
     return await fetch(`${cfg.url}${path}`, init);
   } catch (e) {
-    throw new WorkspaceError(`Supabase(${new URL(cfg.url).host})につながりません: ${(e as Error).cause ?? (e as Error).message}`, 502);
+    // エラー文には鍵の一部が入ることがあるので、そのままは返さない
+    console.error(e);
+    throw new WorkspaceError(`Supabase(${new URL(cfg.url).host})につながりません。SUPABASE_URL と SUPABASE_SECRET_KEY を確かめてください`, 502);
   }
 }
 
