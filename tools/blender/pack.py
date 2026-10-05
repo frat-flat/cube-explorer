@@ -37,7 +37,9 @@ s = open(os.path.join(WORLDS, "world.html"), encoding="utf-8").read()
 for t in ['<!doctype html>\n', '<html lang="ja">\n', '<head>\n', '</head>\n', '<body>\n', '</body>\n', '</html>\n', '<meta charset="utf-8">\n',
           '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n']:
     s = s.replace(t, "")
-s = s.replace("<title>展示の世界 Blender版</title>", "<title>展示の世界 Blender版</title>")
+# 共通の読み込み部品は埋め込む(公開ページは files に無いパスを読めない)
+bw = open(os.path.join(WORLDS, "blender-world.js"), encoding="utf-8").read()
+s = s.replace('<script src="blender-world.js"></script>', f"<script>\n{bw}</script>")
 s = s.replace('<script src="https://cdnjs', f"<script>window.WORLD_LIST = {json.dumps(lst, ensure_ascii=False)};</script>\n<script src=\"https://cdnjs", 1)
 open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(s)
 for fn in sorted(os.listdir(out)):

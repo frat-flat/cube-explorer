@@ -4,6 +4,7 @@
 
 赤い光線・監視カメラ・ガラスケース・懐中電灯はブラウザ側で動かす(public/worlds/heist.html)。
 """
+import json
 import math
 import os
 import sys
@@ -196,6 +197,10 @@ for k in range(4):
 w.extra["cams"] = cams
 w.extra["R"], w.extra["H"], w.extra["RI"], w.extra["DOME"], w.extra["OCU"] = R, H, RI, DOME, OCU
 w.extra["start"] = {"x": 0, "z": R - 1.6, "yaw": 0, "pitch": -0.05}
+# 共通のビューア(world.html・ビルダーの展示)用。heist.html は懐中電灯と光線を自分で足す
+w.extra.update(title="赤外線センサーが張られた夜の美術館", tip="月明かりのドームの下を、展示台の作品を順に見て回ります。",
+               walk=[{"t": "circ", "x": 0, "z": 0, "r": R - 0.7}], bg="#040506", exposure=1.4, hemi=["#5a6488", "#101014", 0.6],
+               palette=["#4a2a0c", "#ffd98e"], glowCubes=True, spotColor="#ffe6c0", spotIntensity=3.2)
 
 # ---- 月明かり(天窓から斜めに差す) ----
 w.light("SUN", (0, H + DOME + 5, 0), 1.6, (0.62, 0.74, 1.0), target=(1.2, 0, -1.0), angle=math.radians(0.6))
@@ -210,4 +215,13 @@ if A.still:
         os._exit(0)
 
 w.export(A.out)
+# 共通のビューアでは光の画像の赤みを抜いて少し明るく(heist.html は自分で同じことをする)
+jp = os.path.splitext(A.out)[0] + ".json"
+with open(jp) as f:
+    info = json.load(f)
+for g in info["groups"].values():
+    if g.get("light"):
+        g.update(lift=0.1, sat=0.3)
+with open(jp, "w") as f:
+    json.dump(info, f, ensure_ascii=False, indent=1)
 os._exit(0)

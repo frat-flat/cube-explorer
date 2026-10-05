@@ -1,0 +1,135 @@
+{
+ "groups": {
+  "gravel": {
+   "rough": 0.95,
+   "metal": 0.0,
+   "light": "zen_gravel_light.jpg",
+   "lightScale": 1.1940017938613892
+  },
+  "deck": {
+   "rough": 0.6,
+   "metal": 0.0,
+   "light": "zen_deck_light.jpg",
+   "lightScale": 1.6586315631866455
+  },
+  "stone": {
+   "rough": 0.9,
+   "metal": 0.0,
+   "light": "zen_stone_light.jpg",
+   "lightScale": 1.8927969932556152
+  },
+  "plants": {
+   "vcol": true,
+   "lightScale": 0.600463330745697,
+   "rough": 0.85,
+   "metal": 0
+  },
+  "fence": {
+   "vcol": true,
+   "lightScale": 0.7847663760185242,
+   "rough": 0.7,
+   "metal": 0
+  },
+  "water": {
+   "rough": 0.05,
+   "metal": 0.0,
+   "opacity": 0.78,
+   "light": "zen_water_light.jpg",
+   "lightScale": 1.0790005922317505
+  },
+  "sky": {
+   "rough": 0.8,
+   "metal": 0.0,
+   "unlit": true,
+   "nofog": true
+  }
+ },
+ "spots": [
+  {
+   "x": -6.0,
+   "y": 0.63,
+   "z": 3.5,
+   "face": 0.6259247939487887,
+   "dist": 3.4,
+   "r": 1.7,
+   "lift": 0.04
+  },
+  {
+   "x": 3.5,
+   "y": 0.63,
+   "z": 1.0,
+   "face": -0.31339420294520665,
+   "dist": 3.4,
+   "r": 1.7,
+   "lift": 0.04
+  },
+  {
+   "x": -2.5,
+   "y": 0.63,
+   "z": -5.5,
+   "face": 0.14351517616925677,
+   "dist": 3.4,
+   "r": 1.7,
+   "lift": 0.04
+  },
+  {
+   "x": 0.5,
+   "y": 0.63,
+   "z": -10.5,
+   "face": -0.022417768511335135,
+   "dist": 3.4,
+   "r": 1.7,
+   "lift": 0.04
+  }
+ ],
+ "title": "和の庭",
+ "tip": "縁側から庭へ下りて、石の上の作品を見て回ります。床をタップで移動、ドラッグで見回せます。",
+ "start": {
+  "x": 0,
+  "z": 12.8,
+  "yaw": 0,
+  "pitch": -0.1
+ },
+ "walk": [
+  {
+   "t": "rect",
+   "x0": -13.8,
+   "z0": -12.600000000000001,
+   "x1": 13.8,
+   "z1": 13.0
+  }
+ ],
+ "bg": "#c9d3df",
+ "fog": [
+  "#ddd2c0",
+  0.012
+ ],
+ "exposure": 1.0,
+ "hemi": [
+  "#d7e2ff",
+  "#5a4a32",
+  0.55
+ ],
+ "sun": {
+  "dir": [
+   -0.8042947053909302,
+   0.4640161693096161,
+   -0.3712129592895508
+  ],
+  "color": "#ffcf96",
+  "intensity": 1.35,
+  "box": 20
+ },
+ "reflect": {
+  "r": 3.4,
+  "x": 8.5,
+  "z": -7.3,
+  "y": 0.02,
+  "group": "water",
+  "opacity": 0.78
+ },
+ "palette": [
+  "#ece6d8",
+  "#2b2f3a"
+ ]
+}

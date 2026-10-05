@@ -4,25 +4,33 @@
    "rough": 0.08,
    "metal": 0.0,
    "light": "heist_floor_light.jpg",
-   "lightScale": 5.331733226776123
+   "lightScale": 5.331733226776123,
+   "lift": 0.1,
+   "sat": 0.3
   },
   "walls": {
    "rough": 0.85,
    "metal": 0.0,
    "light": "heist_walls_light.jpg",
-   "lightScale": 1.0712378025054932
+   "lightScale": 1.0712378025054932,
+   "lift": 0.1,
+   "sat": 0.3
   },
   "dome": {
    "rough": 0.9,
    "metal": 0.0,
    "light": "heist_dome_light.jpg",
-   "lightScale": 0.6867135167121887
+   "lightScale": 0.6867135167121887,
+   "lift": 0.1,
+   "sat": 0.3
   },
   "stone": {
    "rough": 0.35,
    "metal": 0.0,
    "light": "heist_stone_light.jpg",
-   "lightScale": 3.1225690841674805
+   "lightScale": 3.1225690841674805,
+   "lift": 0.1,
+   "sat": 0.3
   },
   "brass": {
    "rough": 0.3,
@@ -32,7 +40,9 @@
    "rough": 0.55,
    "metal": 0.0,
    "light": "heist_art_light.jpg",
-   "lightScale": 2.3697004318237305
+   "lightScale": 2.3697004318237305,
+   "lift": 0.1,
+   "sat": 0.3
   }
  },
  "spots": [
@@ -105,5 +115,29 @@
   "z": 9.4,
   "yaw": 0,
   "pitch": -0.05
- }
+ },
+ "title": "赤外線センサーが張られた夜の美術館",
+ "tip": "月明かりのドームの下を、展示台の作品を順に見て回ります。",
+ "walk": [
+  {
+   "t": "circ",
+   "x": 0,
+   "z": 0,
+   "r": 10.3
+  }
+ ],
+ "bg": "#040506",
+ "exposure": 1.4,
+ "hemi": [
+  "#5a6488",
+  "#101014",
+  0.6
+ ],
+ "palette": [
+  "#4a2a0c",
+  "#ffd98e"
+ ],
+ "glowCubes": true,
+ "spotColor": "#ffe6c0",
+ "spotIntensity": 3.2
 }

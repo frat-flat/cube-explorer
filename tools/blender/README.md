@@ -22,3 +22,15 @@ python3 tools/blender/heist.py --out public/worlds/heist.glb --size 2048 --sampl
 
 出力は `heist.glb`(色)・`heist_<組>_light.jpg`(光)・`heist.json`(光の倍率・作品の場所・カメラの位置)。4コアで約23分。
 赤い光線・監視カメラ・ガラスケース・警報は `public/worlds/heist.html` が動かす。
+
+## 縮める(本番に置く前)
+
+焼いた GLB は meshopt で圧縮してから `public/worlds/` に置く(10 の世界で 77MB → 35MB)。読む側(`world.html`・`/builder`)は `meshopt_decoder.js` を読み込んでいるので、そのまま開ける。
+
+```
+npx @gltf-transform/cli meshopt public/worlds/<w>.glb public/worlds/<w>.glb --level medium
+```
+
+## ビルダーの展示
+
+`/builder` の展示は `public/worlds/blender-world.js` で各世界を読み込み、読み込みが終わるまでは元の手作りの世界を見せる。キューブの数が作品の置き場(json の `spots`)を超えると、同じ世界を奥へ複製して展示室を増やす。展示室は「＋/−」で手で増やすこともできる。
