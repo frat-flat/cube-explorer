@@ -322,7 +322,10 @@ function renderFilters() {
   h += `<span class="lb">計が</span><input id="fMin" type="text" inputmode="numeric" placeholder="例 1,000,000" value="${f.min != null ? fmt(f.min) : ''}" aria-label="計の下限"><span class="lb">以上</span>`;
   for (const k of ['y', 'z']) if (f[k]) h += `<button class="chip" data-x="${k}">${esc(k === 'y' ? f0.cols[0] : sl.stack.axis)} = ${esc(f[k])} ×</button>`;
   if (f.min != null) h += `<button class="chip" data-x="min">計 ≥ ${fmt(f.min)} ×</button>`;
+  if (f.y || f.z || f.min != null) h += '<span class="lb">該当しないもの:</span>' + [['shrink', '省いて縮める'], ['ghost', '透明で残す'], ['hide', '隠す']]
+    .map(([k, t]) => `<button data-show="${k}"${(f.show || 'shrink') === k ? ' class="on"' : ''}>${t}</button>`).join('');
   el.innerHTML = h;
+  el.querySelectorAll('[data-show]').forEach(b => b.onclick = () => { f.show = b.dataset.show; selCell = null; viewChanged(); });
   el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMonth(+b.dataset.m));
   el.querySelectorAll('select').forEach(x => x.onchange = () => { f[x.dataset.f] = x.value || null; sel = new Map(); selCell = null; viewChanged(); });
   el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { f[b.dataset.x] = null; sel = new Map(); selCell = null; viewChanged(); });
@@ -394,11 +397,17 @@ const sun = new THREE.DirectionalLight(0xffffff, .45); sun.position.set(4, 9, 6)
 
 // 潜った先の重ねを、子のキューブとして描く。X=値の列(週など)、Y=行(カテゴリなど)、Z=重ねの軸(月)
 function buildChildCube(slot) {
-  const shs = slot.sheets, f = shs[0];
-  if (!f) { const sp = textSprite('条件に合うものはありません', css('--muted'), .5); world.add(sp); return; }
+  const pe = path[path.length - 1] || {}, fl = pe.filters || {};
+  // 該当しないものの見せ方:shrink=省いて最小の形(キューブ/面/線)に縮める、ghost=元の形のまま透明で残す、hide=元の形のまま描かない
+  const filtered = fl.y || fl.z || fl.min != null, mode = filtered ? (fl.show || 'shrink') : 'shrink';
+  const keep = mode === 'shrink' ? null : pe.slots[0];
+  const shs = keep ? keep.sheets : slot.sheets, f = shs[0];
+  if (!f || !slot.sheets.length) { const sp = textSprite('条件に合うものはありません', css('--muted'), .5); if (f) sp.position.set(0, 4.6, 0); world.add(sp); if (!f || mode === 'hide') return; }
+  // 元の形で描くとき、絞った結果に残ったコマを (元のシート, 行の名前) → (絞ったシート, 行番号) で引く
+  const hit = (sh, name) => { const fs = slot.sheets.find(x => x.id === sh.id || x.id.startsWith(sh.id + '~')); const i = fs ? fs.rows.findIndex(r => r[0] === name) : -1; return i < 0 ? null : { sid: fs.id, r: i }; };
   const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), ys = [...new Set(shs.flatMap(x => x.rows.map(r => r[0])))];
   // 絞って行が1つになったら、重ねの軸を縦に回して1枚の面に畳む(例:衣料だけ → ショップ×週)
-  const fold = ys.length === 1 && shs.length > 1 && shs.every(x => x.rows.length === 1);
+  const fold = !keep && ys.length === 1 && shs.length > 1 && shs.every(x => x.rows.length === 1);
   const rowNames = fold ? shs.map(x => x.member) : ys;
   const nx = vc.length, ny = rowNames.length, nz = fold ? 1 : shs.length;
   const u = Math.min(6.4 / nx, 6.4 / ny, 6.4 / nz, 1.5), W = nx * u, H = ny * u, D = nz * u;
@@ -406,12 +415,15 @@ function buildChildCube(slot) {
   const g = new THREE.Group(); world.add(g);
   const lo = new THREE.Color(css('--paper')), hi = new THREE.Color(css('--accent'));
   shs.forEach((sh, k) => sh.rows.forEach((r, ri) => vc.forEach((c, xi) => {
+    const h = keep ? hit(sh, r[0]) : { sid: sh.id, r: ri };
+    if (!h && mode === 'hide') return;
     const t = max ? num(r[c]) / max : 0, col = lo.clone().lerp(hi, .12 + .88 * t);
-    const m = new THREE.Mesh(new THREE.BoxGeometry(u * .78, u * .78, u * .78), new THREE.MeshLambertMaterial({ color: col }));
+    const m = new THREE.Mesh(new THREE.BoxGeometry(u * .78, u * .78, u * .78), h ? new THREE.MeshLambertMaterial({ color: col })
+      : new THREE.MeshLambertMaterial({ color: new THREE.Color(css('--paper')), transparent: true, opacity: .1, depthWrite: false }));
     m.position.set(-W / 2 + (xi + .5) * u, H / 2 - ((fold ? k : ys.indexOf(r[0])) + .5) * u, fold ? 0 : D / 2 - (k + .5) * u);
-    m.userData.cell = { sid: sh.id, r: ri, c, base: col };
-    g.add(m); blocks.push(m);
-    const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--frame')), transparent: true, opacity: .55 }));
+    g.add(m);
+    if (h) { m.userData.cell = { sid: h.sid, r: h.r, c, base: col }; blocks.push(m); }
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--frame')), transparent: true, opacity: h ? .55 : .18 }));
     e.position.copy(m.position); g.add(e);
   })));
   g.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W + .3, H + .3, D + .3)), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--stack')) })));
@@ -422,8 +434,10 @@ function buildChildCube(slot) {
   const names = [[`X: ${f.xName || '値'}`, cx, [0, -H / 2 - 1.0, D / 2 + .2]], [`Y: ${fold ? slot.stack.axis : f.cols[0]}`, cy, [-W / 2 - 1.6, H / 2 + .55, D / 2 + .2]]];
   if (nz > 1) names.push([`Z: ${slot.stack.axis}`, cz, [W / 2 + 1.2, -H / 2 - .8, 0]]);
   names.forEach(([t, c, pos]) => { const sp = textSprite(t, c, .38); sp.position.set(...pos); g.add(sp); });
-  const pe = path[path.length - 1] || {}, fl = pe.filters || {};
-  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fl.min != null ? '・計' + fmt(fl.min) + '以上' : '') + (fold ? '(面に畳んだ)' : '(子のキューブ)'), cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
+  const dims = [nx, ny, nz].filter(n => n > 1).length;
+  const how = mode === 'ghost' ? '(該当しないものは透明)' : mode === 'hide' ? '(該当しないものは隠す)'
+    : dims >= 3 ? '(子のキューブ)' : dims === 2 ? (fold ? '(面に畳んだ)' : '(面)') : '(線)';
+  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fl.min != null ? '・計' + fmt(fl.min) + '以上' : '') + how, cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
   styleBlocks();
 }
 function blockWorld(sid, r, c) {
