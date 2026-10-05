@@ -100,18 +100,35 @@
   const gltf = await loadGLTF(src(`${W}.glb`));
   const root = gltf.scene; scene.add(root);
   const lights = {};
-  for (const [name, g] of Object.entries(info.groups)) if (g.light) { const t = await loadTex(g.light); t.flipY = false; t.encoding = THREE.sRGBEncoding; lights[name] = t; }
+  // 光の画像の手直し(json の組ごとに、焼き直さずに調整できる): lift=暗い所を持ち上げる割合、sat=色みを残す割合
+  const tweak = (img, lift, sat) => {
+    const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+    const x = c.getContext("2d"); x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const l = 0.3 * p[i] + 0.55 * p[i + 1] + 0.15 * p[i + 2];
+      for (let k = 0; k < 3; k++) { const v = l + (p[i + k] - l) * sat; p[i + k] = v + (255 - v) * lift * (1 - v / 255); }
+    }
+    x.putImageData(d, 0, 0); return new THREE.CanvasTexture(c);
+  };
+  for (const [name, g] of Object.entries(info.groups)) if (g.light) {
+    let t = await loadTex(g.light);
+    if (g.lift || g.sat != null) t = tweak(t.image, g.lift || 0, g.sat ?? 1);
+    t.flipY = false; t.encoding = THREE.sRGBEncoding; lights[name] = t;
+  }
   const spotsFromGlb = [];
   root.traverse((o) => {
     if (/^spot_\d+$/.test(o.name)) spotsFromGlb.push(o);
     if (!o.isMesh) return;
     const key = info.groups[o.name] ? o.name : info.groups[o.parent?.name] ? o.parent.name : null, g = key && info.groups[key];
-    if (g && g.unlit) {
+    if (g && g.vcol) { // 色 × 光を頂点の色に焼いた物(葉・草)
+      const k = g.lightScale || 1; o.material = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(k, k, k), side: THREE.DoubleSide });
+    } else if (g && g.unlit) {
       o.material = new THREE.MeshBasicMaterial({ map: o.material.map, toneMapped: false, fog: !g.nofog, transparent: (g.opacity ?? 1) < 1, opacity: g.opacity ?? 1, side: THREE.DoubleSide });
     } else if (g) {
-      if (lights[key]) o.geometry.setAttribute("uv2", o.geometry.attributes.uv);
-      o.material = new THREE.MeshStandardMaterial({ map: o.material.map, lightMap: lights[key] || null, lightMapIntensity: g.lightScale || 1, roughness: g.rough, metalness: g.metal,
-        transparent: (g.opacity ?? 1) < 1, opacity: g.opacity ?? 1, depthWrite: (g.opacity ?? 1) >= 1 });
+      // 焼いた光の面は MeshBasic(色 × 光の画像)。動く光(太陽・半球光)は作品と金属だけに効かせ、二重に明るくならないようにする
+      const tr = { transparent: (g.opacity ?? 1) < 1, opacity: g.opacity ?? 1, depthWrite: (g.opacity ?? 1) >= 1 };
+      if (lights[key]) { o.geometry.setAttribute("uv2", o.geometry.attributes.uv); o.material = new THREE.MeshBasicMaterial({ map: o.material.map, lightMap: lights[key], lightMapIntensity: g.lightScale || 1, ...tr }); }
+      else o.material = new THREE.MeshStandardMaterial({ map: o.material.map, roughness: g.rough, metalness: g.metal, ...tr });
       o.receiveShadow = true; ground.push(o);
     } else { // 光る物
       const c = o.material.emissive ? o.material.emissive.clone() : new THREE.Color(1, 1, 1);

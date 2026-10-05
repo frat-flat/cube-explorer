@@ -43,12 +43,13 @@ class World:
         bg.inputs["Strength"].default_value = strength
 
     # ---- 組 ----
-    def group(self, name, size=1024, rough=0.8, metal=0.0, bake=True, unlit=False, opacity=1.0):
+    def group(self, name, size=1024, rough=0.8, metal=0.0, bake=True, unlit=False, opacity=1.0, vcol=False):
         """bake=False: 焼かない(光る物。GLB の emissive のまま)
         unlit=True: 発光の色(空・ネオン・ホログラムの模様など)だけを画像に焼き、ブラウザでは光の計算をせずに貼る
         metal>=0.5: 拡散光が無いので光の画像は焼かない(映り込みで見せる)
-        opacity<1: ブラウザで半透明にする(水面・ガラス)"""
-        self.groups[name] = dict(objs=[], size=size, rough=rough, metal=metal, bake=bake, unlit=unlit, opacity=opacity)
+        opacity<1: ブラウザで半透明にする(水面・ガラス)
+        vcol=True: 色と光を頂点の色に焼く(葉・草のように面が細かすぎて画像に収まらない物)"""
+        self.groups[name] = dict(objs=[], size=size, rough=rough, metal=metal, bake=bake, unlit=unlit, opacity=opacity, vcol=vcol)
 
     def add(self, group, o, material):
         o.data.materials.clear()
@@ -177,6 +178,37 @@ class World:
         self.sc.cycles.samples = self.samples
         return img
 
+    def _bake_vcol(self, o, g):
+        """色 × 光を頂点(面の角)の色に焼く。明るい所が 1 になるよう縮め、倍率を返す"""
+        me = o.data
+        attr = me.color_attributes.new("bake", "FLOAT_COLOR", "CORNER")
+        me.color_attributes.active_color = attr
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        b = self.sc.render.bake
+        b.target = "VERTEX_COLORS"
+        b.use_pass_direct = b.use_pass_indirect = b.use_pass_color = True
+        self.sc.cycles.samples = max(self.samples, 96)
+        bpy.ops.object.bake(type="DIFFUSE")
+        self.sc.cycles.samples = self.samples
+        b.target = "IMAGE_TEXTURES"
+        px = np.empty(len(attr.data) * 4, dtype=np.float32)
+        attr.data.foreach_get("color", px)
+        px = px.reshape(-1, 4)
+        peak = float(np.percentile(px[:, :3].max(axis=1), 99.5)) or 1.0
+        px[:, :3] = np.clip(px[:, :3] / peak, 0, 1)
+        px[:, 3] = 1
+        attr.data.foreach_set("color", px.ravel())
+        m = bpy.data.materials.new(f"{o.name}_baked")
+        m.use_nodes = True
+        m.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = g["rough"]
+        o.data.materials.clear()
+        o.data.materials.append(m)
+        while len(me.uv_layers):
+            me.uv_layers.remove(me.uv_layers[0])
+        return {"vcol": True, "lightScale": peak, "rough": g["rough"], "metal": 0}
+
     def _denoise(self, img):
         sc = self.sc
         size = img.size[0]
@@ -237,6 +269,9 @@ class World:
             if not g["bake"]:
                 continue
             print(f"baking {name} {g['size']}px ...", flush=True)
+            if g["vcol"]:
+                info["groups"][name] = self._bake_vcol(o, g)
+                continue
             self._uv(o)
             entry = {"rough": g["rough"], "metal": g["metal"]}
             if g["opacity"] < 1:
@@ -275,7 +310,7 @@ class World:
             if ob.type in ("LIGHT", "CAMERA"):
                 bpy.data.objects.remove(ob)
         bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_image_format="JPEG", export_jpeg_quality=88,
-                                  export_extras=True, export_lights=False, export_cameras=False, export_apply=True)
+                                  export_extras=True, export_lights=False, export_vertex_color="ACTIVE", export_cameras=False, export_apply=True)
         with open(base + ".json", "w") as f:
             json.dump(info, f, ensure_ascii=False, indent=1)
         print("wrote", out, flush=True)

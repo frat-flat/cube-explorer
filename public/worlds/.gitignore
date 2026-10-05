@@ -1,0 +1,8 @@
+# 焼いた世界のファイルは大きいので git には入れない(tools/blender の各スクリプトで作り直せる)。試作の2つだけ入れてある
+*.glb
+*_light.jpg
+*.json
+!modern.glb
+!heist.glb
+!heist.json
+!heist_*_light.jpg
