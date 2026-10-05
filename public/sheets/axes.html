@@ -787,7 +787,7 @@ function renderShowRow() {
 function renderPinBar() {
   renderShowRow();
   const n = units().filter(b => b.pin).length;
-  $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: ドラッグしても箱の角度は変わりません(ズームはできます)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
+  $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: 箱は正面を向けたまま止まり、ドラッグしても角度は変わりません(ズームはできます)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
   $('pinHint').hidden = !n; $('unpinAll').hidden = !n;
   $('selUnit').innerHTML = '<option value="">(固定するものを選ぶ)</option>'
     + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
@@ -996,8 +996,10 @@ renderer.domElement.addEventListener('pointerup', () => {
 renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
-  // 箱を固定してもその時の角度のまま写す(立体感は残す)。固定中はドラッグで箱の角度が変わらないだけ
-  camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
+  // 固定するときは必ずどこかの面を正面にする。箱は必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
+  // 遠近はそのままなので、箱の奥行き(中の壁)とキューブの立体感は残る。キューブは選んだ目を正面に向ける
+  const th = boxLocked() ? 0 : cam.th, ph = boxLocked() ? 0 : cam.ph;
+  camera.position.set(cam.dist * Math.cos(ph) * Math.sin(th), cam.dist * Math.sin(ph), cam.dist * Math.cos(ph) * Math.cos(th));
   camera.lookAt(0, 0, 0);
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
