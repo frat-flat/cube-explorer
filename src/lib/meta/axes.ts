@@ -9,6 +9,7 @@ export type Axis = {
   sourceTable: string | null;
   sourceColumn: string | null;
   labelColumn: string | null;
+  keyColumn: string | null;
   timeGrain: TimeGrain | null;
   masterKey: string | null;
 };
@@ -20,6 +21,7 @@ export type AxisRow = {
   source_table: string | null;
   source_column: string | null;
   label_column: string | null;
+  key_column: string | null;
   time_grain: string | null;
   master_key: string | null;
 };
@@ -32,6 +34,7 @@ export function toAxis(row: AxisRow): Axis {
     sourceTable: row.source_table,
     sourceColumn: row.source_column,
     labelColumn: row.label_column,
+    keyColumn: row.key_column,
     timeGrain: row.time_grain as TimeGrain | null,
     masterKey: row.master_key,
   };
