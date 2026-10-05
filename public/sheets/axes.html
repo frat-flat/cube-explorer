@@ -73,7 +73,7 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 #pinCtl [hidden]{display:none}
 #pinCtl input{flex:1 1 220px;min-width:0}
 #cmdMsg{color:var(--muted);font-size:12px}
-.unit{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
+.unit{white-space:nowrap;font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
 .node.sel{outline:2px solid var(--mine);outline-offset:-1px}
 button.pin{white-space:nowrap}
 button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
@@ -180,7 +180,7 @@ tfoot td{font-weight:700}
   <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
   <div id="pinCtl">
     <div class="row"><b>選ぶ</b><select id="selUnit" aria-label="箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap">サイコロの<select id="selFace" aria-label="正面にする目"></select>を正面にする</span></div>
-    <div class="row"><b>指示</b><input id="cmd" placeholder="例: 箱1を固定して②を正面 / キューブ2は③ / 全部①にそろえる / 箱1を外す"><button class="small" id="cmdGo">実行</button></div>
+    <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
     <div class="row"><span id="cmdMsg">立体の箱やキューブを押しても選べます。サイコロの目は ①正面 ②上 ③右 ④左 ⑤下 ⑥背面(向かい合う目の和は7)</span></div>
   </div>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
@@ -265,6 +265,8 @@ try { S = JSON.parse(localStorage.getItem(KEY)); if (!S || !S.axes || !S.boxes |
 S.prefs = S.prefs || {};
 // 箱とキューブには必ず番号(箱1・キューブ1…)を振る。指示で呼べるように一度振った番号は変えない
 const unitOf = b => (b.kind === 'box' ? '箱' : 'キューブ') + b.no;
+// 単位=段(法人単位・ショップ単位)。箱・キューブが持つ軸の名前で決まる
+const levelOf = b => { const k = Object.keys(b.own || {})[0]; return k && ax(k) ? ax(k).name : (b.kind === 'box' ? '箱' : 'キューブ'); };
 function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, ...S.boxes.filter(b => b.kind === k && b.no).map(b => b.no)); S.boxes.filter(b => b.kind === k && !b.no).forEach(b => b.no = ++n); } }
 numberUnits();
 // 前の版の面の名前(front など)をサイコロの目に置き換える
@@ -324,7 +326,7 @@ function renderTree() {
   const kids = p => S.boxes.filter(b => b.parent === p);
   const walk = (p, d) => kids(p).forEach(b => {
     const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
-    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${sel === b.id ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + faceOf(b.pin.face).name : '固定'}</button></div>`;
+    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + faceOf(b.pin.face).name : '固定'}</button></div>`;
     S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
@@ -736,6 +738,9 @@ const faceOpt = (f, c) => f.name + (faceAxes(f, c) ? '(' + faceAxes(f, c) + ')' 
 const pinTo = id => { const f = faceOf(id); return { yaw: f.yaw, pitch: f.pitch, face: f.id }; };
 const pinQ = new THREE.Quaternion(), pinE = new THREE.Euler(), invQ = new THREE.Quaternion();
 const units = () => S.boxes.filter(b => b.kind === 'box' || b.kind === 'cube');
+const levels = () => [...new Set(units().map(levelOf))];
+// sel は箱・キューブの id か、段ごとまとめて選ぶときの 'lv:法人'
+const selUnits = () => !sel ? [] : sel.startsWith('lv:') ? units().filter(b => levelOf(b) === sel.slice(3)) : [box(sel)].filter(Boolean);
 function refreshPins() { save(); renderTree(); paint(); renderPinBar(); }
 function setFace(id, face) { box(id).pin = pinTo(face); refreshPins(); }
 function togglePin(id) { const c = box(id); if (c.pin) delete c.pin; else c.pin = { ...PIN0 }; sel = id; refreshPins(); }
@@ -744,13 +749,16 @@ function renderPinBar() {
   const n = units().filter(b => b.pin).length;
   $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。固定したものはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : '';
   $('pinHint').hidden = !n;
-  $('selUnit').innerHTML = '<option value="">(箱かキューブを選ぶ)</option>' + units().map(b => `<option value="${b.id}">${unitOf(b)} ${esc(b.name)}${b.pin ? '(固定中)' : ''}</option>`).join('');
+  $('selUnit').innerHTML = '<option value="">(箱かキューブを選ぶ)</option>'
+    + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
+    + '<optgroup label="1つずつ">' + units().map(b => `<option value="${b.id}">${unitOf(b)} ${esc(b.name)}(${esc(levelOf(b))}単位)${b.pin ? '(固定中)' : ''}</option>`).join('') + '</optgroup>';
   $('selUnit').value = sel || '';
-  const u = sel && box(sel);
+  const us = selUnits(), u = us[0];
   $('selPin').hidden = !u; $('selFaceWrap').hidden = !u;
   if (!u) return;
-  $('selPin').textContent = u.pin ? '固定を外す' : '固定する'; $('selPin').classList.toggle('on', !!u.pin);
-  $('selFace').innerHTML = FACES.map(f => `<option value="${f.id}">${esc(faceOpt(f, u))}</option>`).join('');
+  const allPinned = us.every(b => b.pin);
+  $('selPin').textContent = allPinned ? '固定を外す' : us.length > 1 ? `${us.length}個とも固定する` : '固定する'; $('selPin').classList.toggle('on', allPinned);
+  $('selFace').innerHTML = FACES.map(f => `<option value="${f.id}">${esc(us.length > 1 ? f.name : faceOpt(f, u))}</option>`).join('');
   $('selFace').value = u.pin ? u.pin.face || 'd1' : 'd1';
 }
 // 指示を読む: 「箱1を固定して②を正面」「法人Aは③」「全部①にそろえる」「キューブ2を外す」
@@ -760,11 +768,14 @@ function runCmd(text) {
   const all = /全部|すべて|全て|ぜんぶ/.test(z);
   let targets = [];
   if (all) targets = units().filter(b => /箱/.test(z) && !/キューブ/.test(z) ? b.kind === 'box' : /キューブ/.test(z) && !/箱/.test(z) ? b.kind === 'cube' : true);
-  else {
+  // 「法人単位」「ショップ単位」はその段の箱・キューブを全部
+  let lv = levels().find(L => z.includes(L + '単位'));
+  if (!all && lv) targets = units().filter(b => levelOf(b) === lv);
+  else if (!all) {
     for (const b of units()) if (new RegExp(unitOf(b) + '(?![0-9])').test(z) || z.includes(b.name)) targets.push(b);
     // 「法人A」のように箱の持ち主の値でも呼べる
     if (!targets.length) for (const b of units()) if (b.kind === 'box' && Object.values(b.own).some(v => z.includes(v))) targets.push(b);
-    if (!targets.length && sel) targets = [box(sel)];
+    if (!targets.length && sel) targets = selUnits();
   }
   if (!targets.length) return '対象が分かりませんでした。「箱1」「キューブ2」のように番号か名前で書いてください';
   const circled = '①②③④⑤⑥'.split('');
@@ -772,13 +783,13 @@ function runCmd(text) {
   for (let i = 0; i < 6; i++) if (z.includes(circled[i])) face = 'd' + (i + 1);
   if (!face && (m = z.match(/([1-6])\s*(?:の目|を正面|が正面|面|にそろえ)/))) face = 'd' + m[1];
   if (!face && /斜め/.test(z)) face = 'naname';
-  const named = all || units().some(b => targets.includes(b) && (z.includes(unitOf(b)) || z.includes(b.name) || b.kind === 'box' && Object.values(b.own).some(v => z.includes(v))));
+  const named = all || !!lv || units().some(b => targets.includes(b) && (z.includes(unitOf(b)) || z.includes(b.name) || b.kind === 'box' && Object.values(b.own).some(v => z.includes(v))));
   if (!face && !named && !/固定|外す|解除|はずす|やめ/.test(z)) return '分かりませんでした。「箱1を固定して②を正面」のように、番号か名前と目(①〜⑥)を書いてください';
-  if (/外す|解除|はずす|やめ/.test(z)) { targets.forEach(b => delete b.pin); refreshPins(); return `${targets.map(unitOf).join('・')} の固定を外しました`; }
+  if (/外す|解除|はずす|やめ/.test(z)) { targets.forEach(b => delete b.pin); refreshPins(); return `${lv ? lv + '単位(' : ''}${targets.map(unitOf).join('・')}${lv ? ')' : ''} の固定を外しました`; }
   targets.forEach(b => b.pin = face ? pinTo(face) : (b.pin || { ...PIN0 }));
-  if (targets.length === 1) sel = targets[0].id;
+  if (targets.length === 1) sel = targets[0].id; else if (lv) sel = 'lv:' + lv;
   refreshPins();
-  return `${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${faceOf(targets[0].pin.face).name}を正面にしました`;
+  return `${lv ? lv + '単位の ' : ''}${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${faceOf(targets[0].pin.face).name}を正面にしました`;
 }
 const cam = { th: -.45, ph: .34, dist: 19 };
 function textSprite(t, color, h) {
@@ -834,7 +845,7 @@ function paint() {
     const fill = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: .05, depthWrite: false })); bg.add(fill);
     fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, top: true }); addDice(bg, b, W, H, D);
     if (b.pin) bg.add(edges(W + .16, H + .16, D + .16, new THREE.Color(css('--hl')), true, .9));
-    if (sel === b.id) bg.add(edges(W + .3, H + .3, D + .3, new THREE.Color(css('--mine')), false, 1));
+    if (selUnits().includes(b)) bg.add(edges(W + .3, H + .3, D + .3, new THREE.Color(css('--mine')), false, 1));
     bg.add(edges(W, H, D, new THREE.Color(css('--box')), true));
     const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定 ' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), .42); lb.position.set(0, H / 2 + .4, 0); bg.add(lb);
     const own = S.sheets.filter(x => x.cube === b.id), nk = S.boxes.filter(c => c.parent === b.id).length;
@@ -848,7 +859,7 @@ function paint() {
       // 触る判定用の見えない箱。固定したキューブはここをドラッグするとそれだけ回る
       const hitM = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); hitM.userData.unit = c.id; cg.add(hitM); hits.push(hitM);
       groups.push({ g: cg, u: c, parentG: bg });
-      if (sel === c.id) cg.add(edges(s + .3, s + .3, s + .3, new THREE.Color(css('--mine')), false, 1));
+      if (selUnits().includes(c)) cg.add(edges(s + .3, s + .3, s + .3, new THREE.Color(css('--mine')), false, 1));
       // キューブの辺は3軸の色(X=紫、Y=緑、Z=桃)で、固定の3軸を持つことを示す
       cg.add(edges(s, s, s, new THREE.Color(css('--accent')), false, .9));
       const axLine = (from, to, col) => { const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]); cg.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(css(col)) }))); };
@@ -917,8 +928,8 @@ $('bookRead').onclick = readBook;
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
 $('selUnit').onchange = e => select(e.target.value || null);
-$('selPin').onclick = () => sel && togglePin(sel);
-$('selFace').onchange = e => sel && setFace(sel, e.target.value);
+$('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) delete b.pin; else if (!b.pin) b.pin = { ...PIN0 }; }); refreshPins(); };
+$('selFace').onchange = e => { selUnits().forEach(b => b.pin = pinTo(e.target.value)); refreshPins(); };
 $('cmdGo').onclick = () => { $('cmdMsg').textContent = runCmd($('cmd').value); };
 $('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) $('cmdGo').click(); };
 $('addMonth').onclick = addMonth;
