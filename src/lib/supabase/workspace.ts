@@ -24,6 +24,18 @@ export function supabaseConfig(): SupabaseConfig | null {
   return url && key ? { url, key } : null;
 }
 
+/** 鍵の中身は出さずに、どんな形の値かだけを言う(入れ間違いを見つけるため) */
+export function keyShape(key: string): string {
+  const kind = key.startsWith("sb_secret_")
+    ? "Secret key の形"
+    : key.startsWith("sb_publishable_")
+      ? "Publishable key(公開用)の形。Secret key を入れてください"
+      : key.startsWith("eyJ")
+        ? "古い形の鍵(JWT)。anon ではなく service_role か、新しい Secret key を入れてください"
+        : "sb_secret_ で始まっていません";
+  return `${kind}、${key.length}文字`;
+}
+
 /** 新しい形の鍵(sb_secret_…)は apikey だけ、古い形(JWT の service_role)は Authorization にも入れる */
 export function headers(key: string): Record<string, string> {
   const h: Record<string, string> = { apikey: key, "content-type": "application/json" };
@@ -61,7 +73,7 @@ async function call(cfg: SupabaseConfig, path: string, init: RequestInit): Promi
 export async function loadWorkspace(cfg: SupabaseConfig, owner: string): Promise<Saved> {
   const q = new URLSearchParams({ owner: `eq.${owner}`, select: "state,updated_at" });
   const res = await call(cfg, `/rest/v1/${TABLE}?${q}`, { headers: headers(cfg.key), cache: "no-store" });
-  if (!res.ok) throw new WorkspaceError(`Supabase から読めませんでした(${res.status}${res.status === 401 ? "、SUPABASE_SECRET_KEY を確かめてください" : ""})`, 502);
+  if (!res.ok) throw new WorkspaceError(`Supabase から読めませんでした(${res.status}${res.status === 401 ? `、SUPABASE_SECRET_KEY を確かめてください。いま入っている値: ${keyShape(cfg.key)}` : ""})`, 502);
   const rows = (await res.json()) as { state: unknown; updated_at: string }[];
   return rows[0] ? { state: rows[0].state, updatedAt: rows[0].updated_at } : null;
 }

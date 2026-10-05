@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { headers, isState, urlProblem, loadWorkspace, saveWorkspace, supabaseConfig, WorkspaceError } from "./workspace";
+import { headers, isState, keyShape, urlProblem, loadWorkspace, saveWorkspace, supabaseConfig, WorkspaceError } from "./workspace";
 
 const cfg = { url: "https://abc.supabase.co", key: "sb_secret_x" };
 const state = { axes: [], boxes: [], sheets: [], saved: [], dict: [], history: [] };
@@ -73,5 +73,14 @@ describe("urlProblem", () => {
   it("つながらないときは落ちずに WorkspaceError", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
     await expect(loadWorkspace(cfg, "a")).rejects.toBeInstanceOf(WorkspaceError);
+  });
+});
+
+describe("keyShape", () => {
+  it("鍵の中身は出さずに形と長さだけ言う", () => {
+    expect(keyShape("sb_secret_abc")).toBe("Secret key の形、13文字");
+    expect(keyShape("sb_publishable_abc")).toContain("Publishable");
+    expect(keyShape("11")).toBe("sb_secret_ で始まっていません、2文字");
+    expect(keyShape("sb_secret_abc")).not.toContain("abc");
   });
 });
