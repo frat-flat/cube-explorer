@@ -200,9 +200,9 @@ const SAMPLE = () => ({
   ],
   place: { app:'in', con:'in', corp:'in', shop:'in', 'st-pay':'in' }
 });
-const KEY = 'sheet-vessel-v2';
+const KEY = 'sheet-vessel-v3';
 let S;
-try { S = JSON.parse(localStorage.getItem(KEY)) || SAMPLE(); } catch(e) { S = SAMPLE(); }
+try { S = JSON.parse(localStorage.getItem(KEY)) || SAMPLE(); if (!S.sheets || !S.sheets.length || !S.stacks || !S.links || !S.place) S = SAMPLE(); } catch(e) { S = SAMPLE(); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
 
 let active = S.sheets[0].id;          // 下の表に出すシート
@@ -839,7 +839,8 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme
 new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 resize(); scene.background = new THREE.Color(css('--stage'));
-renderAll(); tick();
+try { renderAll(); } catch (e) { S = SAMPLE(); active = S.sheets[0].id; save(); renderAll(); }   // 保存した状態が壊れていてもサンプルで開く
+tick();
 document.fonts?.ready.then(() => build());
 })();
 </script>
