@@ -272,6 +272,12 @@ tfoot td{font-weight:700}
 .form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin-top:6px}
 .form input,.form select,.form button{width:100%;font-size:12.5px;padding:2px 4px}
 .tabs{display:flex;flex-direction:column;gap:6px}
+.stash{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.stash .t{font-weight:700}
+.stash .d{font-size:12px;color:var(--muted)}
+.stash .cols{display:flex;flex-wrap:wrap;gap:4px}
+.stash .cols span{font-size:11.5px;border:1px solid var(--line);border-radius:99px;padding:0 7px}
+.stash .cols span.left{border-color:var(--mine);color:var(--mine)}
 .tab{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;font-size:13px}
 .tab .d{grid-column:2;color:var(--muted);font-size:12.5px}
 .tab code,.gas code{font-family:var(--mono);font-size:12px}
@@ -313,7 +319,7 @@ tfoot td{font-weight:700}
   <span class="cloud" id="cloud" hidden></span>
   <a class="out" id="logout" href="/auth/signout" hidden>ログアウト</a>
 </header>
-<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
+<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="saving"><span class="ic" aria-hidden="true">▤</span><span class="lb">Saving</span><span class="nb" id="nb-saving" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
 <div class="content">
 <div class="view" data-view="home">
   <div class="vhead"><h1>ホーム</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を軸の辞書に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
@@ -373,6 +379,10 @@ tfoot td{font-weight:700}
     <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
   <section id="unitSec" hidden><h2>シートの行から箱・キューブを作る</h2><div id="unitForm"></div></section>
   <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
+</div>
+<div class="view" data-view="saving" hidden>
+  <div class="vhead"><h1>Saving</h1><p class="lead">読み取ったけれど、まだ箱・キューブに反映していないシート・列・行の置き場です。箱・キューブに反映するときは、必ず元のスプシから最新を読み直してから入れます。</p></div>
+  <section><div id="savingList"></div></section>
 </div>
 <div class="view" data-view="dict" hidden>
   <div class="vhead"><h1>軸の辞書</h1><p class="lead">軸と、呼び名・値の言い換えを管理します。</p></div>
@@ -511,7 +521,7 @@ function upgradeSample2() {
 }
 // 読み込んだ中身を画面で使える形にそろえる(はじめと、Supabase から読んだとき)
 function adopt(x) {
-  S = x; S.prefs = S.prefs || {};
+  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || [];
   upgradeSample();
   numberUnits();
   // 前の版の面の名前(front など)をサイコロの目に置き換える
@@ -672,16 +682,18 @@ function readSheet() {
   const txt = $('newData').value.trim(); if (!txt) return;
   const lines = txt.split(/\r?\n/).filter(x => x.trim()), sep = lines[0].includes('\t') ? '\t' : ',';
   const grid = lines.map(x => x.split(sep).map(v => v.trim())), cols = grid[0], rows = grid.slice(1).map(r => cols.map((_, i) => r[i] ?? ''));
-  pending = { name: $('newName').value.trim() || 'シート', cube: $('target').value, tag: $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}, cols, rows,
-    picks: pickCols(cols, rows) };
-  renderMatches();
+  const name = $('newName').value.trim() || 'シート', e = stash({ src: 'paste', name, cols, rows });
+  pending = { name, cube: $('target').value, tag: $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}, cols, rows,
+    picks: pickCols(cols, rows), stash: [{ id: e.id, off: 0 }] };
+  save(); renderMatches(); renderSaving();
 }
 // 貼り付けたシートの行から箱・キューブを作る(1行=1つ。名前に使う列と単位の名前を選ぶ)
 function readUnits() {
   const txt = $('newData').value.trim(); if (!txt) { note('シートの中身を貼り付けてください'); return; }
   const lines = txt.split(/\r?\n/).filter(x => x.trim()), sep = lines[0].includes('\t') ? '\t' : ',';
   const grid = lines.map(x => x.split(sep).map(v => v.trim())), cols = grid[0], rows = grid.slice(1).map(r => cols.map((_, i) => r[i] ?? ''));
-  openUnits({ name: $('newName').value.trim() || 'シート', cols, rows });
+  const name = $('newName').value.trim() || 'シート', e = stash({ src: 'paste', name, cols, rows });
+  save(); openUnits({ name, cols, rows, stash: e.id });
 }
 let unitSrc = null;
 function openUnits(src) { unitSrc = { kind: 'box', nameCols: [0], unit: '', parent: '', ...src }; renderUnits(); go('import'); $('unitSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
@@ -704,8 +716,19 @@ function renderUnits() {
   $('uParent').onchange = e => { u.parent = e.target.value; };
   $('uMake').onclick = makeUnits; $('uCancel').onclick = () => { unitSrc = null; renderUnits(); };
 }
-function makeUnits() {
-  const u = unitSrc, unit = u.unit.trim(), parent = u.parent || null, made = [], seen = new Set(S.boxes.filter(b => b.parent === parent).map(b => b.kind + '\u0001' + b.name));
+async function makeUnits() {
+  const u0 = unitSrc; if (!u0) return;
+  let fresh = '';
+  if (u0.src && u0.src.url) {
+    $('uMake').disabled = true; note('反映の前に、元のスプシから最新を読み直しています…');
+    let f = null; try { f = await freshen(u0.src); } catch (e) { note('最新を読み直せなかったので反映しませんでした: ' + e.message); }
+    save(); renderSaving();
+    if (!f || unitSrc !== u0) { if (unitSrc === u0) renderUnits(); return; }
+    if (f.cols.join('\u0001') !== u0.cols.join('\u0001')) { u0.cols = f.cols; u0.rows = f.rows; u0.nameCols = u0.nameCols.filter(i => i < f.cols.length); renderUnits(); note('元のスプシの列が変わっていたので、最新の列で選び直してください(まだ反映していません)'); return; }
+    fresh = JSON.stringify(f.rows) !== JSON.stringify(u0.rows) ? `反映の前に最新を読み直し、行が変わっていたので最新(${f.rows.length} 行)で作った` : `反映の前に最新を読み直した(変わりなし、${f.rows.length} 行)`;
+    u0.rows = f.rows;
+  }
+  const u = u0, unit = u.unit.trim(), parent = u.parent || null, made = [], seen = new Set(S.boxes.filter(b => b.parent === parent).map(b => b.kind + '\u0001' + b.name));
   u.rows.forEach((r, ri) => {
     const name = unitName(u, r), k = u.kind + '\u0001' + name; if (!name || seen.has(k)) return; seen.add(k);
     const info = Object.fromEntries(u.cols.map((c, i) => [c, r[i]]));
@@ -714,7 +737,8 @@ function makeUnits() {
     S.boxes.push(b); made.push(name);
   });
   S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${u.name} の行から${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作った(単位: ${unit})`,
-    lines: [`名前に使った列: ${u.nameCols.map(i => colL(i) + ' ' + u.cols[i]).join('・')}`, `入れた先: ${parent ? box(parent).name : 'いちばん上'}`, `作ったもの: ${made.slice(0, 10).join(' / ')}${made.length > 10 ? ' ほか' : ''}`], sources: [{ book: u.name, tab: '', range: 'A2:' + colL(u.cols.length - 1) + (u.rows.length + 1) }], results: [] });
+    lines: [...(fresh ? [fresh] : []), `名前に使った列: ${u.nameCols.map(i => colL(i) + ' ' + u.cols[i]).join('・')}`, `入れた先: ${parent ? box(parent).name : 'いちばん上'}`, `作ったもの: ${made.slice(0, 10).join(' / ')}${made.length > 10 ? ' ほか' : ''}`,
+      ...markDone(u.stash ? [{ id: u.stash, off: 0 }] : [], u.cols.map(() => true), u.rows.map((r, i) => unitName(u, r) ? i : -1).filter(i => i >= 0))], sources: [{ book: u.name, tab: '', range: 'A2:' + colL(u.cols.length - 1) + (u.rows.length + 1) }], results: [] });
   unitSrc = null; renderUnits(); numberUnits(); save(); renderAll(); paint();
   note(`${unit}の${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作りました`);
 }
@@ -737,8 +761,18 @@ function renderMatches() {
   $('matches').querySelectorAll('[data-note]').forEach(x => x.oninput = () => { p.picks[+x.dataset.note].note = x.value; });
   $('queueInfo').textContent = queue.length ? `このあと ${queue.length} 枚の承認が続きます` : '';
 }
-function approve() {
+async function approve() {
   const p = pending; if (!p) return;
+  // 反映の前に、元のスプシから必ず最新を読み直す。読めなければ反映しない。列が変わっていたら選び直してもらう
+  if (p.src && p.src.url) {
+    $('approve').disabled = true; note('反映の前に、元のスプシから最新を読み直しています…');
+    let f = null; try { f = await freshen(p.src); } catch (e) { note('最新を読み直せなかったので反映しませんでした: ' + e.message); }
+    $('approve').disabled = false; save(); renderSaving();
+    if (!f || pending !== p) return;
+    if (f.cols.join('\u0001') !== p.cols.join('\u0001')) { p.cols = f.cols; p.rows = f.rows; p.picks = pickCols(f.cols, f.rows); renderMatches(); note('元のスプシの列が変わっていたので、最新の列で選び直してください(まだ反映していません)'); return; }
+    p.fresh = JSON.stringify(f.rows) !== JSON.stringify(p.rows) ? `反映の前に最新を読み直し、行が変わっていたので最新(${f.rows.length} 行)で入れた` : `反映の前に最新を読み直した(変わりなし、${f.rows.length} 行)`;
+    p.rows = f.rows;
+  }
   const lines = [];
   const bind = p.cols.map((c, i) => {
     const m = p.picks[i];
@@ -760,6 +794,8 @@ function approve() {
     return { axis: a.id, value: cd.value, rel };
   });
   const id = 'sh' + Date.now().toString(36);
+  if (p.fresh) lines.push(p.fresh);
+  lines.push(...markDone(p.stash, bind));
   S.sheets.push({ id, cube: p.cube, name: p.name, tag: p.tag, cols: p.cols, rows: p.rows, bind, origin: p.origin ? { text: p.origin.text, short: p.origin.short } : null, cf: p.cf || [], dv: p.dv || [], formulas: p.formulas || {} });
   S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: p.origin ? '取り込み' : '承認', title: `${where({ cube: p.cube, name: p.name })} を入れた`,
     lines: [...(p.origin ? p.origin.minutes : []), ...lines], sources: p.origin ? p.origin.sources : [], results: [id] });
@@ -952,9 +988,10 @@ async function readBook() {
   try { const r = await fetch('/api/sheets/read?url=' + encodeURIComponent(url), { credentials: 'same-origin' }); if ((r.headers.get('content-type') || '').includes('json')) j = await r.json(); } catch (e) {}
   $('bookRead').disabled = false;
   if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')';
-  if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。使うタブを選んで取り込んでください`); }
+  if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。使うタブを選んで取り込んでください(反映するまでは Saving に置いておきます)`); }
   else if (j && j.error) { book = null; renderBook(); bookMsg(j.error, true); return; }
   else { book = mockBook(url); bookMsg('ここからはリンク先を読めないため、例のデータで流れを見せています。本物はアプリの画面で読めます', true); }
+  book.url = book.url || url; stashBook(book); save(); renderSaving();
   renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
@@ -983,7 +1020,7 @@ function renderBook() {
   $('book').innerHTML = h;
   $('book').querySelectorAll('[data-use]').forEach(c => c.onchange = () => { book.tabs[+c.dataset.use].use = c.checked; });
   $('book').querySelectorAll('input[name=merge]').forEach(r => r.onchange = () => { book.merge = r.value === '1'; });
-  $('book').querySelectorAll('[data-units]').forEach(x => x.onclick = () => { const t = book.tabs[+x.dataset.units]; openUnits({ name: book.name + ' › ' + t.name, cols: t.cols, rows: t.rows }); });
+  $('book').querySelectorAll('[data-units]').forEach(x => x.onclick = () => { const t = book.tabs[+x.dataset.units]; const e = S.saving.find(x => x.url === book.url && x.tab === t.name); openUnits({ name: book.name + ' › ' + t.name, cols: t.cols, rows: t.rows, src: { url: book.url, tabs: [t.name], merge: false }, stash: e && e.id }); });
   $('bookGo').onclick = importBook; $('bookCancel').onclick = () => { book = null; renderBook(); };
 }
 function importBook() {
@@ -994,6 +1031,7 @@ function importBook() {
     ...b.gas.map(g => `GAS ${g.fn}(${g.trig}): ${g.text}。自動では動かさず「${g.plan}」とする案`), ...(skip.length ? [`使わないタブ: ${skip.join('・')}`] : [])];
   const fx = t => Object.fromEntries(Object.entries(t.formulas).map(([c, f]) => [c, f]));
   const mk = (name, cols, rows, tag, t, srcTabs, extra) => ({ name, cube: target, tag, cols, rows, picks: pickCols(cols, rows), cf: t.cf.map(c => ({ ...c, col: c.col + (extra || 0) })), dv: t.dv.map(c => ({ ...c, col: c.col + (extra || 0) })), formulas: fx(t),
+    src: { url: b.url, tabs: srcTabs.map(x => x.name), merge: extra === 1 }, stash: srcTabs.map(x => S.saving.find(e => e.url === b.url && e.tab === x.name)).filter(Boolean).map(e => ({ id: e.id, off: extra || 0 })),
     origin: { text: b.name + ' › ' + srcTabs.map(x => x.name).join(' / '), short: srcTabs.length > 1 ? srcTabs.length + 'タブをまとめた' : 'スプシから', minutes: head, sources: srcTabs.map(x => ({ book: b.name, tab: x.name, range: 'A1:' + colL(x.cols.length - 1) + (x.rows.length + 1) })) } });
   const items = [];
   if (b.real) {   // 本物のスプシ: シート名はスプシとタブの名前、タブ名に年月があれば「月」の値にする
@@ -1009,6 +1047,82 @@ function importBook() {
     S.history.push({ id: 'h' + Date.now().toString(36) + 'c', at: today(), kind: '取り込み', title: `${b.name} › ${t.name} の関数を「まとめる」に置き換えた`, lines: Object.values(t.formulas).map(f => `${f.f.replace('{r}', 'n')} → モール=au PAY・月=2026-09・科目=売上 を ショップごとに`), sources: [{ book: b.name, tab: t.name, range: 'B2:B' }], results: [] }); });
   book = null; queue = items.slice(1); pending = items[0] || null; save(); renderAll();
   if (pending) go('import'), $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---------- Saving: 読み取ったけれど、まだ箱・キューブに反映していないシート・列・行の置き場 ----------
+// 1枚(スプシのタブ、または貼り付けたシート)ごとに、反映した列と行を覚える。全部の列と行を反映したら Saving から外す。
+// 反映(列を軸にしてキューブに入れる・行から箱やキューブを作る)の直前には、スプシなら必ず元を読み直して最新にしてから入れる
+const rowKey = r => JSON.stringify(r);
+function refreshEntry(e, cols, rows) {
+  // 読み直したら、反映済みの印は列は名前で、行は中身で引き継ぐ(中身が変わった行は、まだ反映していない扱い)
+  const doneCols = new Set(e.colsDone.map(i => e.cols[i])), doneRows = new Set(e.rowsDone.map(i => rowKey(e.rows[i])));
+  e.cols = cols; e.rows = rows.map(r => cols.map((_, i) => r[i] ?? '')); e.at = new Date().toISOString();
+  e.colsDone = cols.map((c, i) => doneCols.has(c) ? i : -1).filter(i => i >= 0);
+  e.rowsDone = e.rows.map((r, i) => doneRows.has(rowKey(r)) ? i : -1).filter(i => i >= 0);
+  return e;
+}
+function stash(x) {
+  const e = S.saving.find(y => x.url ? y.url === x.url && y.tab === x.tab : !y.url && y.name === x.name);
+  if (e) { e.name = x.name; return refreshEntry(e, x.cols, x.rows); }
+  const n = { id: 'sv' + Date.now().toString(36) + S.saving.length, colsDone: [], rowsDone: [], ...x, at: new Date().toISOString() };
+  S.saving.push(n); return n;
+}
+const stashBook = b => b.tabs.filter(t => t.kind === 'data').forEach(t => stash({ src: 'link', url: b.url, book: b.name, tab: t.name, month: t.month || '', name: b.name + ' › ' + t.name, cols: t.cols, rows: t.rows }));
+// 元のスプシを読み直す(アプリの外では例のデータ)。読めなければ理由を投げる
+async function fetchBook(url) {
+  let j = null;
+  try { const r = await fetch('/api/sheets/read?url=' + encodeURIComponent(url), { credentials: 'same-origin' }); if ((r.headers.get('content-type') || '').includes('json')) j = await r.json(); } catch (e) {}
+  if (j && j.book) { j.book.url = j.book.url || url; return j.book; }
+  if (j && j.error) throw new Error(j.error);
+  const b = mockBook(url); b.url = url; return b;
+}
+// 反映に使うタブを読み直し、Saving も最新にして、反映に使う列と行を返す(タブをまとめるときは先頭に「月」)
+async function freshen(src) {
+  const b = await fetchBook(src.url), ts = src.tabs.map(n => b.tabs.find(t => t.name === n));
+  if (ts.some(t => !t)) throw new Error('元のタブが見つかりません(タブの名前が変わったか、消えた可能性があります)');
+  ts.forEach(t => stash({ src: 'link', url: src.url, book: b.name, tab: t.name, month: t.month || '', name: b.name + ' › ' + t.name, cols: t.cols, rows: t.rows }));
+  return src.merge ? { cols: ['月', ...ts[0].cols], rows: ts.flatMap(t => t.rows.map(r => [t.month, ...r])) } : { cols: [...ts[0].cols], rows: ts[0].rows.map(r => [...r]) };
+}
+// 反映した列(used[i] が真の列。off は先頭に足した「月」の分)と行に印を付け、全部反映したものは Saving から外す。履歴の行を返す
+function markDone(list, used, rows) {
+  const out = [];
+  for (const { id, off } of list || []) {
+    const e = S.saving.find(x => x.id === id); if (!e) continue;
+    used.forEach((u, i) => { const c = i - (off || 0); if (u && c >= 0 && c < e.cols.length && !e.colsDone.includes(c)) e.colsDone.push(c); });
+    (rows || e.rows.map((_, i) => i)).forEach(i => { if (i < e.rows.length && !e.rowsDone.includes(i)) e.rowsDone.push(i); });
+    const lc = e.cols.length - e.colsDone.length, lr = e.rows.length - e.rowsDone.length;
+    if (!lc && !lr) { S.saving = S.saving.filter(x => x !== e); out.push(`Saving: 「${e.name}」はすべて反映したので Saving から外した`); }
+    else out.push(`Saving: 「${e.name}」はまだ反映していない列 ${lc} 個・行 ${lr} 行を Saving に残した`);
+  }
+  return out;
+}
+const whenTxt = iso => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+function renderSaving() {
+  const el = $('savingList'); if (!el) return;
+  const nb = $('nb-saving'); if (nb) { nb.hidden = !S.saving.length; nb.textContent = S.saving.length; }
+  if (!S.saving.length) { el.innerHTML = '<p class="muted">まだ反映していないものはありません。スプシのリンクや貼り付けで読み取ると、箱・キューブに反映するまでここに置いておきます。</p>'; return; }
+  el.innerHTML = S.saving.map(e => {
+    const lr = e.rows.length - e.rowsDone.length, left = e.rows.map((r, i) => [r, i]).filter(([, i]) => !e.rowsDone.includes(i));
+    return `<div class="stash" data-sv="${e.id}"><div class="t">${esc(e.name)}</div>
+      <div class="d">${e.url ? 'スプシのリンク' : '貼り付け'}・読み取り ${esc(whenTxt(e.at))}・${e.rows.length} 行 × ${e.cols.length} 列・まだ反映していない行 ${lr} 行</div>
+      <div class="cols">${e.cols.map((c, i) => `<span class="${e.colsDone.includes(i) ? '' : 'left'}" title="${e.colsDone.includes(i) ? '反映済み' : 'まだ反映していない'}">${colL(i)} ${esc(c)}${e.colsDone.includes(i) ? ' ✓' : ''}</span>`).join('')}</div>
+      ${left.length ? `<div class="d">まだの行の例: ${esc(left.slice(0, 3).map(([r, i]) => `${i + 2}行目 ${r.slice(0, 3).join(' ')}`).join(' / '))}</div>` : ''}
+      <div class="row">${e.url ? '<button class="small" data-svr>最新を読み直す</button>' : ''}<button class="small primary" data-svm>軸を読み取ってキューブに入れる</button><button class="small" data-svu>行から箱・キューブを作る</button><button class="small" data-svx>Saving から消す</button></div></div>`;
+  }).join('') + '<p class="muted">スプシから読んだものは、反映の直前に必ず元を読み直し、最新の内容で入れます。貼り付けたものは元が無いので、貼り付けた内容で入れます。</p>';
+  el.querySelectorAll('[data-sv]').forEach(card => {
+    const e = S.saving.find(x => x.id === card.dataset.sv), q = s => card.querySelector(s);
+    const src = e.url ? { url: e.url, tabs: [e.tab], merge: false } : null;
+    if (q('[data-svr]')) q('[data-svr]').onclick = async () => { q('[data-svr]').disabled = true; try { await freshen(src); note(`「${e.name}」を読み直しました`); } catch (x) { note('読み直せませんでした: ' + x.message); } save(); renderSaving(); };
+    q('[data-svm]').onclick = () => {
+      pending = { name: e.name, cube: $('target').value, tag: e.month ? { month: e.month } : {}, cols: [...e.cols], rows: e.rows.map(r => [...r]), picks: pickCols(e.cols, e.rows), src, stash: [{ id: e.id, off: 0 }],
+        origin: e.url ? { text: e.name, short: 'スプシから', minutes: [`Saving の「${e.name}」(${e.url})から入れた`], sources: [{ book: e.book, tab: e.tab, range: 'A1:' + colL(e.cols.length - 1) + (e.rows.length + 1) }] } : null };
+      // 反映済みの列は「使わない」を初期値にする
+      e.colsDone.forEach(i => { if (pending.picks[i]) pending.picks[i].pick = 'skip'; });
+      queue = []; renderMatches(); go('import'); $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+    q('[data-svu]').onclick = () => openUnits({ name: e.name, cols: [...e.cols], rows: e.rows.map(r => [...r]), src, stash: e.id });
+    q('[data-svx]').onclick = () => { S.saving = S.saving.filter(x => x !== e); S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '取り込み', title: `Saving から「${e.name}」を消した`, lines: [`反映していない列 ${e.cols.length - e.colsDone.length} 個・行 ${e.rows.length - e.rowsDone.length} 行は入れずに消した`], sources: [], results: [] }); save(); renderAll(); renderHome(); };
+  });
 }
 
 // ---------- シート(スプシを模した表) ----------
@@ -2100,7 +2214,7 @@ $('navToggle').onclick = () => navC(!document.querySelector('.shell').classList.
 try { if (localStorage.getItem('axis-boxes-v2:navc')) navC(true); } catch (e) {}
 
 // ---------- つなぐ ----------
-function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
+function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); renderSaving(); }
 $('read').onclick = readSheet;
 $('readUnits').onclick = readUnits;
 $('approve').onclick = approve;
@@ -2114,7 +2228,7 @@ document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (
 
 // ---------- ダッシュボードの画面切り替え ----------
 // 左のメニュー(と data-go を持つボタン)で画面を1つだけ見せる。開いていた画面は次に開いたときも同じ(ブラウザに覚える)
-const VIEWS = { home: 'ホーム', world: 'World', gather: 'まとめる', import: 'シートを入れる', dict: '軸の辞書', history: '履歴', settings: '設定' };
+const VIEWS = { home: 'ホーム', world: 'World', gather: 'まとめる', import: 'シートを入れる', saving: 'Saving', dict: '軸の辞書', history: '履歴', settings: '設定' };
 function go(v) {
   if (!VIEWS[v]) v = 'home';
   document.querySelectorAll('.view').forEach(e => e.hidden = e.dataset.view !== v);
@@ -2132,7 +2246,7 @@ function renderHome() {
     ['dict', '軸', S.axes.filter(visibleAxis).length, '辞書の言い換え ' + S.dict.length + ' 件'], ['gather', '保存したまとめ', S.saved.length, upd ? '更新あり ' + upd + ' 件' : 'すべて見た'], ['import', '承認待ち', wait, wait ? '押して承認へ' : 'ありません']];
   $('kpis').innerHTML = K.map(([v, k, n, sub]) => `<button class="kpi" data-go="${v}"><span class="k">${k}</span><span class="v">${n}</span><span class="s">${esc(sub)}</span></button>`).join('');
   $('recent').innerHTML = S.history.length ? [...S.history].reverse().slice(0, 4).map(h => `<div class="ri"><span class="pill cube">${esc(h.kind)}</span><span class="t" title="${esc(h.title)}">${esc(h.title)}</span><span class="at">${esc(h.at)}</span></div>`).join('') : '<span class="muted">まだありません</span>';
-  [['import', wait], ['gather', upd]].forEach(([v, n]) => { const e = $('nb-' + v); e.hidden = !n; e.textContent = n; });
+  [['import', wait], ['gather', upd], ['saving', S.saving.length]].forEach(([v, n]) => { const e = $('nb-' + v); e.hidden = !n; e.textContent = n; });
 }
 
 $('save').onclick = saveQuery;
