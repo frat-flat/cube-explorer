@@ -66,6 +66,13 @@ input[type=text]{min-width:0}
 #crumbs button{font-size:12.5px;padding:2px 8px;background:var(--panel)}
 #crumbs button.cur{border-color:var(--hl);background:var(--hlSoft)}
 #crumbs .tg{margin-left:10px;border-color:var(--stack);color:var(--stack)}
+#filters{position:absolute;left:10px;top:44px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;max-width:calc(100% - 20px)}
+#filters select,#filters button{font-size:12.5px;padding:1px 6px;background:var(--panel)}
+#filters .lb{color:var(--muted)}
+#filters button.on{background:var(--stack);border-color:var(--stack);color:#fff}
+#filters .chip{border-color:var(--hl);background:var(--hlSoft)}
+tfoot td{font-weight:700;background:var(--paper2);cursor:default}
+td.sum{font-weight:700}
 #crumbs span{color:var(--muted);font-size:12px}
 #hint{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);pointer-events:none}
 #chain{font-size:13px;min-height:22px}
@@ -153,7 +160,7 @@ T-03	渡辺 陸	H-03</textarea>
     <button id="lineMode">線: シートどうし</button>
     <button id="clearSel">選択を外す</button>
   </div>
-  <div id="stage"><div id="crumbs" hidden></div><div id="hint">ドラッグで回す・ホイールで寄る・行を押すとつながる行が光る・「▸ 内訳」で潜る</div></div>
+  <div id="stage"><div id="crumbs" hidden></div><div id="filters" hidden></div><div id="hint">ドラッグで回す・ホイールで寄る・行を押すとつながる行が光る・「▸ 内訳」で潜る</div></div>
   <div id="chain"></div>
   <div class="tablewrap"><table id="table"></table></div>
 </main>
@@ -221,7 +228,16 @@ function slots() {
 const placeOf = slotId => S.place[slotId] || 'in';
 // 今見ている枠の一覧。潜っていなければ器の一番上、潜っていればその場所の中身
 function viewSlots() {
-  if (path.length) return path[path.length - 1].slots;
+  if (path.length) {
+    // 潜った先のフィルター。データは消さず、見る範囲だけ絞る(y=行の値、z=重ねの目盛り)
+    const e = path[path.length - 1], f = e.filters || {};
+    return e.slots.map(sl => {
+      let shs = sl.sheets;
+      if (f.z) shs = shs.filter(x => x.member === f.z);
+      if (f.y) shs = shs.map(x => { const c = { ...x, id: x.id + '~' + f.y, rows: x.rows.filter(r => r[0] === f.y) }; virt.set(c.id, c); return c; });
+      return { ...sl, sheets: shs };
+    });
+  }
   return slots().map(id => { const st = S.stacks.find(s => s.id === id); return { id, sheets: slotSheets(id), stack: st ? { name: st.name, axis: st.axis } : null, place: placeOf(id) }; });
 }
 const viewLinks = () => path.length ? [] : S.links;
@@ -246,25 +262,62 @@ let diveView = 'cube';   // 潜った先を 子のキューブ(cube) か シー�
 let selCell = null;      // 子のキューブで選んだコマ
 function dive(sh, r, c) {
   const kind = sh.drill && sh.drill[c]; if (!kind) return false;
-  const slot = viewSlots().find(s => s.sheets.includes(sh));
+  const slot = viewSlots().find(s => s.sheets.some(x => x.id === sh.id));
   const members = slot && slot.stack && slot.sheets.length > 1 ? slot.sheets : [sh];
   const key = sh.rows[r][0];
   const inner = members.map(m => {
-    const rr = m === sh ? r : m.rows.findIndex(x => x[0] === key); if (rr < 0) return null;
+    const rr = m.id === sh.id ? r : m.rows.findIndex(x => x[0] === key); if (rr < 0) return null;
     const g = DRILLS[kind](m.rows[rr][c], m.id + ':' + rr + ':' + c);
     g.id = 'v' + (++vid); g.member = m.member; virt.set(g.id, g); return g;
   }).filter(Boolean);
   const label = key + ' の' + sh.cols[c] + (members.length > 1 ? '(' + slot.stack.axis + 'ごと)' : sh.member ? '(' + sh.member + ')' : '');
+  enter({ label, filters: {}, slots: [{ id: 'd' + vid, sheets: inner, stack: members.length > 1 ? { name: inner[0].name, axis: slot.stack.axis } : null, place: 'in' }] },
+    cellWorld(sh.id, r, c) || blockWorld(sh.id, r, c));
+  return true;
+}
+function enter(entry, p) {
   const go = () => {
-    selCell = null;
-    path.push({ label, slots: [{ id: 'd' + vid, sheets: inner, stack: members.length > 1 ? { name: inner[0].name, axis: slot.stack.axis } : null, place: 'in' }] });
-    sel = new Map(); active = inner[inner.length - 1].id;
+    selCell = null; path.push(entry);
+    sel = new Map(); const v = viewSlots()[0].sheets; active = (v[v.length - 1] || {}).id;
     Object.assign(camGoal, { tx: 0, ty: 0, tz: 0, dist: diveView === 'cube' ? 20 : 15 }); cam.dist = 8;
     viewChanged();
   };
-  const p = cellWorld(sh.id, r, c) || blockWorld(sh.id, r, c);
   if (p && !reduce) { Object.assign(camGoal, { tx: p.x, ty: p.y, tz: p.z, dist: 5 }); setTimeout(go, 380); } else go();
+}
+// 列ごと潜る:その列の全行(全ショップ)の内訳を、行を目盛りにして重ねる。月は重ねの目盛りから1つ選ぶ
+function diveColumn(sh, c) {
+  const kind = sh.drill && sh.drill[c]; if (!kind) return false;
+  const slot = viewSlots().find(s => s.sheets.some(x => x.id === sh.id));
+  const months = slot && slot.stack && slot.sheets.length > 1 ? slot.sheets : [sh];
+  const who = sh.cols[0].replace(/ID$/, '');
+  const make = m => m.rows.map((row, rr) => { const g = DRILLS[kind](row[c], m.id + ':' + rr + ':' + c); g.id = 'v' + (++vid); g.member = row[0]; virt.set(g.id, g); return g; });
+  const entry = { base: '全' + who + 'の' + sh.cols[c], months, monthIdx: months.indexOf(sh), make, filters: {},
+    slots: [{ id: 'd' + (++vid), sheets: make(sh), stack: { name: '', axis: who }, place: 'in' }] };
+  entry.label = entry.base + (sh.member ? '(' + sh.member + ')' : '');
+  const o = meshes.find(m => m.sh.id === sh.id);
+  enter(entry, o ? o.mesh.getWorldPosition(new THREE.Vector3()) : null);
   return true;
+}
+function setMonth(i) {
+  const e = path[path.length - 1]; e.monthIdx = i;
+  e.slots[0].sheets = e.make(e.months[i]); e.label = e.base + '(' + e.months[i].member + ')';
+  sel = new Map(); selCell = null; viewChanged();
+}
+function renderFilters() {
+  const el = document.getElementById('filters'), e = path[path.length - 1];
+  el.hidden = !e; if (!e) return;
+  const sl = e.slots[0], f0 = sl.sheets[0], f = e.filters;
+  const ys = f0 ? f0.rows.map(r => r[0]) : [], zs = sl.stack && sl.sheets.length > 1 ? sl.sheets.map(x => x.member) : [];
+  let h = '';
+  if (e.months && e.months.length > 1) h += '<span class="lb">月:</span>' + e.months.map((m, i) => `<button data-m="${i}"${i === e.monthIdx ? ' class="on"' : ''}>${esc(m.member)}</button>`).join('');
+  const opt = (k, label, vals) => `<span class="lb">${esc(label)}で絞る:</span><select data-f="${k}" aria-label="${esc(label)}で絞る"><option value="">すべて</option>${vals.map(v => `<option${f[k] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
+  if (ys.length > 1) h += opt('y', f0.cols[0], ys);
+  if (zs.length > 1) h += opt('z', sl.stack.axis, zs);
+  for (const k of ['y', 'z']) if (f[k]) h += `<button class="chip" data-x="${k}">${esc(k === 'y' ? f0.cols[0] : sl.stack.axis)} = ${esc(f[k])} ×</button>`;
+  el.innerHTML = h;
+  el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMonth(+b.dataset.m));
+  el.querySelectorAll('select').forEach(x => x.onchange = () => { f[x.dataset.f] = x.value || null; sel = new Map(); selCell = null; viewChanged(); });
+  el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { f[b.dataset.x] = null; sel = new Map(); selCell = null; viewChanged(); });
 }
 function goUp(n) { path.length = n; sel = new Map(); selCell = null; const v = viewSlots(); active = (v[0] && v[0].sheets[0] || {}).id; viewChanged(); }
 function renderCrumbs() {
@@ -272,9 +325,9 @@ function renderCrumbs() {
   el.innerHTML = '<button data-n="0">器</button>' + path.map((p, i) => `<span>›</span><button data-n="${i + 1}"${i === path.length - 1 ? ' class="cur"' : ''}>${esc(p.label)}</button>`).join('');
   el.innerHTML += `<button class="tg" id="dvToggle">${diveView === 'cube' ? 'シートで見る' : '子のキューブで見る'}</button>`;
   el.querySelectorAll('button[data-n]').forEach(b => b.onclick = () => goUp(+b.dataset.n));
-  document.getElementById('dvToggle').onclick = () => { diveView = diveView === 'cube' ? 'sheet' : 'cube'; build(); renderCrumbs(); };
+  document.getElementById('dvToggle').onclick = () => { diveView = diveView === 'cube' ? 'sheet' : 'cube'; build(); renderCrumbs(); renderTable(); };
 }
-function viewChanged() { build(); renderList(); renderTable(); renderChain(); renderCrumbs(); }
+function viewChanged() { build(); renderList(); renderTable(); renderChain(); renderCrumbs(); renderFilters(); }
 
 // ---------- つながりをたどる ----------
 function pairs(link) {
@@ -332,7 +385,10 @@ const sun = new THREE.DirectionalLight(0xffffff, .45); sun.position.set(4, 9, 6)
 function buildChildCube(slot) {
   const shs = slot.sheets, f = shs[0];
   const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), ys = f.rows.map(r => r[0]);
-  const nx = vc.length, ny = ys.length, nz = shs.length;
+  // 絞って行が1つになったら、重ねの軸を縦に回して1枚の面に畳む(例:衣料だけ → ショップ×週)
+  const fold = ys.length === 1 && shs.length > 1;
+  const rowNames = fold ? shs.map(x => x.member) : ys;
+  const nx = vc.length, ny = rowNames.length, nz = fold ? 1 : shs.length;
   const u = Math.min(6.4 / nx, 6.4 / ny, 6.4 / nz, 1.5), W = nx * u, H = ny * u, D = nz * u;
   let max = 0; shs.forEach(sh => sh.rows.forEach(r => vc.forEach(c => { max = Math.max(max, num(r[c])); })));
   const g = new THREE.Group(); world.add(g);
@@ -340,7 +396,7 @@ function buildChildCube(slot) {
   shs.forEach((sh, k) => sh.rows.forEach((r, ri) => vc.forEach((c, xi) => {
     const t = max ? num(r[c]) / max : 0, col = lo.clone().lerp(hi, .12 + .88 * t);
     const m = new THREE.Mesh(new THREE.BoxGeometry(u * .78, u * .78, u * .78), new THREE.MeshLambertMaterial({ color: col }));
-    m.position.set(-W / 2 + (xi + .5) * u, H / 2 - (ri + .5) * u, D / 2 - (k + .5) * u);
+    m.position.set(-W / 2 + (xi + .5) * u, H / 2 - ((fold ? k : ri) + .5) * u, fold ? 0 : D / 2 - (k + .5) * u);
     m.userData.cell = { sid: sh.id, r: ri, c, base: col };
     g.add(m); blocks.push(m);
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--frame')), transparent: true, opacity: .55 }));
@@ -349,12 +405,13 @@ function buildChildCube(slot) {
   g.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W + .3, H + .3, D + .3)), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--stack')) })));
   const cx = css('--ax'), cy = css('--ay'), cz = css('--stack');
   vc.forEach((c, xi) => { const sp = textSprite(f.cols[c], cx, .3); sp.position.set(-W / 2 + (xi + .5) * u, -H / 2 - .45, D / 2 + .2); g.add(sp); });
-  ys.forEach((y, ri) => { const sp = textSprite(y, cy, .3); sp.position.set(-W / 2 - .35 - sp.scale.x / 2, H / 2 - (ri + .5) * u, D / 2 + .2); g.add(sp); });
-  if (nz > 1) shs.forEach((sh, k) => { const sp = textSprite(sh.member || sh.name, cz, .28); sp.position.set(W / 2 + .35 + sp.scale.x / 2, -H / 2 - .25, D / 2 - (k + .5) * u); g.add(sp); });
-  const names = [[`X: ${f.xName || '値'}`, cx, [0, -H / 2 - 1.0, D / 2 + .2]], [`Y: ${f.cols[0]}`, cy, [-W / 2 - 1.6, H / 2 + .55, D / 2 + .2]]];
+  rowNames.forEach((y, ri) => { const sp = textSprite(y, cy, .3); sp.position.set(-W / 2 - .35 - sp.scale.x / 2, H / 2 - (ri + .5) * u, D / 2 + .2); g.add(sp); });
+  if (!fold && nz > 1) shs.forEach((sh, k) => { const sp = textSprite(sh.member || sh.name, cz, .28); sp.position.set(W / 2 + .35 + sp.scale.x / 2, -H / 2 - .25, D / 2 - (k + .5) * u); g.add(sp); });
+  const names = [[`X: ${f.xName || '値'}`, cx, [0, -H / 2 - 1.0, D / 2 + .2]], [`Y: ${fold ? slot.stack.axis : f.cols[0]}`, cy, [-W / 2 - 1.6, H / 2 + .55, D / 2 + .2]]];
   if (nz > 1) names.push([`Z: ${slot.stack.axis}`, cz, [W / 2 + 1.2, -H / 2 - .8, 0]]);
   names.forEach(([t, c, pos]) => { const sp = textSprite(t, c, .38); sp.position.set(...pos); g.add(sp); });
-  const ttl = textSprite((path[path.length - 1] || {}).label + '(子のキューブ)', cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
+  const pe = path[path.length - 1] || {}, fl = pe.filters || {};
+  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fold ? '(面に畳んだ)' : '(子のキューブ)'), cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
   styleBlocks();
 }
 function blockWorld(sid, r, c) {
@@ -704,21 +761,37 @@ $('shapeCube').onclick = () => { S.shape = 'cube'; save(); renderAll(); };
 $('shapeCyl').onclick = () => { S.shape = 'cyl'; save(); renderAll(); };
 
 // ---------- 下の表とつながりの説明 ----------
+// 子のキューブを見ているときは、下の表を「面の表」にする(重ねの目盛り × 行 × 値の列、合計つき)
+function renderPivot(t) {
+  const sl = viewSlots()[0], shs = sl.sheets, f = shs[0]; if (!f) { t.innerHTML = ''; return; }
+  const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), multi = sl.stack && shs.length > 1;
+  const tot = vc.map(() => 0); let all = 0;
+  const body = shs.flatMap(sh => sh.rows.map((r, ri) => {
+    const sum = vc.reduce((a, c) => a + num(r[c]), 0); vc.forEach((c, i) => { tot[i] += num(r[c]); }); all += sum;
+    return `<tr class="${isSel(sh.id, ri) ? 'hl' : ''}" data-s="${sh.id}" data-r="${ri}">${multi ? `<td>${esc(sh.member)}</td>` : ''}<td>${esc(r[0])}</td>${vc.map(c => `<td data-c="${c}" tabindex="0"><span class="v">${esc(r[c])}</span>${sh.drill && sh.drill[c] ? '<button class="dv" title="このマスの内訳へ潜る">▸ 内訳</button>' : ''}</td>`).join('')}<td class="sum">${fmt(sum)}</td></tr>`;
+  })).join('');
+  t.innerHTML = `<thead><tr>${multi ? `<th>${esc(sl.stack.axis)}</th>` : ''}<th>${esc(f.cols[0])}</th>${vc.map(c => `<th>${esc(f.cols[c])}</th>`).join('')}<th>計</th></tr></thead><tbody>${body}</tbody>
+    <tfoot><tr>${multi ? '<td></td>' : ''}<td>合計</td>${tot.map(x => `<td>${fmt(x)}</td>`).join('')}<td>${fmt(all)}</td></tr></tfoot>`;
+}
 function renderTable() {
+  if (path.length && diveView === 'cube') return renderPivot($('table'));
   const sh = sheet(active), t = $('table'); if (!sh) { t.innerHTML = ''; return; }
   const keyCols = new Set(viewLinks().filter(l => slotSheets(l.to).includes(sh)).map(l => l.tcol));
   const fk = new Map(viewLinks().filter(l => slotSheets(l.from).includes(sh)).map(l => [l.fcol, slotName(l.to)]));
   const title = sh.name + (sh.member && path.length ? ' ' + sh.member : '');
-  t.innerHTML = `<thead><tr><th>${esc(title)}</th>${sh.cols.map((c, i) => `<th>${esc(c)}${fk.has(i) ? `<span class="tag">→ ${esc(fk.get(i))}</span>` : keyCols.has(i) ? '<span class="tag">鍵</span>' : sh.drill && sh.drill[i] ? '<span class="tag">▸ 潜れる</span>' : ''}</th>`).join('')}</tr></thead>
+  t.innerHTML = `<thead><tr><th>${esc(title)}</th>${sh.cols.map((c, i) => `<th>${esc(c)}${fk.has(i) ? `<span class="tag">→ ${esc(fk.get(i))}</span>` : keyCols.has(i) ? '<span class="tag">鍵</span>' : sh.drill && sh.drill[i] ? `<button class="dv dvc" data-c="${i}" title="この列の全行の内訳へ潜る">▸ 全行の内訳</button>` : ''}</th>`).join('')}</tr></thead>
     <tbody>${sh.rows.map((r, ri) => `<tr class="${isSel(sh.id, ri) ? 'hl' : ''}" data-r="${ri}"><td>${ri + 1}</td>${r.map((v, ci) => sh.drill && sh.drill[ci] ? `<td data-c="${ci}" tabindex="0"><span class="v">${esc(v)}</span><button class="dv" title="このマスの内訳へ潜る">▸ 内訳</button></td>` : `<td data-c="${ci}" tabindex="0">${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody>`;
 }
 $('table').addEventListener('click', e => {
-  const tr = e.target.closest('tbody tr'), sh = sheet(active); if (!tr || !sh) return;
+  const hc = e.target.closest('.dvc'); if (hc) { diveColumn(sheet(active), +hc.dataset.c); return; }
+  const tr = e.target.closest('tbody tr'), sh = sheet(tr && tr.dataset.s || active); if (!tr || !sh) return;
   const td = e.target.closest('td[data-c]');
+  if (tr.dataset.s) active = sh.id;
   if (e.target.closest('.dv')) { dive(sh, +tr.dataset.r, +td.dataset.c); return; }
   selCell = td && sh.valueCols && sh.valueCols.includes(+td.dataset.c) ? { sid: sh.id, r: +tr.dataset.r, c: +td.dataset.c } : null;
   if (e.detail >= 2 && td) {   // 1回目の再描画で要素が替わっても効くよう、回数で判定。▸の列は潜る、それ以外は直す
     if (dive(sh, +tr.dataset.r, +td.dataset.c)) return;
+    if (tr.dataset.s) return;
     td.contentEditable = 'true'; td.focus(); return;
   }
   if (!td || !td.isContentEditable) select(sh.id, +tr.dataset.r);
@@ -740,7 +813,8 @@ function renderChain() {
     const ex = !path.length && S.sheets.find(x => x.drill && x.rows.length);
     el.innerHTML = (path.length ? '<span class="note">潜った先です。立体の左上のパンくずで戻れます。子のキューブのコマを押すと表の行が光り、ダブルクリックするとさらに潜れます(表の「▸ 内訳」でも潜れます)。</span>'
       : '<span class="note">行を押すと、つながる行をたどって順に出します。「▸ 内訳」の付いたマスは押すと内訳へ潜れます。</span>')
-      + (ex ? `<br><button class="go" data-s="${ex.id}" data-r="0" data-c="${Object.keys(ex.drill)[0]}">例: ${esc(ex.rows[0][0])} の${esc(ex.cols[Object.keys(ex.drill)[0]])}へ潜る ▸</button>` : '');
+      + (ex ? (() => { const st = stackOf(ex.id), last = st ? sheet(st.members[st.members.length - 1]) : ex, c = Object.keys(ex.drill)[0];
+          return `<br><button class="go" data-s="${ex.id}" data-r="0" data-c="${c}">例: ${esc(ex.rows[0][0])} の${esc(ex.cols[c])}へ潜る ▸</button><button class="go" data-col="1" data-s="${last.id}" data-c="${c}">例: 全${esc(ex.cols[0].replace(/ID$/, ''))}の${esc(ex.cols[c])}(${esc(last.member || last.name)})へ潜る ▸</button>`; })() : '');
     return;
   }
   const order = viewSlots().flatMap(s => s.sheets).filter(s => sel.has(s.id));
@@ -754,11 +828,11 @@ function renderChain() {
     return `<span class="step">${esc(s.name)}${s.member && path.length ? ' ' + esc(s.member) : ''} ${esc(rows.join('・'))}</span>`;
   }).join(' › ') + (selCell && sheet(selCell.sid) ? (() => { const sc = sheet(selCell.sid); return `<br><span class="step">選んだコマ: ${esc(sc.member || '')} ${esc(sc.rows[selCell.r][0])} × ${esc(sc.cols[selCell.c])} = ${esc(sc.rows[selCell.r][selCell.c])}</span>`; })() : '') + (gos.size ? '<br>' + [...gos.values()].join('') : '');
 }
-$('chain').addEventListener('click', e => { const b = e.target.closest('.go'); if (b) dive(sheet(b.dataset.s), +b.dataset.r, +b.dataset.c); });
+$('chain').addEventListener('click', e => { const b = e.target.closest('.go'); if (!b) return; b.dataset.col ? diveColumn(sheet(b.dataset.s), +b.dataset.c) : dive(sheet(b.dataset.s), +b.dataset.r, +b.dataset.c); });
 
 function renderAll() {
   $('shapeCube').classList.toggle('on', S.shape === 'cube'); $('shapeCyl').classList.toggle('on', S.shape !== 'cube');
-  renderList(); renderLinks(); build(); renderTable(); renderChain(); renderCrumbs();
+  renderList(); renderLinks(); build(); renderTable(); renderChain(); renderCrumbs(); renderFilters();
 }
 function applyTheme() { scene.background = new THREE.Color(css('--stage')); build(); }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
