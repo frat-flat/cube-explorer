@@ -134,8 +134,8 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await page.locator(`#cal .day[data-day="${Date.UTC(2026, 3, 12)}"] .dn`).click();
   await expect(page.locator("#cal h3")).toHaveText("2026年4月12日(日)");
   await page.locator("#cField").selectOption("面談日時");
-  await expect(page.locator("#cal .ax.day .chip")).toHaveCount(2);
-  await expect(page.locator("#cal .ax.day")).toContainText("10:30 法人A");
+  await expect(page.locator("#cal .vt .chip")).toHaveCount(2);
+  await expect(page.locator("#cal .vt")).toContainText("10:30 法人A");
   await expect(page.locator("#cal .dl")).toContainText("法人C");
   // 年: 3×4 の月。何月までのもの(開始予定)は月の見出しに
   await page.locator("#cField").selectOption("開始予定");
@@ -143,6 +143,18 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await expect(page.locator("#cal h3")).toHaveText("2026年");
   await expect(page.locator("#cal .ym")).toHaveCount(12);
   await expect(page.locator("#cal .ym").nth(6).locator(".mo")).toContainText("法人A");
+  // 複数年: 1年が1つの枠。年を押すとその年
+  await page.locator('#cal [data-cv="years"]').click();
+  await expect(page.locator("#cal h3")).toHaveText("2021〜2032年");
+  await expect(page.locator("#cal .ym").nth(5)).toContainText("法人B");
+  await page.locator('#cal [data-yy="2026"]').click();
+  await expect(page.locator("#cal h3")).toHaveText("2026年");
+  // 立体で見る: カレンダーの並びのままキューブにする(上の帯だけ残る)
+  await page.locator("#calCube").click();
+  await expect(page.locator("#cal")).toHaveClass(/bar/);
+  await expect(page.locator("#cal .yg")).toHaveCount(0);
+  await page.locator("#calCube").click();
+  await expect(page.locator("#cal .yg")).toHaveCount(1);
   // 日本地図: 地理院タイルの地図に、登録住所のある5つのピン。案内は枠の外
   await page.locator('[data-wm="japan"]').click();
   await expect(page.locator("#jmap .leaflet-interactive")).toHaveCount(5, { timeout: 30_000 });
