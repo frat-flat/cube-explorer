@@ -28,13 +28,13 @@ test("Supabase の保存から開き、変えたら送り返す", async ({ page 
   });
   // 1回目: Supabase は空なので、いまの中身(見本)を送る
   await page.goto("/");
-  await expect(page.locator("#cloud")).toHaveText("Supabase に保存済み");
-  expect(puts.length).toBe(1);
+  await expect.poll(() => puts.length).toBe(1);
+  // うまくいっているときは右上に何も出さない
+  await expect(page.locator("#cloud")).toBeHidden();
   // Supabase 側の中身を書き換えて開き直すと、そちらが出る
   (stored as { axes: { name: string }[] }).axes[0].name = "雲の軸";
   await page.evaluate(() => localStorage.clear());
   await page.goto("/");
-  await expect(page.locator("#cloud")).toHaveText("Supabase から読み込みました");
   await page.locator('.nv[data-go="dict"]').click();
   await expect(page.locator('.view[data-view="dict"]')).toContainText("雲の軸");
 });
