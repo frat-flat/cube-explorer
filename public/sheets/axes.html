@@ -179,7 +179,7 @@ tfoot td{font-weight:700}
 <main>
   <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
   <div id="pinCtl">
-    <div class="row"><b>選ぶ</b><select id="selUnit" aria-label="箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap">サイコロの<select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
+    <div class="row"><b>選ぶ</b><select id="selUnit" aria-label="箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row"><label class="muted"><input type="checkbox" id="advFaces"> ②④⑥(縦横を入れ替えた目)も選べるようにする(上級)</label></div>
     <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
     <div class="row"><span id="cmdMsg">立体の箱やキューブを押しても選べます。ふだん使う目は ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。②④⑥は縦横を入れ替えた目(上級)</span></div>
@@ -327,7 +327,7 @@ function renderTree() {
   const kids = p => S.boxes.filter(b => b.parent === p);
   const walk = (p, d) => kids(p).forEach(b => {
     const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
-    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + faceOf(b.pin.face).name : '固定'}</button></div>`;
+    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + (b.kind === 'box' ? '中は' : '') + faceOf(b.pin.face).name : '固定'}</button></div>`;
     S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
@@ -750,12 +750,22 @@ const levels = () => [...new Set(units().map(levelOf))];
 // sel は箱・キューブの id か、段ごとまとめて選ぶときの 'lv:法人'
 const selUnits = () => !sel ? [] : sel.startsWith('lv:') ? units().filter(b => levelOf(b) === sel.slice(3)) : [box(sel)].filter(Boolean);
 function refreshPins() { save(); renderTree(); paint(); renderPinBar(); }
-function setFace(id, face) { box(id).pin = pinTo(face); refreshPins(); }
-function togglePin(id) { const c = box(id); if (c.pin) delete c.pin; else c.pin = { ...PIN0 }; sel = id; refreshPins(); }
+// 箱の固定: 箱は置き場所を変えず、正面をこちらに向けたまま(中のキューブが画面の横に並んだまま)にする。
+// 箱に選んだ目は中のキューブに効かせ、キューブはその場で回る。こうすると「法人単位で③」で各キューブの③が横に並ぶ
+const kidsOf = b => S.boxes.filter(c => c.parent === b.id && c.kind === 'cube');
+function applyPin(b, face) {
+  if (b.kind !== 'box') { b.pin = pinTo(face || (b.pin && b.pin.face) || 'd1'); return; }
+  const f = face || (b.pin && b.pin.face) || 'd1';
+  b.pin = { yaw: 0, pitch: 0, roll: 0, face: f };
+  kidsOf(b).forEach(c => { if (!c.pin || c.pin.byBox) c.pin = { ...pinTo(f), byBox: true }; });
+}
+function unpin(b) { delete b.pin; if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin && c.pin.byBox) delete c.pin; }); }
+function setFace(id, face) { const b = box(id); if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, face); refreshPins(); }
+function togglePin(id) { const c = box(id); if (c.pin) unpin(c); else applyPin(c); sel = id; refreshPins(); }
 function select(id) { sel = id; renderTree(); paint(); renderPinBar(); }
 function renderPinBar() {
   const n = units().filter(b => b.pin).length;
-  $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。固定したものはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : '';
+  $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : '';
   $('pinHint').hidden = !n;
   $('selUnit').innerHTML = '<option value="">(箱かキューブを選ぶ)</option>'
     + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
@@ -768,6 +778,7 @@ function renderPinBar() {
   $('selPin').textContent = allPinned ? '固定を外す' : us.length > 1 ? `${us.length}個とも固定する` : '固定する'; $('selPin').classList.toggle('on', allPinned);
   $('selFace').innerHTML = FACES.filter(f => faceUsable(f) || (u.pin && u.pin.face === f.id)).map(f => `<option value="${f.id}">${esc(us.length > 1 ? f.name : faceOpt(f, u))}</option>`).join('');
   $('advFaces').checked = advOn();
+  $('selFacePre').textContent = us.some(b => b.kind === 'box') ? '中のキューブの' : 'サイコロの';
   const pf = u.pin && faceOf(u.pin.face); $('faceSheet').hidden = !(us.length === 1 && u.kind === 'cube' && pf && pf.h != null);
   $('selFace').value = u.pin ? u.pin.face || 'd1' : 'd1';
 }
@@ -796,11 +807,12 @@ function runCmd(text) {
   if (face && !faceUsable(faceOf(face))) return `${faceOf(face).name}は縦横を入れ替えた目です。①③⑤のどれかを正面にして「この面をシートにする」から「縦横を入れ替える」を使うか、「②④⑥も選べるようにする(上級)」をオンにしてください`;
   const named = all || !!lv || units().some(b => targets.includes(b) && (z.includes(unitOf(b)) || z.includes(b.name) || b.kind === 'box' && Object.values(b.own).some(v => z.includes(v))));
   if (!face && !named && !/固定|外す|解除|はずす|やめ/.test(z)) return '分かりませんでした。「箱1を固定して②を正面」のように、番号か名前と目(①〜⑥)を書いてください';
-  if (/外す|解除|はずす|やめ/.test(z)) { targets.forEach(b => delete b.pin); refreshPins(); return `${lv ? lv + '単位(' : ''}${targets.map(unitOf).join('・')}${lv ? ')' : ''} の固定を外しました`; }
-  targets.forEach(b => b.pin = face ? pinTo(face) : (b.pin || { ...PIN0 }));
+  if (/外す|解除|はずす|やめ/.test(z)) { targets.forEach(unpin); refreshPins(); return `${lv ? lv + '単位(' : ''}${targets.map(unitOf).join('・')}${lv ? ')' : ''} の固定を外しました`; }
+  targets.forEach(b => { if (b.kind === 'box' && face) kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); if (face || !b.pin) applyPin(b, face); });
   if (targets.length === 1) sel = targets[0].id; else if (lv) sel = 'lv:' + lv;
   refreshPins();
-  return `${lv ? lv + '単位の ' : ''}${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${faceOf(targets[0].pin.face).name}を正面にしました`;
+  const isBox = targets.every(b => b.kind === 'box');
+  return `${lv ? lv + '単位の ' : ''}${targets.map(b => unitOf(b) + ' ' + b.name).join('・')} を固定し、${isBox ? '中のキューブの' : ''}${faceOf(targets[0].pin.face).name}を正面にしました${isBox ? '(箱は置き場所も向きもそのまま)' : ''}`;
 }
 const cam = { th: -.45, ph: .34, dist: 19 };
 function textSprite(t, color, h) {
@@ -863,7 +875,7 @@ function paint() {
     if (b.pin) bg.add(edges(W + .16, H + .16, D + .16, new THREE.Color(css('--hl')), true, .9));
     if (selUnits().includes(b)) bg.add(edges(W + .3, H + .3, D + .3, new THREE.Color(css('--mine')), false, 1));
     bg.add(edges(W, H, D, new THREE.Color(css('--box')), true));
-    const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定 ' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), .42); lb.position.set(0, H / 2 + .4, 0); bg.add(lb);
+    const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), .42); lb.position.set(0, H / 2 + .4, 0); bg.add(lb);
     const own = S.sheets.filter(x => x.cube === b.id), nk = S.boxes.filter(c => c.parent === b.id).length;
     own.forEach((sh, i) => {   // 箱にじかに入れたシート(店舗をまたぐシートなど)
       const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
@@ -905,9 +917,9 @@ function unitAt(e) {
   ray.setFromCamera(ndc, camera); const hs = ray.intersectObjects(hits).map(h => box(h.object.userData.unit));
   return hs.find(u => u.kind === 'cube') || hs[0] || null;
 }
-renderer.domElement.addEventListener('pointerdown', e => { const u = unitAt(e); drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, u, rot: u && u.pin ? u : null }; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener('pointerdown', e => { const u = unitAt(e); drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, u, rot: u && u.pin && u.kind === 'cube' ? u : null }; renderer.domElement.setPointerCapture(e.pointerId); });
 renderer.domElement.addEventListener('pointermove', e => {
-  if (!drag) { const u = unitAt(e); renderer.domElement.style.cursor = u ? (u.pin ? 'move' : 'pointer') : ''; return; }
+  if (!drag) { const u = unitAt(e); renderer.domElement.style.cursor = u ? (u.pin && u.kind === 'cube' ? 'move' : 'pointer') : ''; return; }
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
   if (drag.rot) { drag.rot.pin.yaw += dx * .01; drag.rot.pin.pitch = Math.max(-1.58, Math.min(1.58, drag.rot.pin.pitch + dy * .01)); return; }
@@ -918,7 +930,7 @@ renderer.domElement.addEventListener('pointerup', () => {
   else if (drag && !drag.moved && drag.u && drag.u.id !== sel) select(drag.u.id);
   drag = null;
 });
-renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin) { u.pin = pinTo(u.pin.face); save(); } });
+renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(50, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
@@ -927,7 +939,7 @@ function loop() {
   for (const { g, u, top, parentG } of groups) {
     if (!u.pin) { g.quaternion.identity(); continue; }
     pinQ.setFromEuler(pinE.set(u.pin.pitch, u.pin.yaw, u.pin.roll || 0, 'ZXY'));
-    if (top) g.quaternion.copy(camera.quaternion).multiply(pinQ);
+    if (top) g.quaternion.copy(camera.quaternion);   // 箱は場所そのまま、正面をこちらに向けるだけ
     else g.quaternion.copy(invQ.copy(parentG.quaternion).invert()).multiply(camera.quaternion).multiply(pinQ);
   }
   renderer.render(scene, camera); requestAnimationFrame(loop);
@@ -944,8 +956,8 @@ $('bookRead').onclick = readBook;
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
 $('selUnit').onchange = e => select(e.target.value || null);
-$('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) delete b.pin; else if (!b.pin) b.pin = { ...PIN0 }; }); refreshPins(); };
-$('selFace').onchange = e => { selUnits().forEach(b => b.pin = pinTo(e.target.value)); refreshPins(); };
+$('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
+$('selFace').onchange = e => { selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
 $('advFaces').onchange = e => { S.advFaces = e.target.checked; save(); paint(); renderPinBar(); };
 // 固定した面をそのままシートにする: 縦の軸を行、横の軸を列に、奥行きの軸は手前の1枚(最初の値)、そのキューブの持ち主で絞る
 $('faceSheet').onclick = () => {
