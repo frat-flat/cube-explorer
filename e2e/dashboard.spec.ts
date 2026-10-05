@@ -86,5 +86,22 @@ test("World で設定した世界の中に立体を並べる", async ({ page }) 
   // 読み込み中の表示が消えれば世界が入っている
   await expect(page.locator("#worldMsg")).toBeHidden({ timeout: 30_000 });
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}").prefs?.world)).toBe("zen");
+  // 世界の中は展示: 凡例(文字)は出さない
+  await expect(page.locator("#legend")).toBeHidden();
+  // 名前で探すと、そのキューブの中(無地)に入り、戻るボタンで世界に戻る
+  // 和の庭では探す欄は立て札の中
+  await expect(page.locator("#guide.sign")).toBeVisible();
+  await page.locator("#gFind").fill("S-01");
+  await page.locator("#gFind").press("Enter");
+  await expect(page.locator("#worldBar")).toContainText("S-01 の中");
+  await expect(page.locator("#legend")).toBeVisible();
+  await page.locator("#worldBack").click();
+  await expect(page.locator("#worldBar")).toBeHidden();
+  // 選んでいる状態なら、そのものの情報と軸が出る。空のまま Enter で中へ、Esc で戻る
+  await expect(page.locator("#guide")).toContainText("3軸");
+  await page.locator("#gFind").press("Enter");
+  await expect(page.locator("#worldBar")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#worldBar")).toBeHidden();
   expect(errors).toEqual([]);
 });

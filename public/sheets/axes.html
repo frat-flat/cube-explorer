@@ -116,6 +116,41 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #gizmo .end{cursor:pointer}
 #gizmo text{font:700 13px var(--sans);text-anchor:middle;dominant-baseline:central;cursor:pointer}
 #gizmo .end:hover text{text-decoration:underline}
+.wfind{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.wfind input{flex:1 1 280px;min-width:0;max-width:520px}
+#worldBar{position:absolute;left:50%;top:10px;transform:translateX(-50%);font-size:13px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;display:flex;gap:8px;align-items:center;white-space:nowrap}
+#worldBar[hidden],#guide[hidden]{display:none}
+/* 世界の中の案内(探す欄と、選んだものの情報)。世界ごとに見た目を変える: 美術館=作品解説の札、街=案内図、庭=立て札、ゲーム=会話の窓、ネオン・宇宙・海=操作盤 */
+#guide{position:absolute;left:10px;bottom:10px;width:min(330px,calc(100% - 20px));max-height:calc(100% - 70px);overflow:auto;font-size:13px;padding:12px 14px;box-shadow:0 6px 22px rgba(0,0,0,.28);--g0:#eee;--g1:#333}
+#guide .gh{font-size:11px;letter-spacing:.12em;opacity:.75;margin-bottom:2px}
+#guide h3{margin:0 0 4px;font-size:16px;line-height:1.35}
+#guide .gd{margin:2px 0 8px;opacity:.9}
+#guide dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;margin:6px 0}
+#guide dt{opacity:.7}#guide dd{margin:0;overflow-wrap:anywhere}
+#guide .gf{display:flex;gap:6px;margin-top:8px}
+#guide .gf input{flex:1;min-width:0;font:inherit;padding:4px 8px}
+#guide .acts{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+#guide .gmsg{font-size:12px;opacity:.8;min-height:1em;margin-top:2px}
+#guide button{font:inherit;cursor:pointer}
+#guide svg{display:block;width:100%;height:auto;margin:6px 0}
+#guide.museum{background:#fbfaf6;color:#2b2722;border:1px solid #d8d2c4;border-left:4px solid var(--g1);border-radius:2px;font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif}
+#guide.museum.dark{background:#16130f;color:#efe6d4;border-color:#3a3224}
+#guide.museum input{border:0;border-bottom:1px solid currentColor;background:transparent;color:inherit;border-radius:0}
+#guide.museum button{background:transparent;color:inherit;border:1px solid currentColor;border-radius:2px;padding:2px 10px}
+#guide.map{background:#f6f3ea;color:#1f2a33;border:2px solid var(--g1);border-radius:10px}
+#guide.map .gh{background:var(--g1);color:#fff;margin:-12px -14px 8px;padding:6px 14px;border-radius:7px 7px 0 0;letter-spacing:.05em;opacity:1;font-weight:700}
+#guide.map input{border:1px solid #b9b3a3;border-radius:16px;background:#fff;color:inherit}
+#guide.map button{background:var(--g1);color:#fff;border:0;border-radius:16px;padding:3px 12px}
+#guide.sign{background:linear-gradient(#b98a55,#8d6236);color:#fff8e8;border:3px solid #5a3a1a;border-radius:4px;font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+#guide.sign input{background:#f6ead2;border:1px solid #5a3a1a;color:#3a2410;border-radius:2px}
+#guide.sign button{background:#5a3a1a;color:#fff8e8;border:0;border-radius:2px;padding:2px 10px}
+#guide.game{background:rgba(12,14,48,.9);color:#fff;border:4px double #fff;border-radius:8px;font-family:var(--mono)}
+#guide.game input{background:#000;color:#fff;border:1px solid #fff;border-radius:0}
+#guide.game button{background:transparent;color:#ffe066;border:0;padding:2px 4px}
+#guide.game button::before{content:"▶ "}
+#guide.term{background:rgba(2,8,18,.86);color:var(--g1);border:1px solid var(--g1);border-radius:4px;font-family:var(--mono);text-shadow:0 0 6px var(--g1)}
+#guide.term input{background:transparent;color:var(--g1);border:1px solid var(--g1);border-radius:2px}
+#guide.term button{background:transparent;color:var(--g1);border:1px solid var(--g1);border-radius:2px;padding:2px 10px}
 #worldMsg{position:absolute;left:50%;top:10px;transform:translateX(-50%);font-size:12px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 8px;pointer-events:none}
 #legend{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);background:var(--panel);border-radius:6px;padding:1px 8px;display:flex;gap:12px;flex-wrap:wrap;pointer-events:none}
 #legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
@@ -207,9 +242,10 @@ tfoot td{font-weight:700}
   </div>
 </div>
 <div class="view" data-view="world" hidden>
-  <div class="vhead"><h1>World</h1><p class="lead">箱とキューブを立体で並べます。まわりの世界は <button class="small" data-go="settings">設定</button> で選べます。<span id="worldNow" style="white-space:nowrap"></span></p></div>
+  <div class="vhead"><h1>World</h1><p class="lead">箱とキューブを立体で並べます。まわりの世界は <button class="small" data-go="settings">設定</button> で選べます。<span id="worldNow" style="white-space:nowrap"></span></p>
+    <div class="row wfind" id="wFindRow"><input id="wFind" list="wFindList" placeholder="箱・キューブ・シートの名前で探して中に入る(選んでいれば空のまま Enter)" aria-label="探して中に入る"><datalist id="wFindList"></datalist><button class="small" id="wFindGo">中に入る</button><span class="muted" id="wFindMsg"></span></div></div>
     <section class="stagecard">
-  <div id="stage"><div id="worldMsg" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
+  <div id="stage"><div id="worldMsg" hidden></div><div id="worldBar" hidden><span id="worldBarT"></span> <button class="small" id="worldBack"></button></div><div id="guide" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
     <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
@@ -928,7 +964,7 @@ const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
 scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
 let world = new THREE.Group(); scene.add(world);
 let hits = [], groups = [], sel = null, fitted = 0;
-const ROLL = Math.PI / 2, LABEL_ROLL = -Math.PI / 2;
+const ROLL = Math.PI / 2;
 // 固定: 固定した箱・キューブは画面(カメラ)に対して同じ向きを保つ。同じ目を正面にそろえれば X軸どうしが横に並ぶ
 // 面はサイコロの目で呼ぶ: ①正面 ②上 ③右 ④左 ⑤下 ⑥背面(向かい合う目の和は7)。h=横の軸、v=縦の軸(キューブの軸 0=X,1=Y,2=Z)
 // ①③⑤ はふだん使う目: ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。
@@ -1050,19 +1086,29 @@ function faceTex(f, label, on) {
   const tx = new THREE.CanvasTexture(c); tx.minFilter = THREE.LinearFilter; return tx;
 }
 // 箱・キューブの6面にサイコロの目を貼る(外から見たときだけ読める。上の端に寄せる)
+// 縦横を入れ替えた目(②④⑥)は、その目を正面に固定したときだけ寝かせる。ふだんは文字を上向きにし、表の縦横も向かいの目(⑤③①)と同じにする
+// 面の札と表は、面の真ん中の台(pivot)に載せる。キューブが回っても、立っている面(世界に対して垂直な面)は
+// 毎回 90度単位で回して文字を上向きに保ち、表の縦横の軸も「いま画面で横になっている辺の軸」に合わせて差し替える(keepUpright)
+// 台をそのまま置いたときの横・縦の辺の軸(0=X,1=Y,2=Z)
+const BASE_HV = { d1: [0, 1], d6: [0, 1], d3: [2, 1], d4: [2, 1], d2: [0, 2], d5: [0, 2] };
+let uprights = [];
+function facePivot(g, f, W, H, D, gap) {
+  const [nx, ny, nz] = f.n, pv = new THREE.Group();
+  pv.position.set(nx * (W / 2 + gap), ny * (H / 2 + gap), nz * (D / 2 + gap)); pv.rotation.set(f.rot[0], f.rot[1], 0);
+  pv.userData.base = pv.quaternion.clone(); g.add(pv); return pv;
+}
+// k が奇数(90度・270度)のときは横と縦の軸が入れ替わる
+const hvAt = (f, k) => { const [h, v] = BASE_HV[f.id]; return k % 2 ? { ...f, h: v, v: h } : { ...f, h, v }; };
 function addDice(g, u, W, H, D) {
   FACES.filter(f => f.n).forEach(f => {
-    const t = faceTex(f, faceAxes(f, u), u.pin && u.pin.face === f.id), ratio = t.image.width / t.image.height;
-    const [nx, ny, nz] = f.n, len = { W, H, D }, lx = len[f.dims[0]], ly = len[f.dims[1]];
-    const [aw, ah] = f.roll ? [ly, lx] : [lx, ly], pw = Math.min(aw * .92, .62 * ratio);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, pw / ratio), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: f.adv && !advOn() ? .45 : 1 }));
-    m.position.set(nx * (W / 2 + .01), ny * (H / 2 + .01), nz * (D / 2 + .01)); m.rotation.set(f.rot[0], f.rot[1], 0);
-    // 縦横を入れ替えた目は札も90度寝かせ、その目を正面にしたときに読めるようにする
-    if (f.roll) m.rotateZ(LABEL_ROLL);
-    m.translateY(ah / 2 - .4);
-    // 箱の札は左上の角に寄せ、中のキューブの札と重ねない
-    if (u.kind === 'box') m.translateX(-(aw / 2 - pw / 2 - .15)), m.translateY(.15);
-    g.add(m);
+    const len = { W, H, D }, aw = len[f.dims[0]], ah = len[f.dims[1]], pv = facePivot(g, f, W, H, D, .01);
+    const mat = k => { const t = faceTex(f, faceAxes(hvAt(f, k), u), u.pin && u.pin.face === f.id), ratio = t.image.width / t.image.height;
+      return { ratio, m: new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: f.adv && !advOn() ? .45 : 1 }) }; };
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1)); pv.add(m);
+    // 札は上の辺に寄せる(箱の札は左上の角に寄せ、中のキューブの札と重ねない)。k が奇数なら上の辺は元の横の辺
+    const lay = (k, x) => { const w = k % 2 ? ah : aw, hh = k % 2 ? aw : ah, pw = Math.min(w * .92, .62 * x.ratio);
+      m.material = x.m; m.scale.set(pw, pw / x.ratio, 1); m.position.set(u.kind === 'box' ? -(w / 2 - pw / 2 - .15) : 0, hh / 2 - .4 + (u.kind === 'box' ? .15 : 0), 0); };
+    uprights.push({ pv, mats: {}, mat, lay, k: -1 });
   });
 }
 function sheetTex(sh, on) {
@@ -1103,12 +1149,25 @@ function tableTex(c, f, fs, on) {
 }
 function addTables(g, c, s, fs) {
   FACES.filter(f => f.n).forEach(f => {
-    const [nx, ny, nz] = f.n, m = new THREE.Mesh(new THREE.PlaneGeometry(s * .94, s * .7), new THREE.MeshBasicMaterial({ map: tableTex(c, f, fs, c.pin && c.pin.face === f.id), side: THREE.FrontSide, transparent: true, opacity: f.adv && !advOn() ? .55 : .97 }));
-    m.position.set(nx * (s / 2 + .005), ny * (s / 2 + .005), nz * (s / 2 + .005)); m.rotation.set(f.rot[0], f.rot[1], 0);
-    if (f.roll) m.rotateZ(LABEL_ROLL);
-    m.translateY(-s * .1);   // 上の端はサイコロの札
-    g.add(m);
+    const pv = facePivot(g, f, s, s, s, .005), m = new THREE.Mesh(new THREE.PlaneGeometry(s * .94, s * .7)); m.position.y = -s * .1; pv.add(m);   // 上の端はサイコロの札
+    const mat = k => new THREE.MeshBasicMaterial({ map: tableTex(c, hvAt(f, k), fs, c.pin && c.pin.face === f.id), side: THREE.FrontSide, transparent: true, opacity: f.adv && !advOn() ? .55 : .97 });
+    uprights.push({ pv, mats: {}, mat, lay: (k, x) => { m.material = x; }, k: -1 });
   });
+}
+const upQ = new THREE.Quaternion(), upQ2 = new THREE.Quaternion(), upV = new THREE.Vector3(), upZ = new THREE.Vector3(0, 0, 1);
+function keepUpright(force) {
+  for (const it of uprights) {
+    it.pv.parent.getWorldQuaternion(upQ); upQ.multiply(it.pv.userData.base);
+    upV.set(0, 0, 1).applyQuaternion(upQ);
+    let k = it.k < 0 ? 0 : it.k;
+    if (Math.abs(upV.y) < .7) {   // 立っている面: 4つの向きのうち、台の上が世界の上にいちばん近いもの
+      let best = -2;
+      for (let j = 0; j < 4; j++) { upV.set(-Math.sin(j * Math.PI / 2), Math.cos(j * Math.PI / 2), 0).applyQuaternion(upQ); if (upV.y > best + 1e-6) { best = upV.y; k = j; } }
+    }
+    if (k === it.k && !force) continue;
+    it.k = k; it.pv.quaternion.copy(it.pv.userData.base).multiply(upQ2.setFromAxisAngle(upZ, k * Math.PI / 2));
+    const par = k % 2; it.mats[par] = it.mats[par] || it.mat(par); it.lay(k, it.mats[par]);
+  }
 }
 // 箱の中に見せるもの(箱の段ごとに選ぶ)
 const SHOW = [['all', 'すべて(中の箱とキューブ。キューブの面に軸で並べたデータ)'], ['box', '中の箱だけ(この箱の中に)'], ['cube', 'キューブだけ(この箱の中に。中の箱のキューブも並べる)'], ['sheet', 'シートだけ(キューブの中の元のシート。箱の枠は出さない)'], ['count', '名前と数だけ']];
@@ -1129,7 +1188,7 @@ function contentsOf(b, mode = showOf(levelOf(b))) {
 }
 // 同じ単位の箱は同じ大きさ(その段でいちばん大きい箱に合わせる)
 function paint() {
-  scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = [];
+  scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = []; uprights = [];
   const memo = {}, allFacts = facts();
   const natural = (b, mode) => {
     // 中身は 手前・上・左の角から X のプラス → Y のマイナス(下) → Z のマイナス(奥) の順に並べる
@@ -1142,25 +1201,30 @@ function paint() {
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
     // 「○○だけ」はひとつ上の段と一緒に見せる。シートだけ=シートとそのキューブ(箱の枠は出さない)、キューブだけ・中の箱だけ=その外側のこの箱
-    const frame = showOf(levelOf(b)) !== 'sheet';
+    const frame = showOf(levelOf(b)) !== 'sheet', ex = exhibit() && !selUnits().includes(b);
     const bg = new THREE.Group(); bg.position.set(...pos); parent.add(bg);
-    const fill = new THREE.Mesh(new THREE.BoxGeometry(W, W, W), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: frame ? .05 : 0, depthWrite: false })); bg.add(fill);
+    const fill = new THREE.Mesh(new THREE.BoxGeometry(W, W, W), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: frame && !ex ? .05 : 0, depthWrite: false })); bg.add(fill);
     fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, box: true, home: bg.position.clone() });
     if (selUnits().includes(b)) bg.add(edges(W + .3, W + .3, W + .3, new THREE.Color(css('--mine')), false, 1));
-    if (frame) {
+    if (ex) {   // 世界の中では、箱は文字のない台と薄いガラスの枠(展示ケース)にする
+      const [c0, c1] = palette();
+      if (top) { const base = new THREE.Mesh(new THREE.BoxGeometry(W + .2, .16, W + .2), new THREE.MeshStandardMaterial({ color: new THREE.Color(c0), roughness: .55, metalness: .1 })); base.position.y = -W / 2 - .08; bg.add(base); }
+      if (frame) bg.add(edges(W, W, W, new THREE.Color(c1), false, .22));
+    } else if (frame) {
       bg.add(edges(W, W, W, new THREE.Color(css('--box')), true));
       const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
     }
+    if (showOf(levelOf(b)) === 'count' && ex) return;
     if (showOf(levelOf(b)) === 'count') {
       const nb = childBoxes(b).length, nc = descCubes(b).length, ns = S.sheets.filter(x => x.cube === b.id || descCubes(b).some(c => c.id === x.cube)).length;
       const t = textSprite([nb ? `箱 ${nb}` : '', `キューブ ${nc}`, `シート ${ns}`].filter(Boolean).join('・'), css('--muted'), .6); bg.add(t);
       return;
     }
-    if (!lay.items.length) { const NONE = { box: '中に箱はありません', cube: '中にキューブはありません', sheet: '中にシートはありません' }[showOf(levelOf(b))] || '空です'; bg.add(textSprite(NONE, css('--muted'), .5)); }
+    if (!lay.items.length && !ex) { const NONE = { box: '中に箱はありません', cube: '中にキューブはありません', sheet: '中にシートはありません' }[showOf(levelOf(b))] || '空です'; bg.add(textSprite(NONE, css('--muted'), .5)); }
     lay.items.forEach((it, k) => {
       const K = lay.k, h = (K - 1) / 2, ix = k % K, iy = Math.floor(k / K) % K, iz = Math.floor(k / (K * K)), p = [(ix - h) * lay.slot, (h - iy) * lay.slot, (h - iz) * lay.slot];
       if (it.sheets) it.sheets.forEach((sh, i) => {   // 箱にじかに入れたシート(店舗をまたぐシートなど)
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), ex ? exhibitMat(.85) : new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
         m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); bg.add(m);
       });
       else if (it.u.kind === 'box') drawBox(it.u, bg, p, false);
@@ -1174,6 +1238,11 @@ function paint() {
       const hitM = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); hitM.userData.unit = c.id; cg.add(hitM); hits.push(hitM);
       groups.push({ g: cg, u: c, parentG: bg, home: cg.position.clone() });
       if (selUnits().includes(c)) cg.add(edges(s + .3, s + .3, s + .3, new THREE.Color(css('--mine')), false, 1));
+      if (exhibit() && !selUnits().includes(c)) {   // 世界の中では、文字のない立体(その世界の色の展示物)にする。押すと中身と軸が出る
+        const body = new THREE.Mesh(new THREE.BoxGeometry(s * .9, s * .9, s * .9), exhibitMat(1)); cg.add(body);
+        cg.add(edges(s * .9, s * .9, s * .9, new THREE.Color(palette()[1]), false, .9));
+        return;
+      }
       // キューブの辺は3軸の色(X=紫、Y=緑、Z=桃)で、固定の3軸を持つことを示す
       cg.add(edges(s, s, s, new THREE.Color(css('--accent')), false, .9));
       const axLine = (from, to, col) => { const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]); cg.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(css(col)) }))); };
@@ -1190,7 +1259,8 @@ function paint() {
       shs.forEach((sh, i) => {
         const on = used.has(sh.id);
         const m = new THREE.Mesh(new THREE.PlaneGeometry(s * .78, s * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, on), side: THREE.DoubleSide }));
-        m.position.set(0, 0, (shs.length - 1) / 2 * .55 - i * .55); cg.add(m);
+        const pv = new THREE.Group(); pv.position.set(0, 0, (shs.length - 1) / 2 * .55 - i * .55); pv.userData.base = pv.quaternion.clone(); pv.add(m); cg.add(pv);
+        uprights.push({ pv, mats: { 0: m.material, 1: m.material }, mat: () => m.material, lay: () => {}, k: -1 });
       });
   };
   const tops = S.boxes.filter(b => !b.parent && b.kind === 'box'), gap = 1.2;
@@ -1199,7 +1269,7 @@ function paint() {
   for (const b of tops) { const W = sizeOf(b); drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
   // 全体の大きさが変わったときだけ、全体が入る距離に引く(ふだんのズームは触らない)
   const span = Math.max(total, ...tops.map(sizeOf));
-  extent = { span, bottom: -Math.max(1, ...tops.map(sizeOf)) / 2 - .2 }; placeEnv();
+  extent = { span, bottom: -Math.max(1, ...tops.map(sizeOf)) / 2 - .2 }; placeEnv(); renderWorldUi();
   if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
 }
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
@@ -1225,7 +1295,7 @@ renderer.domElement.addEventListener('pointerup', () => {
   else if (drag && !drag.moved && drag.u && drag.u.id !== sel) select(drag.u.id);
   drag = null;
 });
-renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
+renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && exhibit()) { enterUnit(u); return; } if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   // 固定するときは必ずどこかの面を正面にする。箱は必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
@@ -1255,6 +1325,8 @@ function loop() {
     pinQ.setFromEuler(pinE.set(u.pin.pitch, u.pin.yaw, u.pin.roll || 0, 'ZXY'));
     parentG.getWorldQuaternion(invQ); g.quaternion.copy(invQ.invert()).multiply(camera.quaternion).multiply(pinQ);
   }
+  keepUpright();
+  if (env && !entered) occlude();
   renderer.render(scene, camera); requestAnimationFrame(loop);
 }
 new ResizeObserver(resize).observe(stage);
@@ -1264,22 +1336,30 @@ new ResizeObserver(resize).observe(stage);
 // 箱とキューブは原点のまま動かさず、世界の方を動かす: 部屋の真ん中を原点に、床を立体の下に、長い方を箱の並ぶ向き(X)に合わせ、
 // 全体が見える距離までカメラを引いても部屋の中に収まる大きさに広げる。ズームの上限も部屋の中まで
 const WORLDS = { none: '標準(無地)', modern: '白い現代美術館', european: '宮殿を改装した欧州の美術館', heist: '夜の美術館', zen: '和の庭', rpg: 'RPGの森', game: 'ゲームの世界', city: '摩天楼の街', ruins: '砂漠の巨大遺跡', cyber: 'ネオン街の屋上', underwater: '海の底', space: '宇宙空間' };
-const envCache = {}; let env = null, envName = null, envLimit = 120, extent = { span: 10, bottom: -5 };
+const envCache = {}; let env = null, envName = null, envLimit = 120, extent = { span: 10, bottom: -5 }, entered = null;
+// 世界の中(展示): 文字は出さず、箱は台とガラスの枠、キューブはその世界の色の立体。選んだものだけふだんの見え方(表・軸)にする
+const exhibit = () => !!env && !entered;
+const palette = () => (env && env.info.palette) || ['#dddddd', '#555555'];
+function exhibitMat(op) {
+  const [c0, c1] = palette(), glow = env && env.info.glowCubes;
+  return new THREE.MeshStandardMaterial({ color: new THREE.Color(c0), roughness: .35, metalness: .15, emissive: new THREE.Color(glow ? c1 : '#000000'), emissiveIntensity: glow ? .45 : 0, transparent: op < 1, opacity: op, side: THREE.DoubleSide });
+}
+function bare() { scene.background = null; scene.fog = null; envLimit = 120; persp.far = 200; persp.updateProjectionMatrix(); renderer.outputEncoding = THREE.LinearEncoding; }
 function fitDist(span) { return Math.max(12, Math.min(120, span * 1.25 + 6)); }
 function worldMsg(t) { $('worldMsg').textContent = t || ''; $('worldMsg').hidden = !t; }
 function setWorld(name) {
   if (!WORLDS[name]) name = 'none';
   $('worldNow').textContent = '今の世界: ' + WORLDS[name];
   if (name === envName) return;
-  envName = name;
-  if (env) { scene.remove(env.g); env = null; }
-  scene.background = null; scene.fog = null; envLimit = 120; persp.far = 200; persp.updateProjectionMatrix(); renderer.outputEncoding = THREE.LinearEncoding;
+  envName = name; entered = null;
+  if (env) { scene.remove(env.g); env = null; occReset(); paint(); }
+  bare();
   if (name === 'none') { worldMsg(''); return; }
   if (!window.BlenderWorld || !THREE.GLTFLoader) { worldMsg('世界を読む部品を読み込めませんでした。標準で表示しています'); envName = null; return; }
   worldMsg(WORLDS[name] + ' を読み込み中…');
   (envCache[name] = envCache[name] || BlenderWorld.load(name, { base: '/worlds/' })).then(({ info, root }) => {
     if (envName !== name) return;
-    const g = new THREE.Group(); g.add(root); env = { g, info }; scene.add(g); placeEnv(); worldMsg('');
+    const g = new THREE.Group(); g.add(root); env = { g, info }; worldMsg(''); paint();
   }).catch(e => { delete envCache[name]; console.error('世界を読み込めませんでした', name, e); if (envName === name) { envName = null; worldMsg('世界を読み込めませんでした。標準で表示しています'); } });
 }
 // 歩ける範囲(json の walk の1つ目)を部屋とみなす。宇宙・海の底のように無い世界は原点のまわり
@@ -1291,6 +1371,8 @@ function roomOf(info) {
 }
 function placeEnv() {
   if (!env) return;
+  if (entered) { scene.remove(env.g); occReset(); bare(); return; }   // 中に入っている間は無地
+  if (env.g.parent !== scene) scene.add(env.g);
   const { g, info } = env, r = roomOf(info), short = Math.min(r.hx, r.hz), k = Math.max(1, fitDist(extent.span) * 1.15 / short);
   g.rotation.y = r.hz > r.hx ? Math.PI / 2 : 0; g.scale.setScalar(k);
   const c = new THREE.Vector3(r.cx, 0, r.cz).applyAxisAngle(new THREE.Vector3(0, 1, 0), g.rotation.y).multiplyScalar(k);
@@ -1300,6 +1382,101 @@ function placeEnv() {
   scene.fog = info.fog ? new THREE.FogExp2(info.fog[0], info.fog[1] / k) : null;
   persp.far = Math.max(200, (info.far || 400) * k); persp.updateProjectionMatrix();
   renderer.outputEncoding = THREE.sRGBEncoding;
+}
+// カメラと立体のあいだに入った世界の物(壁・柱・木・床の裏など)は隠す。隠さないと立体が見えず、文字だけが浮いて真っ暗に見える
+const occRay = new THREE.Raycaster(), occAt = new THREE.Vector3(1e9, 0, 0), occV = new THREE.Vector3(), occD = new THREE.Vector3();
+let occHidden = [], occN = 0;
+function occReset() { occHidden.forEach(o => { o.visible = true; }); occHidden = []; occAt.set(1e9, 0, 0); }
+function occlude() {
+  if (++occN % 5 || camera.position.distanceToSquared(occAt) < 1e-4) return;
+  guideCam();
+  occHidden.forEach(o => { o.visible = true; }); occHidden = []; occAt.copy(camera.position);
+  // 見る中心と、いちばん外の箱それぞれの手前まで線を引き、そこに当たった物を隠す
+  const aims = [[tgt, extent.span / 2], ...groups.filter(x => x.box && !x.u.parent).map(x => [x.g.getWorldPosition(new THREE.Vector3()), sizeOfUnit(x.u) * .75])];
+  for (const [p, r] of aims) {
+    occD.copy(p).sub(camera.position); const len = occD.length(); if (len <= r) continue;
+    occRay.set(camera.position, occD.normalize()); occRay.far = len - r;
+    for (const h of occRay.intersectObject(env.g, true)) if (h.object.visible) { h.object.visible = false; occHidden.push(h.object); }
+  }
+}
+// ---------- 中に入る(世界から、選んだ箱・キューブを無地で見る)----------
+function enterUnit(u) {
+  if (!u) return;
+  entered = env ? u.id : null; sel = u.id; focused = null;
+  renderTree(); paint(); renderPinBar(); focusSel();
+}
+function leaveUnit() {
+  entered = null; focused = sel; tgtGoal.set(0, 0, 0);
+  renderTree(); paint(); renderPinBar(); cam.dist = Math.min(envLimit, fitDist(extent.span));
+}
+function findUnit(q) {
+  const t = q.trim().toLowerCase(); if (!t) return selUnits()[0] || null;
+  const hit = b => [b.name, unitOf(b), ...Object.values(b.own || {})].some(v => String(v).toLowerCase() === t);
+  const part = b => [b.name, unitOf(b), ...Object.values(b.own || {})].some(v => String(v).toLowerCase().includes(t));
+  const sh = S.sheets.find(x => x.name.toLowerCase() === t) || S.sheets.find(x => x.name.toLowerCase().includes(t));
+  return units().find(hit) || units().find(part) || (sh && box(sh.cube)) || null;
+}
+function findGo(inp = $('wFind'), msg = $('wFindMsg')) {
+  const u = findUnit(inp.value);
+  msg.textContent = u ? '' : inp.value.trim() ? '見つかりませんでした' : '探す名前を入れるか、立体を押して選んでください';
+  if (u) { inp.value = ''; enterUnit(u); }
+}
+$('wFindGo').onclick = () => findGo();
+$('wFind').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) findGo(); };
+$('worldBack').onclick = leaveUnit;
+// 世界の中での案内: 中に入っている間は戻るボタン、展示のときは選んだものの情報(どんな情報があるか・軸)
+function renderWorldUi() {
+  const eu = entered && box(entered);
+  if (entered && !eu) entered = null;
+  $('worldBar').hidden = !eu;
+  if (eu) { $('worldBarT').textContent = `${unitOf(eu)} ${eu.name} の中(無地)`; $('worldBack').textContent = '← ' + WORLDS[envName] + 'に戻る'; }
+  $('legend').hidden = exhibit();
+  $('wFindList').innerHTML = [...units().map(b => b.name), ...S.sheets.map(x => x.name)].filter((v, i, a) => a.indexOf(v) === i).map(v => `<option value="${esc(v)}">`).join('');
+  $('wFindRow').hidden = exhibit();
+  renderGuide();
+}
+// 世界ごとの案内の見た目。map は上から見た案内図(箱の並びと現在地)を出す
+const GUIDE = { modern: ['museum', '作品解説'], european: ['museum', '作品解説'], heist: ['museum', '作品解説', 'dark'], city: ['map', '案内図'], ruins: ['map', '遺跡の地図'],
+  zen: ['sign', '立て札'], rpg: ['game', '冒険の書'], game: ['game', 'ステージ案内'], cyber: ['term', 'NAVI://'], space: ['term', '航法コンソール'], underwater: ['term', 'ソナー'] };
+function unitRows(u) {
+  const cubes = u.kind === 'box' ? descCubes(u) : [u], sheets = S.sheets.filter(x => cubes.some(c => c.id === x.cube) || x.cube === u.id);
+  const rows = [['種類', (u.kind === 'box' ? '箱' : 'キューブ') + '(' + esc(levelOf(u)) + '単位)'], ...Object.entries(u.own || {}).map(([a, v]) => [esc(ax(a) ? ax(a).name : a), esc(v)])];
+  if (u.kind === 'cube') rows.push(['3軸', u.axes.map((a, i) => `<span style="color:var(--${['ax', 'ay', 'az'][i]})">${'XYZ'[i]} ${esc(ax(a) ? ax(a).name : a)}</span>`).join(' ・ ')]);
+  else rows.push(['中身', `${childBoxes(u).length ? '箱 ' + childBoxes(u).length + '・' : ''}キューブ ${cubes.length}`]);
+  rows.push(['シート', sheets.length ? sheets.map(x => esc(x.name)).join('・') : 'なし']);
+  Object.entries(u.info || {}).forEach(([k, v]) => rows.push([esc(k), esc(v)]));
+  return rows;
+}
+// 案内図: いちばん外の箱を上から見た四角で、中のキューブを点で描く。押すと選ぶ。▲ は今の視点(カメラ)の位置
+function guideMap() {
+  const tops = groups.filter(x => x.box && !x.u.parent); if (!tops.length) return '';
+  const R = Math.max(extent.span / 2 + 2, 6), sc = 100 / R, P = v => (v * sc).toFixed(1);
+  const rects = tops.map(x => { const W = sizeOfUnit(x.u), p = x.g.position, on = selUnits().includes(x.u);
+    const dots = groups.filter(y => !y.box && descCubes(x.u).includes(y.u)).map(y => { const q = y.g.getWorldPosition(new THREE.Vector3()); return `<circle cx="${P(q.x)}" cy="${P(q.z)}" r="${selUnits().includes(y.u) ? 6 : 4}" fill="var(--g1)" data-pick="${y.u.id}" style="cursor:pointer"/>`; }).join('');
+    return `<rect x="${P(p.x - W / 2)}" y="${P(p.z - W / 2)}" width="${P(W)}" height="${P(W)}" rx="4" fill="${on ? 'rgba(0,0,0,.12)' : 'rgba(0,0,0,.05)'}" stroke="var(--g1)" stroke-width="${on ? 3 : 1.5}" data-pick="${x.u.id}" style="cursor:pointer"/><text x="${P(p.x)}" y="${P(p.z + W / 2) - -14}" text-anchor="middle" font-size="12" fill="currentColor">${esc(x.u.name)}</text>${dots}`; }).join('');
+  return `<svg viewBox="-110 -110 220 230" aria-label="案内図">${rects}<g id="gCam"><path d="M0,-7 L6,6 L-6,6 Z" fill="#d22"/><text y="20" text-anchor="middle" font-size="10" fill="#d22">現在地</text></g></svg>`;
+}
+function guideCam() {
+  const g = document.getElementById('gCam'); if (!g) return;
+  const R = Math.max(extent.span / 2 + 2, 6), sc = 100 / R, x = Math.max(-100, Math.min(100, camera.position.x * sc)), z = Math.max(-100, Math.min(100, camera.position.z * sc));
+  const a = Math.atan2(tgt.x - camera.position.x, -(tgt.z - camera.position.z)) * 180 / Math.PI;
+  g.setAttribute('transform', `translate(${x.toFixed(1)},${z.toFixed(1)}) rotate(${a.toFixed(0)})`);
+}
+function renderGuide() {
+  const el = $('guide'); el.hidden = !exhibit(); if (!exhibit()) return;
+  const [type, head, tone] = GUIDE[envName] || ['museum', '案内'], [c0, c1] = palette(), u = selUnits().length === 1 ? selUnits()[0] : null;
+  el.className = type + (tone ? ' ' + tone : ''); el.style.setProperty('--g0', c0); el.style.setProperty('--g1', type === 'museum' && !tone || type === 'map' ? c1 : c1);
+  const ph = { museum: '作品名・キーワードで探す', map: '行き先(箱・キューブ・シート)を探す', sign: '名を記して探す', game: 'なまえを いれてください', term: '> search' }[type];
+  const title = u ? `${unitOf(u)} ${esc(u.name)}` : esc(env.info.title || WORLDS[envName]);
+  const desc = u ? `<dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : `<div class="gd">${type === 'map' || type === 'term' ? '図の箱や点を押すと選べます。' : ''}立体を押すと説明が出ます。ダブルクリックか下で探すと中に入れます。</div>`;
+  el.innerHTML = `<div class="gh">${esc(head)}</div><h3>${title}</h3>${type === 'map' || type === 'term' ? guideMap() : ''}${desc}
+    ${u ? `<div class="acts"><button id="gClose">閉じる</button><button id="gEnter">中に入る</button></div>` : ''}
+    <div class="gf"><input id="gFind" list="wFindList" placeholder="${ph}" aria-label="探して中に入る"><button id="gGo">${type === 'game' ? 'しらべる' : '探す'}</button></div><div class="gmsg" id="gMsg"></div>`;
+  el.querySelectorAll('[data-pick]').forEach(n => n.onclick = () => select(n.dataset.pick));
+  const go = () => findGo($('gFind'), $('gMsg'));
+  $('gGo').onclick = go; $('gFind').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) go(); };
+  if (u) { $('gClose').onclick = () => { sel = null; focused = null; renderTree(); paint(); renderPinBar(); }; $('gEnter').onclick = () => enterUnit(u); }
+  guideCam();
 }
 
 // ---------- つなぐ ----------
@@ -1313,7 +1490,7 @@ $('bookRead').onclick = readBook;
 // アプリの中で開いたときだけ(読み取りの口に答えがある)ログアウトを出す
 fetch('/api/sheets/read', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j) $('logout').hidden = false; if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')'; }).catch(() => {});
 $('viewClose').onclick = () => { viewId = null; renderView(); };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && viewId) $('viewClose').click(); });
+document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (viewId) $('viewClose').click(); else if (entered) leaveUnit(); });
 
 // ---------- ダッシュボードの画面切り替え ----------
 // 左のメニュー(と data-go を持つボタン)で画面を1つだけ見せる。開いていた画面は次に開いたときも同じ(ブラウザに覚える)
