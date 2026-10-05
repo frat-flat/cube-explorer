@@ -280,7 +280,17 @@ class World:
                 apx = np.array(self._bake(o, g["size"], "emit").pixels[:], dtype=np.float32).reshape(-1, 4)
                 entry["unlit"] = True
             else:
+                # 金属は拡散色が 0(真っ黒)に焼けるので、色を焼く間だけ金属らしさを外す
+                saved = []
+                if g["metal"] >= 0.5:
+                    for ms in o.material_slots:
+                        for n in (ms.material.node_tree.nodes if ms.material and ms.material.use_nodes else []):
+                            if n.type == "BSDF_PRINCIPLED" and not n.inputs["Metallic"].is_linked:
+                                saved.append((n, n.inputs["Metallic"].default_value))
+                                n.inputs["Metallic"].default_value = 0.0
                 apx = np.array(self._bake(o, g["size"], "albedo").pixels[:], dtype=np.float32).reshape(-1, 4)
+                for n, v in saved:
+                    n.inputs["Metallic"].default_value = v
                 if g["metal"] < 0.5:
                     lit = self._denoise(self._bake(o, g["size"], "light"))
                     lpx = np.array(lit.pixels[:], dtype=np.float32).reshape(-1, 4)
