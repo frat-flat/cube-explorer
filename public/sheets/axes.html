@@ -79,7 +79,7 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 button.pin{white-space:nowrap}
 button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
-#gizmo{position:absolute;right:6px;bottom:6px;width:76px;height:76px;overflow:visible}
+#gizmo{position:absolute;left:12px;top:12px;width:76px;height:76px;overflow:visible}
 #gizmo .end{cursor:pointer}
 #gizmo text{font:700 13px var(--sans);text-anchor:middle;dominant-baseline:central;cursor:pointer}
 #gizmo .end:hover text{text-decoration:underline}
@@ -183,7 +183,7 @@ tfoot td{font-weight:700}
 </aside>
 <main>
   <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
-    <svg id="gizmo" viewBox="-38 -38 76 76" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y1"><title>Y の方向へ動かす</title><text id="gty" style="fill:var(--ay)">Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
+    <svg id="gizmo" viewBox="-38 -38 76 76" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
@@ -740,7 +740,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); rend
 const scene = new THREE.Scene(), persp = new THREE.PerspectiveCamera(40, 1, .1, 200);
 // 箱を固定している間は、ドラッグしても箱の角度(視点)を変えない
 const camera = persp;
-// 見る中心。ふだんは全体の真ん中。選んだ箱・キューブがあればそこを中心にズームする。右下の操作キーで X・Y・Z に動かせる
+// 見る中心。ふだんは全体の真ん中。選んだ箱・キューブがあればそこを中心にズームする。左上の小さな3軸で X・Y・Z に動かせる
 const tgt = new THREE.Vector3(), tgtGoal = new THREE.Vector3(), invQ2 = new THREE.Quaternion(), gv = new THREE.Vector3();
 let focused = null;
 function focusSel() {
@@ -959,7 +959,7 @@ function paint() {
   scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = [];
   const memo = {}, allFacts = facts();
   const natural = (b, mode) => {
-    // 中身は 手前・下・左の角から X のプラス → Y のプラス(上) → Z のマイナス(奥) の順に並べる
+    // 中身は 手前・上・左の角から X のプラス → Y のマイナス(下) → Z のマイナス(奥) の順に並べる
     const items = contentsOf(b, mode), n = Math.max(1, items.length), k = Math.max(1, Math.ceil(Math.cbrt(n) - 1e-9));
     const slot = Math.max(cubeSlot, ...items.filter(it => it.u && it.u.kind === 'box').map(it => sizeOf(it.u) + .5));
     return { items, k, slot, size: k * slot + .3 };
@@ -985,7 +985,7 @@ function paint() {
     }
     if (!lay.items.length) { const NONE = { box: '中に箱はありません', cube: '中にキューブはありません', sheet: '中にシートはありません' }[showOf(levelOf(b))] || '空です'; bg.add(textSprite(NONE, css('--muted'), .5)); }
     lay.items.forEach((it, k) => {
-      const K = lay.k, h = (K - 1) / 2, ix = k % K, iy = Math.floor(k / K) % K, iz = Math.floor(k / (K * K)), p = [(ix - h) * lay.slot, (iy - h) * lay.slot, (h - iz) * lay.slot];
+      const K = lay.k, h = (K - 1) / 2, ix = k % K, iy = Math.floor(k / K) % K, iz = Math.floor(k / (K * K)), p = [(ix - h) * lay.slot, (h - iy) * lay.slot, (h - iz) * lay.slot];
       if (it.sheets) it.sheets.forEach((sh, i) => {   // 箱にじかに入れたシート(店舗をまたぐシートなど)
         const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
         m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); bg.add(m);
@@ -1060,11 +1060,11 @@ function loop() {
   tgt.lerp(tgtGoal, .2);   // 見る中心(選んだ箱・キューブか、操作キーで動かした位置)へなめらかに寄る
   camera.position.set(tgt.x + cam.dist * Math.cos(ph) * Math.sin(th), tgt.y + cam.dist * Math.sin(ph), tgt.z + cam.dist * Math.cos(ph) * Math.cos(th));
   camera.lookAt(tgt);
-  // 右下の小さな3軸は、今の向きで X・Y・Z が画面のどちらを向いているかを示す
+  // 左上の小さな3軸は、今の向きで X・Y・Z が画面のどちらを向いているかを示す
   invQ2.copy(camera.quaternion).invert();
-  const GZ = ['x', 'y', 'z'].map(k => { gv.set(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, k === 'z' ? -1 : 0).applyQuaternion(invQ2); return [k, gv.x * 26, -gv.y * 26]; });
+  const GZ = ['x', 'y', 'z'].map(k => { gv.set(k === 'x' ? 1 : 0, k === 'y' ? -1 : 0, k === 'z' ? -1 : 0).applyQuaternion(invQ2); return [k, gv.x * 26, -gv.y * 26]; });
   GZ.forEach(([k, x, y]) => {
-      // 原点から X・Y はプラス、Z はマイナス(中身を並べる奥の向き)にだけ線を引き、先に軸と同じ色の文字を置く
+      // 原点から X はプラス、Y・Z はマイナス(中身を並べる下と奥の向き)にだけ線を引き、先に軸と同じ色の文字を置く
       // 文字は線の延長に置くと線とつながって見えるので、線の先から少し斜め(約30度)にずらす。ずらす向きはほかの軸の線から離れる側
       $('gl' + k).setAttribute('x1', 0); $('gl' + k).setAttribute('y1', 0); $('gl' + k).setAttribute('x2', x * .72); $('gl' + k).setAttribute('y2', y * .72);
       const L = Math.hypot(x, y) || 1, rot = a => [(x * Math.cos(a) - y * Math.sin(a)) / L, (x * Math.sin(a) + y * Math.cos(a)) / L];
