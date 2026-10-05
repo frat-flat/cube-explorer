@@ -59,7 +59,7 @@ test("シートの行から箱を作る", async ({ page }) => {
   await expect(page.locator("#unitSec")).toBeHidden();
   await page.locator('.nv[data-go="home"]').click();
   await expect(page.locator("#tree")).toContainText("0001 法人C 山田");
-  await expect(page.locator("#tree")).toContainText("お客様単位・箱3");
+  await expect(page.locator("#tree")).toContainText("お客様単位・箱6");
   const n = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}").boxes.filter((b: { levelName?: string }) => b.levelName === "お客様").length);
   expect(n).toBe(2);
   expect(errors).toEqual([]);
@@ -103,5 +103,38 @@ test("World で設定した世界の中に立体を並べる", async ({ page }) 
   await expect(page.locator("#worldBar")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator("#worldBar")).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+// World の特別枠: タイムスリップ(カレンダー・宇宙)と日本地図。見本の法人の申込日・登録住所で並べる
+test("World の特別枠で日付と住所で並べ直す", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  await page.route("**/GLTFLoader.js", (r) => r.fulfill({ path: "node_modules/three/examples/js/loaders/GLTFLoader.js", contentType: "text/javascript" }));
+  await page.route("**/meshopt_decoder.js", (r) => r.fulfill({ path: "node_modules/three/examples/js/libs/meshopt_decoder.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  // 見本は代理店・申込者の箱の中に法人
+  await expect(page.locator("#tree")).toContainText("代理店単位");
+  await page.locator('.nv[data-go="world"]').click();
+  // カレンダー: 法人A の申込日(2026-04-12)の札があり、ダブルクリックで中に入れる
+  await page.locator('[data-wm="cal"]').click();
+  await expect(page.locator("#cal")).toBeVisible();
+  await page.locator("#cal [data-cm='3']").click();
+  await expect(page.locator("#cal h3")).toHaveText("2026年4月");
+  await page.locator("#cal .chip", { hasText: "法人A" }).dblclick();
+  await expect(page.locator("#worldBar")).toContainText("法人A の中");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#cal")).toBeVisible();
+  // 日本地図: 登録住所のある5つにピン
+  await page.locator('[data-wm="japan"]').click();
+  await expect(page.locator("#worldMsg")).toBeHidden({ timeout: 30_000 });
+  await expect(page.locator("#guide")).toContainText("ピン 5 件");
+  // 宇宙: 申込日で並べる
+  await page.locator('[data-wm="space"]').click();
+  await expect(page.locator("#worldMsg")).toBeHidden({ timeout: 60_000 });
+  await expect(page.locator("#guide")).toContainText("時間航行");
+  await page.locator("#lField").selectOption("申込日");
+  await expect(page.locator("#guide")).toContainText("並んだもの 4 件");
   expect(errors).toEqual([]);
 });

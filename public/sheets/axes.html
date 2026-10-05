@@ -119,7 +119,33 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 .wfind{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .wfind input{flex:1 1 280px;min-width:0;max-width:520px}
 #worldBar{position:absolute;left:50%;top:10px;transform:translateX(-50%);font-size:13px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;display:flex;gap:8px;align-items:center;white-space:nowrap}
-#worldBar[hidden],#guide[hidden]{display:none}
+#worldBar[hidden],#guide[hidden],#cal[hidden]{display:none}
+.wmodes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.wmodes button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+.wmodes .wsp{font-size:12px;color:var(--muted);margin-left:8px}
+#guide select{font:inherit;max-width:100%;background:transparent;color:inherit;border:1px solid currentColor;border-radius:4px;padding:2px 4px}
+#guide select option{color:#111}
+#guide .lg{display:flex;flex-wrap:wrap;gap:4px 10px;margin:4px 0;font-size:12px}
+#guide .lg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+/* タイムスリップ(カレンダー): 立体の上に重ねる月の暦 */
+#cal{position:absolute;inset:0;z-index:3;background:var(--panel);color:var(--ink);display:flex;flex-direction:column;padding:12px 14px;gap:8px;overflow:auto}
+#cal .ch{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#cal .ch h3{margin:0 6px;font-size:18px;min-width:9em;text-align:center}
+#cal .yr{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:3px}
+#cal .yr button{font-size:11px;padding:2px 0;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);cursor:pointer}
+#cal .yr button.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+#cal .yr button b{display:block;font-size:12px}
+#cal .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(56px,auto);gap:3px;flex:none}
+#cal .dw{font-size:11px;color:var(--muted);text-align:center;min-height:0}
+#cal .grid.wk{grid-auto-rows:auto}
+#cal .day{border:1px solid var(--line);border-radius:6px;padding:2px 4px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+#cal .day.out{opacity:.35}
+#cal .day .dn{font-size:11px;color:var(--muted)}
+#cal .chip{font-size:11px;border-radius:4px;padding:1px 4px;color:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;text-align:left}
+#cal .chip.on{outline:2px solid var(--hl)}
+#cal .ci{font-size:13px;border-top:1px solid var(--line);padding-top:6px}
+#cal .ci dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;margin:4px 0}
+#cal .ci dt{color:var(--muted)}#cal .ci dd{margin:0}
 /* 世界の中の案内(探す欄と、選んだものの情報)。世界ごとに見た目を変える: 美術館=作品解説の札、街=案内図、庭=立て札、ゲーム=会話の窓、ネオン・宇宙・海=操作盤 */
 #guide{position:absolute;left:10px;bottom:10px;width:min(330px,calc(100% - 20px));max-height:calc(100% - 70px);overflow:auto;font-size:13px;padding:12px 14px;box-shadow:0 6px 22px rgba(0,0,0,.28);--g0:#eee;--g1:#333}
 #guide .gh{font-size:11px;letter-spacing:.12em;opacity:.75;margin-bottom:2px}
@@ -243,9 +269,10 @@ tfoot td{font-weight:700}
 </div>
 <div class="view" data-view="world" hidden>
   <div class="vhead"><h1>World</h1><p class="lead">箱とキューブを立体で並べます。まわりの世界は <button class="small" data-go="settings">設定</button> で選べます。<span id="worldNow" style="white-space:nowrap"></span></p>
+    <div class="wmodes" role="tablist" aria-label="World の見せ方"><button class="small" data-wm="world" role="tab">いつもの世界</button><span class="wsp">特別枠</span><button class="small" data-wm="japan" role="tab">日本地図</button><button class="small" data-wm="cal" role="tab">タイムスリップ(カレンダー)</button><button class="small" data-wm="space" role="tab">タイムスリップ(宇宙)</button></div>
     <div class="row wfind" id="wFindRow"><input id="wFind" list="wFindList" placeholder="箱・キューブ・シートの名前で探して中に入る(選んでいれば空のまま Enter)" aria-label="探して中に入る"><datalist id="wFindList"></datalist><button class="small" id="wFindGo">中に入る</button><span class="muted" id="wFindMsg"></span></div></div>
     <section class="stagecard">
-  <div id="stage"><div id="worldMsg" hidden></div><div id="worldBar" hidden><span id="worldBarT"></span> <button class="small" id="worldBack"></button></div><div id="guide" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
+  <div id="stage"><div id="worldMsg" hidden></div><div id="worldBar" hidden><span id="worldBarT"></span> <button class="small" id="worldBack"></button></div><div id="guide" hidden></div><div id="cal" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
     <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
@@ -344,6 +371,13 @@ function mallSheet(shop, mall, cols, ms, label = m => m) {
   const r = rnd(shop + mall);
   return ms.map(m => { const s = Math.round((mall === '楽天' ? 180000 : 90000) * (.6 + r()) / 10) * 10; return [label(m), fmt(s), fmt(Math.round(s * (mall === '楽天' ? .1 : .08) / 10) * 10)]; });
 }
+const SAMPLE_TOPS = [
+  { id: 'a1', kind: 'box', name: '東京ネット販売', levelName: '代理店', info: { 登録住所: '愛知県名古屋市中区栄3-1-1', 契約日: '2025-11-01' } },
+  { id: 'a2', kind: 'box', name: '山田 太郎', levelName: '申込者', info: { 登録住所: '北海道札幌市中央区北1条西2-1', 申込日: '2026-02-14' } }];
+const SAMPLE_CORPS = [
+  { id: 'b1', name: '法人A', parent: 'a1', info: { 申込日: '2026-04-12', 契約日: '2026-05-01', 登録住所: '東京都千代田区丸の内1-1-1' } },
+  { id: 'b2', name: '法人B', parent: 'a1', info: { 申込日: '2026-06-03', 契約日: '2026-06-20', 登録住所: '大阪府大阪市北区梅田3-1-1' } },
+  { id: 'b4', name: '法人C', parent: 'a2', info: { 申込日: '2026-08-18', 登録住所: '福岡県福岡市博多区博多駅前2-1-1' } }];
 const SAMPLE = () => {
   const axes = [
     { id: 'corp', name: '法人', kind: 'key', values: [], fav: false, scope: 'all' },
@@ -366,9 +400,10 @@ const SAMPLE = () => {
     D('val', '8月', '=', 'month', '2026-08', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる'),
     D('val', '9月', '=', 'month', '2026-09', 'sh3', 'このシートでは年を書かずに月だけで呼んでいる')
   ];
+  // いちばん外の箱は申込者や代理店。その中に法人を並べる。法人の情報(申込日・住所など)は World のタイムスリップと日本地図で使う
   const boxes = [
-    { id: 'b1', kind: 'box', name: '法人A', own: { corp: '法人A' }, parent: null },
-    { id: 'b2', kind: 'box', name: '法人B', own: { corp: '法人B' }, parent: null },
+    ...SAMPLE_TOPS.map(t => ({ ...t, own: {}, parent: null })),
+    ...SAMPLE_CORPS.map(c => ({ ...c, kind: 'box', own: { corp: c.name } })),
     { id: 'c1', kind: 'cube', name: 'S-01', own: { shop: 'S-01' }, axes: ['month', 'mall', 'item'], parent: 'b1' },
     { id: 'c2', kind: 'cube', name: 'S-02', own: { shop: 'S-02' }, axes: ['month', 'mall', 'item'], parent: 'b1' },
     { id: 'c3', kind: 'cube', name: 'S-03', own: { shop: 'S-03' }, axes: ['month', 'mall', 'item'], parent: 'b2' }
@@ -385,7 +420,7 @@ const SAMPLE = () => {
   const saved = [{ id: 'v1', name: '各店舗の楽天の9月の売上', q: { fix: { mall: '楽天', month: '2026-09', item: '売上' }, row: 'shop', col: 'item' }, fav: true, scope: 'all', seen: '' },
     { id: 'v2', name: 'S-01 の月別売上(モールごと)', q: { fix: { shop: 'S-01', item: '売上' }, row: 'month', col: 'mall' }, fav: false, scope: 'all', seen: '' }];
   const history = [{ id: 'h0', at: '2026-10-01', kind: '承認', title: 'S-03 の楽天の売上 を入れた', lines: ['対象月 → 月(＝)。値は「9月」のように年なしなので、このシートだけの呼び名として 7月・8月・9月 を 2026-07〜09 と登録', '売上高 → 科目=売上(＝)', '手数料 → 科目=手数料(＝)'], sources: [], results: ['sh3'] }];
-  return { axes, boxes, sheets, saved, dict, history, nextMonth: 10 };
+  return { axes, boxes, sheets, saved, dict, history, nextMonth: 10, sampleV: 2 };
 };
 const KEY = 'axis-boxes-v2';
 let S;
@@ -396,9 +431,24 @@ const unitOf = b => (b.kind === 'box' ? '箱' : 'キューブ') + b.no;
 // 単位=段(法人単位・ショップ単位)。箱・キューブが持つ軸の名前で決まる
 const levelOf = b => { if (b.levelName) return b.levelName; const k = Object.keys(b.own || {})[0]; return k && ax(k) ? ax(k).name : (b.kind === 'box' ? '箱' : 'キューブ'); };
 function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, ...S.boxes.filter(b => b.kind === k && b.no).map(b => b.no)); S.boxes.filter(b => b.kind === k && !b.no).forEach(b => b.no = ++n); } }
+// 前の見本(法人A・法人B がいちばん外の箱)のままなら、代理店・申込者の箱の中に法人を並べる形に一度だけ直す
+function upgradeSample() {
+  if (S.sampleV >= 2) return;
+  S.sampleV = 2;
+  const b1 = S.boxes.find(b => b.id === 'b1'), b2 = S.boxes.find(b => b.id === 'b2');
+  if (!b1 || !b2 || b1.parent || b2.parent || b1.name !== '法人A' || b2.name !== '法人B' || S.boxes.some(b => SAMPLE_TOPS.some(t => t.id === b.id))) return;
+  S.boxes.unshift(...SAMPLE_TOPS.map(t => ({ ...t, own: {}, parent: null })));
+  for (const c of SAMPLE_CORPS) {
+    const b = S.boxes.find(x => x.id === c.id);
+    if (b) { b.parent = c.parent; b.info = { ...c.info, ...(b.info || {}) }; }
+    else S.boxes.push({ ...c, kind: 'box', own: { corp: c.name } });
+  }
+  S.history.push({ id: 'h' + Date.now().toString(36), at: new Date().toISOString().slice(0, 10), kind: '作成', title: '見本を「代理店・申込者の箱の中に法人」の形にした', lines: ['代理店「東京ネット販売」に法人A・法人B、申込者「山田 太郎」に法人C', '法人に申込日・契約日・登録住所を足した(World のタイムスリップと日本地図で使う)'], sources: [], results: [] });
+}
 // 読み込んだ中身を画面で使える形にそろえる(はじめと、Supabase から読んだとき)
 function adopt(x) {
   S = x; S.prefs = S.prefs || {};
+  upgradeSample();
   numberUnits();
   // 前の版の面の名前(front など)をサイコロの目に置き換える
   S.boxes.forEach(b => { if (b.pin && b.pin.face) b.pin.face = ({ front: 'd1', top: 'd2', right: 'd3', left: 'd4', bottom: 'd5', back: 'd6' })[b.pin.face] || b.pin.face; });
@@ -754,7 +804,7 @@ function renderPrefs() {
     <div class="row">${[0, 1, 2].map(i => `<select data-ca="${i}" aria-label="${'XYZ'[i]}軸">${axOpts(ca[i])}</select>`).join('×')}</div>
     <div class="muted">初期値: ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')} ${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">初期値に戻す</button>' : ''}</div>
     <div class="relrow"><b>World の世界</b> <span class="pill ${own('world') ? 'mine' : 'cube'}">${own('world') ? '自分の設定' : '初期値'}</span></div>
-    <select id="pWorld" aria-label="World の世界">${Object.entries(WORLDS).map(([k, t]) => `<option value="${k}"${curPref('world') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    <select id="pWorld" aria-label="World の世界">${Object.entries(WORLDS).filter(([k]) => !SPECIAL_ONLY.includes(k)).map(([k, t]) => `<option value="${k}"${curPref('world') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
     <div class="muted">World の箱とキューブのまわりに映す世界(Blender で作った世界)。初期値: ${WORLDS[SYSTEM.world]} ${own('world') ? '<button class="small" data-reset="world">初期値に戻す</button>' : ''}</div>`;
   const log = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '設定', title: t, lines: l, sources: [], results: [] });
   $('pShade').onchange = e => { const v = e.target.value; if (v === SYSTEM.shade) delete S.prefs.shade; else S.prefs.shade = v; log('濃淡の基準を変えた', [`${SHADES[v]}(初期値は ${SHADES[SYSTEM.shade]})`]); save(); renderAll(); };
@@ -764,7 +814,7 @@ function renderPrefs() {
     log('新しいキューブの3軸を変えた', [`${v.map(a => ax(a).name).join('×')}(初期値は ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')}。今あるキューブの軸は変えない)`]); save(); renderAll(); });
   $('pWorld').onchange = e => { const v = WORLDS[e.target.value] ? e.target.value : SYSTEM.world; if (v === SYSTEM.world) delete S.prefs.world; else S.prefs.world = v; log('World の世界を変えた', [`${WORLDS[v]}(初期値は ${WORLDS[SYSTEM.world]})`]); save(); renderAll(); };
   $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を初期値に戻した', [{ shade: '濃淡の基準', cubeAxes: '新しいキューブの3軸', world: 'World の世界' }[b.dataset.reset]]); save(); renderAll(); });
-  setWorld(curPref('world'));
+  setWorld(activeWorld());
 }
 // 箱の中に箱を足す(法人の中のグループなど)。単位は「グループ」
 function addBox(boxId) {
@@ -1190,6 +1240,7 @@ function contentsOf(b, mode = showOf(levelOf(b))) {
 // 同じ単位の箱は同じ大きさ(その段でいちばん大きい箱に合わせる)
 function paint() {
   scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = []; uprights = [];
+  if (layoutMode()) { paintLayout(); return; }
   const memo = {}, allFacts = facts();
   const natural = (b, mode) => {
     // 中身は 手前・上・左の角から X のプラス → Y のマイナス(下) → Z のマイナス(奥) の順に並べる
@@ -1327,7 +1378,7 @@ function loop() {
     parentG.getWorldQuaternion(invQ); g.quaternion.copy(invQ.invert()).multiply(camera.quaternion).multiply(pinQ);
   }
   keepUpright();
-  if (env && !entered) occlude();
+  if (env && !entered && !env.custom) occlude();
   renderer.render(scene, camera); requestAnimationFrame(loop);
 }
 new ResizeObserver(resize).observe(stage);
@@ -1337,6 +1388,14 @@ new ResizeObserver(resize).observe(stage);
 // 箱とキューブは原点のまま動かさず、世界の方を動かす: 部屋の真ん中を原点に、床を立体の下に、長い方を箱の並ぶ向き(X)に合わせ、
 // 全体が見える距離までカメラを引いても部屋の中に収まる大きさに広げる。ズームの上限も部屋の中まで
 const WORLDS = { none: '標準(無地)', modern: '白い現代美術館', european: '宮殿を改装した欧州の美術館', heist: '夜の美術館', zen: '和の庭', rpg: 'RPGの森', game: 'ゲームの世界', city: '摩天楼の街', ruins: '砂漠の巨大遺跡', cyber: 'ネオン街の屋上', underwater: '海の底', space: '宇宙空間' };
+// 宇宙はタイムスリップ専用(設定の世界には出さない)。japan は日本地図(Blender ではなく地図データから作る)
+const SPECIAL_ONLY = ['space', 'japan'];
+WORLDS.japan = '日本地図';
+const WMODES = { world: 'いつもの世界', japan: '日本地図', cal: 'タイムスリップ(カレンダー)', space: 'タイムスリップ(宇宙)' };
+let wmode = 'world';
+try { wmode = localStorage.getItem('axis-boxes-v2:wmode') || 'world'; } catch (e) {}
+if (!WMODES[wmode]) wmode = 'world';
+const activeWorld = () => wmode === 'space' ? 'space' : wmode === 'japan' ? 'japan' : wmode === 'cal' ? 'none' : (SPECIAL_ONLY.includes(curPref('world')) ? 'none' : curPref('world'));
 const envCache = {}; let env = null, envName = null, envLimit = 120, extent = { span: 10, bottom: -5 }, entered = null;
 // 世界の中(展示): 文字は出さず、箱は台とガラスの枠、キューブはその世界の色の立体。選んだものだけふだんの見え方(表・軸)にする
 const exhibit = () => !!env && !entered;
@@ -1350,12 +1409,20 @@ function fitDist(span) { return Math.max(12, Math.min(120, span * 1.25 + 6)); }
 function worldMsg(t) { $('worldMsg').textContent = t || ''; $('worldMsg').hidden = !t; }
 function setWorld(name) {
   if (!WORLDS[name]) name = 'none';
-  $('worldNow').textContent = '今の世界: ' + WORLDS[name];
+  $('worldNow').textContent = wmode === 'world' ? '今の世界: ' + WORLDS[name] : '特別枠: ' + WMODES[wmode];
   if (name === envName) return;
   envName = name; entered = null;
   if (env) { scene.remove(env.g); env = null; occReset(); paint(); }
   bare();
-  if (name === 'none') { worldMsg(''); return; }
+  if (name === 'none') { worldMsg(''); paint(); return; }
+  if (name === 'japan') {
+    worldMsg('日本地図を読み込み中…');
+    (envCache.japan = envCache.japan || fetch('/worlds/japan.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })).then(J => {
+      if (envName !== 'japan') return;
+      JP = J; env = { g: japanMap(J), info: { title: '日本地図', bg: '#b9d3e6', palette: ['#f5f1e6', '#2a5f8a'] }, custom: true }; worldMsg(''); paint();
+    }).catch(e => { delete envCache.japan; console.error('日本地図を読み込めませんでした', e); if (envName === 'japan') { envName = null; worldMsg('日本地図を読み込めませんでした'); } });
+    return;
+  }
   if (!window.BlenderWorld || !THREE.GLTFLoader) { worldMsg('世界を読む部品を読み込めませんでした。標準で表示しています'); envName = null; return; }
   worldMsg(WORLDS[name] + ' を読み込み中…');
   (envCache[name] = envCache[name] || BlenderWorld.load(name, { base: '/worlds/' })).then(({ info, root }) => {
@@ -1374,6 +1441,7 @@ function placeEnv() {
   if (!env) return;
   if (entered) { scene.remove(env.g); occReset(); bare(); return; }   // 中に入っている間は無地
   if (env.g.parent !== scene) scene.add(env.g);
+  if (env.custom) { scene.background = new THREE.Color(env.info.bg); scene.fog = null; envLimit = 200; persp.far = 1000; persp.updateProjectionMatrix(); renderer.outputEncoding = THREE.LinearEncoding; return; }
   const { g, info } = env, r = roomOf(info), short = Math.min(r.hx, r.hz), k = Math.max(1, fitDist(extent.span) * 1.15 / short);
   g.rotation.y = r.hz > r.hx ? Math.PI / 2 : 0; g.scale.setScalar(k);
   const c = new THREE.Vector3(r.cx, 0, r.cz).applyAxisAngle(new THREE.Vector3(0, 1, 0), g.rotation.y).multiplyScalar(k);
@@ -1403,7 +1471,7 @@ function occlude() {
 // ---------- 中に入る(世界から、選んだ箱・キューブを無地で見る)----------
 function enterUnit(u) {
   if (!u) return;
-  entered = env ? u.id : null; sel = u.id; focused = null;
+  entered = env || wmode !== 'world' ? u.id : null; sel = u.id; focused = null;
   renderTree(); paint(); renderPinBar(); focusSel();
 }
 function leaveUnit() {
@@ -1430,7 +1498,9 @@ function renderWorldUi() {
   const eu = entered && box(entered);
   if (entered && !eu) entered = null;
   $('worldBar').hidden = !eu;
-  if (eu) { $('worldBarT').textContent = `${unitOf(eu)} ${eu.name} の中(無地)`; $('worldBack').textContent = '← ' + WORLDS[envName] + 'に戻る'; }
+  if (eu) { $('worldBarT').textContent = `${unitOf(eu)} ${eu.name} の中(無地)`; $('worldBack').textContent = '← ' + (wmode === 'world' ? WORLDS[envName] : WMODES[wmode]) + 'に戻る'; }
+  document.querySelectorAll('[data-wm]').forEach(b => { b.classList.toggle('on', b.dataset.wm === wmode); b.setAttribute('aria-selected', b.dataset.wm === wmode); });
+  renderCal();
   $('legend').hidden = exhibit();
   $('wFindList').innerHTML = [...units().map(b => b.name), ...S.sheets.map(x => x.name)].filter((v, i, a) => a.indexOf(v) === i).map(v => `<option value="${esc(v)}">`).join('');
   $('wFindRow').hidden = exhibit();
@@ -1438,7 +1508,7 @@ function renderWorldUi() {
 }
 // 世界ごとの案内の見た目。map は上から見た案内図(箱の並びと現在地)を出す
 const GUIDE = { modern: ['museum', '作品解説'], european: ['museum', '作品解説'], heist: ['museum', '作品解説', 'dark'], city: ['map', '案内図'], ruins: ['map', '遺跡の地図'],
-  zen: ['sign', '立て札'], rpg: ['game', '冒険の書'], game: ['game', 'ステージ案内'], cyber: ['term', 'NAVI://'], space: ['term', '航法コンソール'], underwater: ['term', 'ソナー'] };
+  zen: ['sign', '立て札'], rpg: ['game', '冒険の書'], game: ['game', 'ステージ案内'], cyber: ['term', 'NAVI://'], space: ['term', '時間航行'], underwater: ['term', 'ソナー'], japan: ['map', '日本地図'] };
 function unitRows(u) {
   const cubes = u.kind === 'box' ? descCubes(u) : [u], sheets = S.sheets.filter(x => cubes.some(c => c.id === x.cube) || x.cube === u.id);
   const rows = [['種類', (u.kind === 'box' ? '箱' : 'キューブ') + '(' + esc(levelOf(u)) + '単位)'], ...Object.entries(u.own || {}).map(([a, v]) => [esc(ax(a) ? ax(a).name : a), esc(v)])];
@@ -1468,17 +1538,159 @@ function renderGuide() {
   const [type, head, tone] = GUIDE[envName] || ['museum', '案内'], [c0, c1] = palette(), u = selUnits().length === 1 ? selUnits()[0] : null;
   el.className = type + (tone ? ' ' + tone : ''); el.style.setProperty('--g0', c0); el.style.setProperty('--g1', type === 'museum' && !tone || type === 'map' ? c1 : c1);
   const ph = { museum: '作品名・キーワードで探す', map: '行き先(箱・キューブ・シート)を探す', sign: '名を記して探す', game: 'なまえを いれてください', term: '> search' }[type];
-  const title = u ? `${unitOf(u)} ${esc(u.name)}` : esc(env.info.title || WORLDS[envName]);
-  const desc = u ? `<dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : `<div class="gd">${type === 'map' || type === 'term' ? '図の箱や点を押すと選べます。' : ''}立体を押すと説明が出ます。ダブルクリックか下で探すと中に入れます。</div>`;
-  el.innerHTML = `<div class="gh">${esc(head)}</div><h3>${title}</h3>${type === 'map' || type === 'term' ? guideMap() : ''}${desc}
+  const title = u ? `${unitOf(u)} ${esc(u.name)}` : wmode === 'space' ? 'タイムスリップ' : esc(env.info.title || WORLDS[envName]);
+  const desc = u && layoutMode() ? `<dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : layoutMode() ? '<div class="gd">ピンや立体を押すと説明が出ます。ダブルクリックか下で探すと中に入れます。</div>' : u ? `<dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : `<div class="gd">${type === 'map' || type === 'term' ? '図の箱や点を押すと選べます。' : ''}立体を押すと説明が出ます。ダブルクリックか下で探すと中に入れます。</div>`;
+  el.innerHTML = `<div class="gh">${esc(head)}</div><h3>${title}</h3>${layoutMode() ? layoutPanel() : type === 'map' || type === 'term' ? guideMap() : ''}${desc}
     ${u ? `<div class="acts"><button id="gClose">閉じる</button><button id="gEnter">中に入る</button></div>` : ''}
     <div class="gf"><input id="gFind" list="wFindList" placeholder="${ph}" aria-label="探して中に入る"><button id="gGo">${type === 'game' ? 'しらべる' : '探す'}</button></div><div class="gmsg" id="gMsg"></div>`;
   el.querySelectorAll('[data-pick]').forEach(n => n.onclick = () => select(n.dataset.pick));
+  const lf = $('lField'); if (lf) lf.onchange = () => { setField(wmode, lf.value); paint(); };
   const go = () => findGo($('gFind'), $('gMsg'));
   $('gGo').onclick = go; $('gFind').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) go(); };
   if (u) { $('gClose').onclick = () => { sel = null; focused = null; renderTree(); paint(); renderPinBar(); }; $('gEnter').onclick = () => enterUnit(u); }
   guideCam();
 }
+
+// ---------- World の特別枠: 日本地図とタイムスリップ ----------
+// どちらも箱・キューブの「情報」(シートの行から作ったときの列。見本では申込日・契約日・登録住所)のうち、選んだ項目で並べ直す。
+// タイムスリップ(宇宙): 宇宙に光の線を引き、その下に時間の目盛りを振って、日付の順に並べる。カレンダー: 月の暦に日付で置く。
+// 日本地図: 住所の項目を都道府県と市区町村の名前で照らし、その場所にピンを立てる(住所は外に送らない。地図データは /worlds/japan.json)
+let JP = null, calYM = null;
+const layoutMode = () => !!env && !entered && (wmode === 'space' || wmode === 'japan');
+const TOPC = ['#4e79a7', '#f28e2b', '#e15759', '#59a14f', '#b07aa1', '#edc948', '#76b7b2', '#ff9da7'];
+const topOf = u => { let b = u; while (b.parent && box(b.parent)) b = box(b.parent); return b; };
+const topColor = u => { const tops = S.boxes.filter(b => !b.parent); return TOPC[Math.max(0, tops.indexOf(topOf(u))) % TOPC.length]; };
+const ERA = { 令和: 2018, 平成: 1988, 昭和: 1925 };
+function parseDate(v) {
+  const t = String(v ?? '').normalize('NFKC'); let m;
+  if ((m = t.match(/(令和|平成|昭和)\s*(\d+|元)\s*年\s*(\d{1,2})\s*月(?:\s*(\d{1,2})\s*日)?/))) return Date.UTC(ERA[m[1]] + (m[2] === '元' ? 1 : +m[2]), +m[3] - 1, +(m[4] || 1));
+  if ((m = t.match(/(\d{4})\s*[-\/年.]\s*(\d{1,2})(?:\s*[-\/月.]\s*(\d{1,2}))?/)) && +m[2] >= 1 && +m[2] <= 12) return Date.UTC(+m[1], +m[2] - 1, +(m[3] || 1));
+  return null;
+}
+const isAddr = v => /^(北海道|東京都|京都府|大阪府|.{2,3}県)/.test(String(v ?? '').normalize('NFKC').trim());
+const infoKeys = () => [...new Set(units().flatMap(b => Object.keys(b.info || {})))];
+function fieldsFor(mode) { return infoKeys().filter(k => units().some(b => b.info && (mode === 'japan' ? isAddr(b.info[k]) : parseDate(b.info[k]) != null))); }
+function getField(mode) { const fs = fieldsFor(mode); let f = null; try { f = localStorage.getItem('axis-boxes-v2:field:' + mode); } catch (e) {} return fs.includes(f) ? f : fs[0] || null; }
+function setField(mode, f) { try { localStorage.setItem('axis-boxes-v2:field:' + mode, f); } catch (e) {} }
+// 住所 → 地図の点。都道府県の名前で始まり、続きが市区町村の名前で始まれば市区町村の点、なければ都道府県の点
+function geocode(addr) {
+  if (!JP) return null;
+  const t = String(addr ?? '').normalize('NFKC').replace(/\s+/g, '');
+  let pf = JP.pref.find(p => t.startsWith(p.n)), rest = pf ? t.slice(pf.n.length) : t;
+  const cands = JP.city.filter(c => (!pf || c[0] === pf.c) && rest.startsWith(c[1])).sort((a, b) => b[1].length - a[1].length);
+  const c = cands[0];
+  if (c) { pf = pf || JP.pref.find(p => p.c === c[0]); return { x: c[2], y: c[3], where: pf.n + c[1] }; }
+  return pf ? { x: pf.cx, y: pf.cy, where: pf.n } : null;
+}
+const JSC = 0.1, jx = x => (x - JP.w / 2) * JSC + 8, jz = y => (y - JP.h / 2) * JSC;
+function japanMap(J) {
+  JP = J;
+  const g = new THREE.Group(), land = new THREE.MeshLambertMaterial({ color: 0xf5f1e6 }), line = new THREE.LineBasicMaterial({ color: 0x8796a5 });
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: 0xa9c8de })); sea.rotation.x = -Math.PI / 2; sea.position.y = -.05; g.add(sea);
+  for (const p of J.pref) for (const r of p.r) {
+    const sh = new THREE.Shape(r.map(([x, y]) => new THREE.Vector2(jx(x), -jz(y))));
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: .35, bevelEnabled: false }); geo.rotateX(-Math.PI / 2);
+    g.add(new THREE.Mesh(geo, land));
+    g.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(r.map(([x, y]) => new THREE.Vector3(jx(x), .36, jz(y)))), line));
+  }
+  return g;
+}
+// 並べ直したものは「展示」と同じく文字なしの立体(色はいちばん外の箱ごと)。選んだものだけ名前と日付を出す
+function token(u, h, color) {
+  const g = new THREE.Group(), on = selUnits().includes(u);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(h, h, h), new THREE.MeshStandardMaterial({ color: new THREE.Color(color), roughness: .35, metalness: .15, emissive: new THREE.Color(color), emissiveIntensity: wmode === 'space' ? .55 : .15 }));
+  g.add(m); m.userData.unit = u.id; hits.push(m);
+  if (on) g.add(edges(h + .3, h + .3, h + .3, new THREE.Color(css('--mine')), false, 1));
+  return g;
+}
+function paintLayout() {
+  const mode = wmode, f = getField(mode), items = [];
+  for (const u of units()) { const v = u.info && u.info[f]; if (v == null || v === '') continue; const k = mode === 'japan' ? geocode(v) : parseDate(v); if (k != null) items.push({ u, v, k }); }
+  layoutInfo = { f, n: items.length, miss: units().filter(u => u.info && Object.keys(u.info).length && !items.some(it => it.u === u)).length };
+  if (mode === 'japan') {
+    const at = {};
+    for (const it of items) {
+      const key = it.k.x + ',' + it.k.y, i = at[key] = (at[key] ?? -1) + 1, a = i * 2.4, r = .7 * Math.sqrt(i);
+      const pin = new THREE.Group(); pin.position.set(jx(it.k.x) + r * Math.cos(a), .36, jz(it.k.y) + r * Math.sin(a)); world.add(pin);
+      const col = topColor(it.u), on = selUnits().includes(it.u);
+      const stick = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, 2.4, 8), new THREE.MeshStandardMaterial({ color: 0x555555 })); stick.position.y = 1.2; pin.add(stick);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(on ? .8 : .62, 20, 14), new THREE.MeshStandardMaterial({ color: new THREE.Color(col), roughness: .3, emissive: new THREE.Color(on ? col : '#000'), emissiveIntensity: .4 })); head.position.y = 2.6; pin.add(head);
+      const hit = new THREE.Mesh(new THREE.CylinderGeometry(.7, .7, 3.4, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })); hit.position.y = 1.7; hit.userData.unit = it.u.id; hits.push(hit); pin.add(hit);
+      if (on) { const lb = textSprite(`${it.u.name}(${it.k.where})`, '#1d2430', 1.5); lb.position.y = 4; pin.add(lb); }
+      groups.push({ g: pin, u: it.u, box: true, home: pin.position.clone() });
+    }
+    extent = { span: 46, bottom: 0 }; placeEnv(); fitLayout(); renderWorldUi(); return;
+  }
+  // タイムスリップ(宇宙): 光の線(X)と、その下の時間の目盛り
+  items.sort((a, b) => a.k - b.k);
+  const d0 = new Date(items.length ? items[0].k : Date.now()), d1 = new Date(items.length ? items[items.length - 1].k : Date.now());
+  const t0 = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), 1), t1 = Date.UTC(d1.getUTCFullYear(), d1.getUTCMonth() + 1, 1);
+  const L = Math.max(24, Math.min(90, items.length * 4)), X = t => -L / 2 + (t - t0) / (t1 - t0) * L;
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, L + 6, 8), new THREE.MeshBasicMaterial({ color: 0xd8f4ff })); beam.rotation.z = Math.PI / 2; world.add(beam);
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, L + 6, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0x6fd8ff, transparent: true, opacity: .22, blending: THREE.AdditiveBlending, depthWrite: false })); glow.rotation.z = Math.PI / 2; world.add(glow);
+  const months = (d1.getUTCFullYear() - d0.getUTCFullYear()) * 12 + d1.getUTCMonth() - d0.getUTCMonth() + 1, every = months > 48 ? 12 : months > 18 ? 3 : 1;
+  const tick = new THREE.LineBasicMaterial({ color: 0x9fdcff, transparent: true, opacity: .8 });
+  for (let i = 0; i <= months; i++) {
+    const d = new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + i, 1)), x = X(d.getTime()), jan = d.getUTCMonth() === 0, big = jan || i === 0;
+    world.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, -.15, 0), new THREE.Vector3(x, big ? -1.1 : -.6, 0)]), tick));
+    if (i % every === 0 || big) { const lb = textSprite(big ? `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月` : `${d.getUTCMonth() + 1}月`, '#cfeeff', big ? .6 : .45); lb.position.set(x, big ? -1.7 : -1.2, 0); world.add(lb); }
+  }
+  const placed = [];
+  for (const it of items) {
+    const x = X(it.k), lv = placed.filter(p => Math.abs(p - x) < 1.4).length; placed.push(x);
+    const col = topColor(it.u), tk = token(it.u, 1.1, col); tk.position.set(x, 1.9 + lv * 1.6, 0); world.add(tk);
+    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, .1, 0), new THREE.Vector3(x, 1.3 + lv * 1.6, 0)]), new THREE.LineBasicMaterial({ color: new THREE.Color(col), transparent: true, opacity: .7 })));
+    if (selUnits().includes(it.u)) { const lb = textSprite(`${it.u.name} ${String(it.v)}`, '#ffffff', .55); lb.position.set(0, 1.2, 0); tk.add(lb); }
+    groups.push({ g: tk, u: it.u, box: true, home: tk.position.clone() });
+  }
+  extent = { span: L + 6, bottom: -2.5 }; placeEnv(); fitLayout(); renderWorldUi();
+}
+function fitLayout() { if (fitted !== extent.span) { fitted = extent.span; cam.dist = Math.min(envLimit, fitDist(extent.span)); } }
+let layoutInfo = { f: null, n: 0, miss: 0 };
+function layoutPanel() {
+  const fs = fieldsFor(wmode), tops = S.boxes.filter(b => !b.parent);
+  if (!fs.length) return `<div class="gd">${wmode === 'japan' ? '住所' : '日付'}の入った項目がありません。シートの行から箱を作ると、列が項目になります。</div>`;
+  return `<div class="gd">並べる項目 <select id="lField" aria-label="並べる項目">${fs.map(k => `<option${k === layoutInfo.f ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+    <div class="gd">${wmode === 'japan' ? 'ピン' : '並んだもの'} ${layoutInfo.n} 件${layoutInfo.miss ? `(この項目が無い・読めないもの ${layoutInfo.miss} 件)` : ''}</div>
+    <div class="lg">${tops.map(t => `<span><i style="background:${topColor(t)}"></i>${esc(t.name)}</span>`).join('')}</div>${wmode === 'japan' && JP ? `<div class="gd" style="font-size:11px">${esc(JP.src)}</div>` : ''}`;
+}
+// タイムスリップ(カレンダー)
+function renderCal() {
+  const el = $('cal'), show = wmode === 'cal' && !entered; el.hidden = !show; if (!show) return;
+  const f = getField('cal'), fs = fieldsFor('cal'), items = [];
+  for (const u of units()) { const t = u.info && parseDate(u.info[f]); if (t != null) items.push({ u, t, v: u.info[f] }); }
+  if (!calYM) { const last = items.length ? new Date(Math.max(...items.map(i => i.t))) : new Date(); calYM = [last.getUTCFullYear(), last.getUTCMonth()]; }
+  const [Y, M] = calYM, first = new Date(Date.UTC(Y, M, 1)), start = Date.UTC(Y, M, 1 - first.getUTCDay());
+  const dayOf = t => { const d = new Date(t); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()); };
+  const u = selUnits().length === 1 ? selUnits()[0] : null;
+  const yr = [...Array(12)].map((_, m) => { const n = items.filter(i => { const d = new Date(i.t); return d.getUTCFullYear() === Y && d.getUTCMonth() === m; }).length; return `<button data-cm="${m}" class="${m === M ? 'on' : ''}">${m + 1}月<b>${n || '·'}</b></button>`; }).join('');
+  const wk = '日月火水木金土'.split('').map(w => `<div class="dw">${w}</div>`).join(''); let grid = '';
+  for (let i = 0; i < 42; i++) {
+    const t = start + i * 864e5, d = new Date(t), here = items.filter(it => dayOf(it.t) === t);
+    grid += `<div class="day${d.getUTCMonth() !== M ? ' out' : ''}"><span class="dn">${d.getUTCDate()}</span>${here.map(it => `<button class="chip${selUnits().includes(it.u) ? ' on' : ''}" style="background:${topColor(it.u)}" data-cu="${it.u.id}" title="${esc(it.u.name)} ${esc(it.v)}">${esc(it.u.name)}</button>`).join('')}</div>`;
+  }
+  el.innerHTML = `<div class="ch">${fs.length ? `<label>並べる項目 <select id="cField">${fs.map(k => `<option${k === f ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></label>` : '<span class="muted">日付の入った項目がありません</span>'}
+      <span class="sp" style="flex:1"></span><button class="small" data-cy="-1">‹ 前の年</button><button class="small" data-cmv="-1">‹</button><h3>${Y}年${M + 1}月</h3><button class="small" data-cmv="1">›</button><button class="small" data-cy="1">次の年 ›</button></div>
+    <div class="yr">${yr}</div><div class="grid wk">${wk}</div><div class="grid">${grid}</div>
+    <div class="ci">${u ? `<b>${unitOf(u)} ${esc(u.name)}</b><dl>${unitRows(u).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl><button class="small" id="calEnter">中に入る</button> <button class="small" id="calClose">閉じる</button>` : '<span class="muted">日付の札を押すと説明が出ます。ダブルクリックか上の欄で探すと中に入れます。</span>'}</div>`;
+  const mv = n => { const d = new Date(Date.UTC(calYM[0], calYM[1] + n, 1)); calYM = [d.getUTCFullYear(), d.getUTCMonth()]; renderCal(); };
+  el.querySelectorAll('[data-cmv]').forEach(b => b.onclick = () => mv(+b.dataset.cmv));
+  el.querySelectorAll('[data-cy]').forEach(b => b.onclick = () => mv(12 * b.dataset.cy));
+  el.querySelectorAll('[data-cm]').forEach(b => b.onclick = () => { calYM = [Y, +b.dataset.cm]; renderCal(); });
+  // ダブルクリックは click の回数で見る(1回目の再描画で札が置き換わっても入れるように)
+  el.querySelectorAll('[data-cu]').forEach(b => { b.onclick = e => { if (e.detail >= 2) { enterUnit(box(b.dataset.cu)); return; } sel = b.dataset.cu; focused = null; renderTree(); renderCal(); }; });
+  if ($('cField')) $('cField').onchange = e => { setField('cal', e.target.value); calYM = null; renderCal(); };
+  if (u) { $('calEnter').onclick = () => enterUnit(u); $('calClose').onclick = () => { sel = null; renderTree(); renderCal(); }; }
+}
+function setWMode(m) {
+  if (!WMODES[m]) m = 'world';
+  wmode = m; entered = null; calYM = null; focused = null;
+  try { localStorage.setItem('axis-boxes-v2:wmode', m); } catch (e) {}
+  if (m === 'japan') { cam.th = 0; cam.ph = 1.0; } else if (m === 'space') { cam.th = 0; cam.ph = .22; }
+  tgtGoal.set(0, 0, 0); fitted = 0;
+  setWorld(activeWorld()); paint(); renderPinBar();
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-wm]'); if (b) setWMode(b.dataset.wm); });
 
 // ---------- つなぐ ----------
 function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
