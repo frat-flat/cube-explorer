@@ -1265,8 +1265,10 @@ $('preset').onchange = e => fillPreset(+e.target.value);
 S.saved.forEach(s => { if (!s.seen) s.seen = sig(s); });
 renderAll(); fillPreset(0); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
 // Supabase に保存があればそれを正として開き直す。まだ無ければ、いまの中身を最初の保存として送る
-fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => {
-  if (!j || !j.configured) return;
+fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.status === 404 ? null : r.json().then(j => ({ ...j, ok: r.ok })).catch(() => ({ ok: false, error: '応答 ' + r.status }))).then(j => {
+  if (!j) return;
+  if (!j.ok) { cloudMark('Supabase に読めません(' + (j.error || '') + ')', true); return; }
+  if (!j.configured) { cloudMark('このブラウザにだけ保存(Supabase は未設定)'); return; }
   cloud = true;
   if (validState(j.state)) { adopt(j.state); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} renderAll(); cloudMark('Supabase から読み込みました'); }
   else pushCloud();
