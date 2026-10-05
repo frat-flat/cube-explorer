@@ -732,7 +732,11 @@ function renderHist() {
 // ---------- 立体:箱の中にキューブ、キューブの中にシート ----------
 const stage = $('stage'), css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); stage.prepend(renderer.domElement);
-const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .1, 200);
+const scene = new THREE.Scene(), persp = new THREE.PerspectiveCamera(40, 1, .1, 200);
+// 箱を固定したら視点は正面で固定する(箱のほかの面は見えない)。奥行きで形がゆがまないように正面からまっすぐ写す
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 400);
+let camera = persp;
+const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
 scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
 let world = new THREE.Group(); scene.add(world);
 let hits = [], groups = [], sel = null, fitted = 0;
@@ -784,7 +788,7 @@ function renderShowRow() {
 function renderPinBar() {
   renderShowRow();
   const n = units().filter(b => b.pin).length;
-  $('pinHint').textContent = n ? `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : '';
+  $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: 視点は正面で固定(ほかの面は見えません)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
   $('pinHint').hidden = !n; $('unpinAll').hidden = !n;
   $('selUnit').innerHTML = '<option value="">(箱かキューブを選ぶ)</option>'
     + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
@@ -881,7 +885,7 @@ function sheetTex(sh, on) {
   const t = new THREE.CanvasTexture(c); t.minFilter = THREE.LinearFilter; return t;
 }
 // 箱の中に見せるもの(箱の段ごとに選ぶ)
-const SHOW = [['all', 'すべて(箱・キューブ・シート)'], ['box', '中の箱だけ'], ['cube', 'キューブだけ(中の箱のキューブも並べる)'], ['sheet', 'シートだけ'], ['count', '名前と数だけ']];
+const SHOW = [['all', 'すべて(箱・キューブ・シート)'], ['box', '中の箱だけ(この箱の中に)'], ['cube', 'キューブだけ(この箱の中に。中の箱のキューブも並べる)'], ['sheet', 'シートだけ(キューブの中に。箱の枠は出さない)'], ['count', '名前と数だけ']];
 const showOf = L => (S.boxShow || {})[L] || 'all';
 const cubeW = 2.2, cubeSlot = cubeW * Math.sqrt(3) + .1;   // 1マスはキューブがどの向きに回ってもはみ出ない広さ
 const childBoxes = b => S.boxes.filter(x => x.parent === b.id && x.kind === 'box');
@@ -894,7 +898,7 @@ function contentsOf(b, mode = showOf(levelOf(b))) {
   if (mode === 'count') return [];
   if (mode === 'cube') return descCubes(b).map(u => ({ u }));
   if (mode === 'box') return boxes.map(u => ({ u }));
-  if (mode === 'sheet') return [...(own.length ? [{ sheets: own }] : []), ...descCubes(b).map(c => S.sheets.filter(x => x.cube === c.id)).filter(l => l.length).map(l => ({ sheets: l }))];
+  if (mode === 'sheet') return [...(own.length ? [{ sheets: own }] : []), ...descCubes(b).filter(c => S.sheets.some(x => x.cube === c.id)).map(u => ({ u }))];
   return [...boxes.map(u => ({ u })), ...cubes.map(u => ({ u })), ...(own.length ? [{ sheets: own }] : [])];
 }
 // 同じ単位の箱は同じ大きさ(その段でいちばん大きい箱に合わせる)
@@ -909,12 +913,16 @@ function paint() {
   const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) memo[L] = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); return memo[L]; };
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
+    // 「○○だけ」はひとつ上の段と一緒に見せる。シートだけ=シートとそのキューブ(箱の枠は出さない)、キューブだけ・中の箱だけ=その外側のこの箱
+    const frame = showOf(levelOf(b)) !== 'sheet';
     const bg = new THREE.Group(); bg.position.set(...pos); parent.add(bg);
-    const fill = new THREE.Mesh(new THREE.BoxGeometry(W, W, W), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: .05, depthWrite: false })); bg.add(fill);
+    const fill = new THREE.Mesh(new THREE.BoxGeometry(W, W, W), new THREE.MeshBasicMaterial({ color: new THREE.Color(css('--box')), transparent: true, opacity: frame ? .05 : 0, depthWrite: false })); bg.add(fill);
     fill.userData.unit = b.id; hits.push(fill); groups.push({ g: bg, u: b, box: true, home: bg.position.clone() });
     if (selUnits().includes(b)) bg.add(edges(W + .3, W + .3, W + .3, new THREE.Color(css('--mine')), false, 1));
-    bg.add(edges(W, W, W, new THREE.Color(css('--box')), true));
-    const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
+    if (frame) {
+      bg.add(edges(W, W, W, new THREE.Color(css('--box')), true));
+      const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
+    }
     if (showOf(levelOf(b)) === 'count') {
       const nb = childBoxes(b).length, nc = descCubes(b).length, ns = S.sheets.filter(x => x.cube === b.id || descCubes(b).some(c => c.id === x.cube)).length;
       const t = textSprite([nb ? `箱 ${nb}` : '', `キューブ ${nc}`, `シート ${ns}`].filter(Boolean).join('・'), css('--muted'), .6); bg.add(t);
@@ -963,7 +971,7 @@ function paint() {
   const span = Math.max(total, ...tops.map(sizeOf));
   if (fitted !== span) { fitted = span; cam.dist = Math.max(12, Math.min(120, span * 1.25 + 6)); }
 }
-function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
 let drag = null;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 // 押した所の箱・キューブ。キューブを優先する
@@ -978,6 +986,7 @@ renderer.domElement.addEventListener('pointermove', e => {
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
   if (Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy) > 4) drag.moved = true;
   if (drag.rot) { drag.rot.pin.yaw += dx * .01; drag.rot.pin.pitch = Math.max(-1.58, Math.min(1.58, drag.rot.pin.pitch + dy * .01)); return; }
+  if (boxLocked()) return;   // 箱を固定している間は視点を動かさない(ズームはできる)
   cam.th -= dx * .006; cam.ph = Math.max(-1.35, Math.min(1.35, cam.ph + dy * .005));   // 下からも回り込める(⑤の面を見るため)
 });
 renderer.domElement.addEventListener('pointerup', () => {
@@ -988,8 +997,15 @@ renderer.domElement.addEventListener('pointerup', () => {
 renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
-  camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
-  camera.lookAt(0, 0, 0);
+  if (boxLocked()) {
+    camera = ortho; const hh = cam.dist * Math.tan(THREE.MathUtils.degToRad(20)), hw = hh * persp.aspect;
+    if (ortho.top !== hh || ortho.right !== hw) { ortho.left = -hw; ortho.right = hw; ortho.top = hh; ortho.bottom = -hh; ortho.updateProjectionMatrix(); }
+    ortho.position.set(0, 0, 200); ortho.lookAt(0, 0, 0);
+  } else {
+    camera = persp;
+    camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
+    camera.lookAt(0, 0, 0);
+  }
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
   // 中のキューブは箱の中の自分のマスから動かず、固定したキューブ(箱で固定した中身も)はその場で選んだ目をこちらに向ける
