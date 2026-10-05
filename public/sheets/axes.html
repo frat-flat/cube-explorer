@@ -183,7 +183,7 @@ tfoot td{font-weight:700}
 </aside>
 <main>
   <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
-    <svg id="gizmo" viewBox="-38 -38 76 76" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y1"><title>Y の方向へ動かす</title><text id="gty" style="fill:var(--ay)">Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z1"><title>Z の方向へ動かす</title><text id="gtz" style="fill:var(--az)">Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
+    <svg id="gizmo" viewBox="-38 -38 76 76" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y1"><title>Y の方向へ動かす</title><text id="gty" style="fill:var(--ay)">Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
@@ -1062,10 +1062,15 @@ function loop() {
   camera.lookAt(tgt);
   // 右下の小さな3軸は、今の向きで X・Y・Z が画面のどちらを向いているかを示す
   invQ2.copy(camera.quaternion).invert();
-  ['x', 'y', 'z'].map(k => { gv.set(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, k === 'z' ? 1 : 0).applyQuaternion(invQ2); return [k, gv.x * 26, -gv.y * 26]; }).forEach(([k, x, y]) => {
-      // 原点からプラスの向きにだけ線を引き、先に軸と同じ色の文字を置く(マイナス側は出さない)
-      $('gl' + k).setAttribute('x1', 0); $('gl' + k).setAttribute('y1', 0); $('gl' + k).setAttribute('x2', x * .78); $('gl' + k).setAttribute('y2', y * .78);
-      $('gt' + k).setAttribute('x', x); $('gt' + k).setAttribute('y', y);
+  const GZ = ['x', 'y', 'z'].map(k => { gv.set(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, k === 'z' ? -1 : 0).applyQuaternion(invQ2); return [k, gv.x * 26, -gv.y * 26]; });
+  GZ.forEach(([k, x, y]) => {
+      // 原点から X・Y はプラス、Z はマイナス(中身を並べる奥の向き)にだけ線を引き、先に軸と同じ色の文字を置く
+      // 文字は線の延長に置くと線とつながって見えるので、線の先から少し斜め(約30度)にずらす。ずらす向きはほかの軸の線から離れる側
+      $('gl' + k).setAttribute('x1', 0); $('gl' + k).setAttribute('y1', 0); $('gl' + k).setAttribute('x2', x * .72); $('gl' + k).setAttribute('y2', y * .72);
+      const L = Math.hypot(x, y) || 1, rot = a => [(x * Math.cos(a) - y * Math.sin(a)) / L, (x * Math.sin(a) + y * Math.cos(a)) / L];
+      const gap = ([ux, uy]) => Math.min(...GZ.filter(o => o[0] !== k).map(([, ox, oy]) => { const m = Math.hypot(ox, oy) || 1; return Math.acos(Math.max(-1, Math.min(1, (ux * ox + uy * oy) / m))); }));
+      const [ux, uy] = [rot(.5), rot(-.5)].sort((p, q) => gap(q) - gap(p))[0], r = Math.max(L * 1.05, 14), tx = ux * r, ty = uy * r;
+      $('gt' + k).setAttribute('x', tx); $('gt' + k).setAttribute('y', ty);
     });
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
