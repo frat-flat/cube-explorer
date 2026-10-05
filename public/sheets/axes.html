@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* 左: 箱とキューブ・軸の辞書・シートを入れる。右: 立体と「まとめる」 */
+/* ダッシュボード: 上にヘッダー、左にメニュー、右に選んだ画面。シートは右から出る引き出しで開く */
 :root{
   --bg:#eef0f3; --panel:#ffffff; --ink:#1d2430; --muted:#5f6b7c; --line:#d5dae2;
   --paper:#fbfbf8; --paperInk:#222a35; --paperLine:#c9ced6;
@@ -27,14 +27,42 @@
   --accent:#7ea2ff; --hl:#ffb938; --hlSoft:#5a4316; --ok:#5fd393; --okSoft:#1d3a2a;
   --box:#d39b62; --stack:#ff6fb5; --frame:#8a97ab; --stage:#10151d; --ax:#b393ff; --ay:#5fd393; --az:#ff6fb5; --mine:#4fd0e0; color-scheme:dark}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;padding:0 16px;box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.55;box-sizing:border-box}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-.app{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr);gap:16px;padding-block:14px;min-height:100%}
-aside{display:flex;flex-direction:column;gap:12px;min-width:0}
-main{display:flex;flex-direction:column;gap:12px;min-width:0}
-h1{font-size:18px;margin:0}
-.lead{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+.shell{display:grid;grid-template-columns:200px minmax(0,1fr);grid-template-rows:52px minmax(0,1fr);height:100vh}
+.top{grid-column:1/3;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.top .sp{flex:1}
+.brand{display:flex;align-items:center;gap:8px;font-size:15px;white-space:nowrap}
+.logo{display:inline-flex;color:var(--accent)}
+.crumb{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb::before{content:"/";margin-right:10px;color:var(--line)}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:10px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.nv{display:flex;align-items:center;gap:10px;border:none;background:none;border-radius:7px;padding:8px 10px;text-align:left;color:var(--muted);font-size:13.5px;width:100%}
+.nv:hover{background:var(--bg);color:var(--ink)}
+.nv.on{background:var(--bg);color:var(--accent);font-weight:700}
+.nv .ic{width:18px;text-align:center;font-size:15px}
+.nv .lb{flex:1;white-space:nowrap}
+.nv .nb{font-size:11px;border-radius:99px;padding:0 7px;background:var(--hl);color:#000;font-weight:700}
+.content{overflow:auto;padding:18px 20px 28px;min-width:0}
+.view{display:flex;flex-direction:column;gap:14px;max-width:1400px;margin:0 auto}
+.vhead h1{font-size:20px;margin:0}
+.lead{color:var(--muted);font-size:12.5px;margin:2px 0 0;max-width:72ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.kpi:hover{border-color:var(--accent)}
+.kpi .k{font-size:12px;color:var(--muted)}
+.kpi .v{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1.2}
+.kpi .s{font-size:11.5px;color:var(--muted)}
+.home{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+.home .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+.two.wide{grid-template-columns:minmax(0,1fr) 340px}
+.recent{display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.recent .ri{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 6px}
+.recent .ri .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent .ri .at{grid-column:2;color:var(--muted);font-size:11.5px}
+.drawer{position:fixed;top:52px;right:0;bottom:0;width:min(760px,100vw);z-index:20;border-radius:0;border-width:0 0 0 1px;box-shadow:-12px 0 32px rgba(0,0,0,.18);overflow:auto}
 section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
 section h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:0;font-weight:700;display:flex;gap:8px;align-items:center}
 section h2 .sp{flex:1}
@@ -57,7 +85,8 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 .node{display:flex;gap:6px;align-items:center;padding:2px 4px;border-radius:5px;cursor:pointer}
 .node:hover{background:var(--bg)}
 .node.used{background:var(--hlSoft)}
-.node .ax{color:var(--muted);font-size:11.5px}
+.node{flex-wrap:wrap}
+.node .ax{color:var(--muted);font-size:11.5px;white-space:nowrap}
 .ind1{padding-left:18px}.ind2{padding-left:36px}
 /* 軸の辞書 */
 .axis{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 6px;align-items:center;padding:5px 6px;border:1px solid var(--line);border-radius:6px}
@@ -65,7 +94,7 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 .axis .al{grid-column:2/4;color:var(--muted);font-size:12px}
 .axis.mine{border-style:dashed;border-color:var(--mine)}
 /* 立体 */
-#stage{position:relative;height:360px;border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
+#stage{position:relative;height:clamp(360px,calc(100vh - 380px),720px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
 #pinBar{position:absolute;right:8px;top:8px;max-width:calc(100% - 16px);font-size:12px;color:var(--muted);pointer-events:none}
 #pinBar button{pointer-events:auto}
 #pinBar .hint{background:var(--stage);padding:1px 4px;border-radius:4px}
@@ -145,28 +174,57 @@ tfoot td{font-weight:700}
 #prefs select{max-width:100%}
 #pShade{width:100%}
 .relrow input{font-size:12.5px;padding:1px 6px;flex:1;min-width:8em}
-@media (max-width:860px){.app{grid-template-columns:minmax(0,1fr)}#stage{height:300px}}
+@media (max-width:1100px){.home,.two,.two.wide{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){.shell{grid-template-columns:minmax(0,1fr);grid-template-rows:52px auto minmax(0,1fr)}
+  .top{grid-column:1}.side{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px}.nv{width:auto;padding:6px 10px}
+  .content{padding:14px 16px 24px}#stage{height:320px}.drawer{top:0}.crumb,#addMonth{display:none}}
 </style>
 
-<div class="app">
-<aside>
-  <div><h1>軸の辞書と箱</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を軸の辞書に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
-  <section><h2>箱とキューブ<span class="sp"></span><button class="small" id="addMonth" title="各シートに次の月の行が入ったことにする">次の月のデータが入った(試し)</button></h2><div class="tree" id="tree"></div></section>
-  <section><h2>軸の辞書<span class="sp"></span><label class="muted"><input type="checkbox" id="showMine" checked> マイリストも見る</label></h2><div id="axes" class="tree"></div>
-    <p class="muted">★ はお気に入り。点線はマイリスト(自分だけの一時的な軸で、全体のシートには反映しない)。</p></section>
-  <section><h2>登録辞書(呼び名と値の言い換え)</h2><div class="dict" id="dict"></div>
-    <details><summary class="muted">言い換えを足す</summary><div class="form">
-      <select id="dKind" aria-label="種類"><option value="col">列の呼び名</option><option value="val">値の呼び名</option></select>
-      <input id="dFrom" placeholder="呼び名(例: 楽天市場)" aria-label="呼び名">
-      <select id="dRel" aria-label="関係"><option value="=">＝ 同じ</option><option value="≒">≒ ほぼ同じ</option><option value="⊃">⊃ 含む</option><option value="⊂">⊂ 一部</option></select>
-      <select id="dAxis" aria-label="軸"></select>
-      <input id="dVal" placeholder="値(例: 楽天)" aria-label="値">
-      <select id="dScope" aria-label="使う範囲"></select>
-      <input id="dNote" placeholder="メモ(違いなど)" aria-label="メモ" style="grid-column:1/3">
-      <button id="dAdd" style="grid-column:1/3">登録する</button></div></details>
-    <p class="muted">＝は同じものとして扱います。≒(ほぼ同じ)・⊃(含む)・⊂(一部)は似ていても同じではない関係で、まとめるときは「≒・⊃も混ぜる」を選んだときだけ入ります。範囲を1枚のシートにすると、そのシートの中だけの呼び名になります。</p></section>
-  <section><h2>設定(初期値と自分の設定を分けて持つ)</h2><div id="prefs"></div>
-    <p class="muted">初期値はシステムで固定し、誰も書き換えません。変えた内容は「自分の設定」として初期値とは別に持ち、いつでも初期値に戻せます。変えた記録は履歴に残ります。</p></section>
+<div class="shell">
+<header class="top">
+  <div class="brand"><span class="logo" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2.5 21 7v10l-9 4.5L3 17V7z"/><path d="M3 7l9 4.5L21 7M12 11.5v10"/></svg></span><b>軸の辞書と箱</b></div>
+  <span class="crumb" id="crumb">ホーム</span>
+  <span class="sp"></span>
+  <button class="small" id="addMonth" title="各シートに次の月の行が入ったことにする">次の月のデータが入った(試し)</button>
+</header>
+<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
+<div class="content">
+<div class="view" data-view="home">
+  <div class="vhead"><h1>ホーム</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を軸の辞書に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="home">
+    <section class="stagecard"><h2>立体(箱・キューブ・シート)</h2>
+  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
+    <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
+  <div id="pinCtl">
+    <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
+    <div class="row" id="showRow"></div>
+    <div class="row"><label class="muted"><input type="checkbox" id="advFaces"> ②④⑥(縦横を入れ替えた目)も選べるようにする(上級)</label></div>
+    <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
+    <div class="row"><span id="cmdMsg">立体の箱やキューブを押しても選べます。ふだん使う目は ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。②④⑥は縦横を入れ替えた目(上級)</span></div>
+  </div>
+    </section>
+    <div class="col">
+      <section><h2>箱とキューブ</h2><div class="tree" id="tree"></div></section>
+      <section><h2>最近の履歴<span class="sp"></span><button class="small" data-go="history">すべて見る</button></h2><div class="recent" id="recent"></div></section>
+    </div>
+  </div>
+</div>
+<div class="view" data-view="gather" hidden>
+  <div class="vhead"><h1>まとめる</h1><p class="lead">箱とキューブを渡り歩いて、条件に合う値を1枚のシートにします。保存したまとめは、データが入ると自動で更新されます。</p></div>
+  <div class="two wide">
+  <section><h2>まとめる(箱とキューブを渡り歩いてシートにする)</h2>
+    <div class="gather" id="gather"></div>
+    <div class="trail" id="trail"></div>
+    <div class="tablewrap"><table id="result"></table></div>
+    <div class="row"><input type="text" id="saveName" placeholder="まとめの名前" aria-label="まとめの名前"><select id="saveScope" aria-label="保存先"><option value="all">全体に保存</option><option value="mine">マイリストに保存</option></select><button id="save">このまとめを保存</button><span class="note" id="note"></span></div>
+  </section>
+  <section><h2>保存したまとめ(データが入ると自動で更新)</h2><div class="saved" id="saved"></div></section>
+  </div>
+</div>
+<div class="view" data-view="import" hidden>
+  <div class="vhead"><h1>シートを入れる</h1><p class="lead">スプシのリンクか、貼り付けたシートから列を読み取り、軸の候補を出します。最後に人が承認してから入ります。</p></div>
+  <div class="two">
   <section><h2>スプシのリンクで登録</h2>
     <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
     <div class="row"><span class="muted">入れる先</span><select id="bookTarget" aria-label="入れる先"></select></div>
@@ -180,32 +238,42 @@ tfoot td{font-weight:700}
     <textarea id="newData" aria-label="シートの中身(1行目が列名、カンマかタブ区切り)"></textarea>
     <button class="primary" id="read">軸を読み取って候補を出す</button>
   </section>
-</aside>
-<main>
-  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
-    <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
-  <div id="pinCtl">
-    <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
-    <div class="row" id="showRow"></div>
-    <div class="row"><label class="muted"><input type="checkbox" id="advFaces"> ②④⑥(縦横を入れ替えた目)も選べるようにする(上級)</label></div>
-    <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
-    <div class="row"><span id="cmdMsg">立体の箱やキューブを押しても選べます。ふだん使う目は ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。②④⑥は縦横を入れ替えた目(上級)</span></div>
   </div>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
     <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
   <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
-  <section><h2>まとめる(箱とキューブを渡り歩いてシートにする)</h2>
-    <div class="gather" id="gather"></div>
-    <div class="trail" id="trail"></div>
-    <div class="tablewrap"><table id="result"></table></div>
-    <div class="row"><input type="text" id="saveName" placeholder="まとめの名前" aria-label="まとめの名前"><select id="saveScope" aria-label="保存先"><option value="all">全体に保存</option><option value="mine">マイリストに保存</option></select><button id="save">このまとめを保存</button><span class="note" id="note"></span></div>
-  </section>
-  <section><h2>保存したまとめ(データが入ると自動で更新)</h2><div class="saved" id="saved"></div></section>
-  <section id="viewSec" hidden><h2><span id="viewTitle">シート</span><span class="sp"></span><button class="small" id="viewClose">閉じる</button></h2>
+</div>
+<div class="view" data-view="dict" hidden>
+  <div class="vhead"><h1>軸の辞書</h1><p class="lead">軸と、呼び名・値の言い換えを管理します。</p></div>
+  <div class="two">
+  <section><h2>軸の辞書<span class="sp"></span><label class="muted"><input type="checkbox" id="showMine" checked> マイリストも見る</label></h2><div id="axes" class="tree"></div>
+    <p class="muted">★ はお気に入り。点線はマイリスト(自分だけの一時的な軸で、全体のシートには反映しない)。</p></section>
+  <section><h2>登録辞書(呼び名と値の言い換え)</h2><div class="dict" id="dict"></div>
+    <details><summary class="muted">言い換えを足す</summary><div class="form">
+      <select id="dKind" aria-label="種類"><option value="col">列の呼び名</option><option value="val">値の呼び名</option></select>
+      <input id="dFrom" placeholder="呼び名(例: 楽天市場)" aria-label="呼び名">
+      <select id="dRel" aria-label="関係"><option value="=">＝ 同じ</option><option value="≒">≒ ほぼ同じ</option><option value="⊃">⊃ 含む</option><option value="⊂">⊂ 一部</option></select>
+      <select id="dAxis" aria-label="軸"></select>
+      <input id="dVal" placeholder="値(例: 楽天)" aria-label="値">
+      <select id="dScope" aria-label="使う範囲"></select>
+      <input id="dNote" placeholder="メモ(違いなど)" aria-label="メモ" style="grid-column:1/3">
+      <button id="dAdd" style="grid-column:1/3">登録する</button></div></details>
+    <p class="muted">＝は同じものとして扱います。≒(ほぼ同じ)・⊃(含む)・⊂(一部)は似ていても同じではない関係で、まとめるときは「≒・⊃も混ぜる」を選んだときだけ入ります。範囲を1枚のシートにすると、そのシートの中だけの呼び名になります。</p></section>
+  </div>
+</div>
+<div class="view" data-view="history" hidden>
+  <div class="vhead"><h1>履歴</h1><p class="lead">読み取りの議事録と、まとめた・分けたシートの元をたどれます。</p></div>
+  <section><h2>履歴(読み取りの議事録・まとめた/分けたシートの元)</h2><div class="hist" id="hist"></div></section>
+</div>
+<div class="view" data-view="settings" hidden>
+  <div class="vhead"><h1>設定</h1></div>
+  <section><h2>設定(初期値と自分の設定を分けて持つ)</h2><div id="prefs"></div>
+    <p class="muted">初期値はシステムで固定し、誰も書き換えません。変えた内容は「自分の設定」として初期値とは別に持ち、いつでも初期値に戻せます。変えた記録は履歴に残ります。</p></section>
+</div>
+</div>
+<section id="viewSec" class="drawer" hidden aria-label="シートを開く"><h2><span id="viewTitle">シート</span><span class="sp"></span><button class="small" id="viewClose">閉じる</button></h2>
     <div class="trail" id="viewInfo"></div><div class="fbar" id="fbar">セルを押すと中身(関数があれば関数)が出ます。ダブルクリックで直せます</div>
     <div class="tablewrap"><table class="grid" id="viewGrid"></table></div><div class="row" id="viewActs"></div></section>
-  <section><h2>履歴(読み取りの議事録・まとめた/分けたシートの元)</h2><div class="hist" id="hist"></div></section>
-</main>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -348,7 +416,7 @@ function renderTree() {
   el.querySelectorAll('[data-unit]').forEach(n => n.onclick = () => select(n.dataset.unit));
   el.querySelectorAll('[data-addcube]').forEach(n => n.onclick = () => addCube(n.dataset.addcube));
   el.querySelectorAll('[data-addbox]').forEach(n => n.onclick = () => addBox(n.dataset.addbox));
-  el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
+  el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollTop = 0; });
 }
 function renderAxes() {
   const fsAll = facts();
@@ -429,6 +497,7 @@ function readSheet() {
 }
 const pickCols = (cols, rows) => cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', rel: null, note: '', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; });
 function renderMatches() {
+  queueMicrotask(renderHome);
   const sec = $('matchSec'); sec.hidden = !pending; if (!pending) return;
   const p = pending;
   $('matches').innerHTML = (p.origin ? `<p class="muted">元: ${esc(p.origin.text)}</p>` : '') + `<p class="muted">入れる先: ${esc(pathOf(p.cube).map(b => b.name).join(' › '))} ・ シート「${esc(p.name)}」${Object.entries(p.tag).map(([a, v]) => ' ・ ' + esc(ax(a).name) + '=' + esc(v)).join('')}。列ごとに、過去に登録した軸と同じ意味か別かを選んでください。候補はすべて並べています。</p>` +
@@ -535,6 +604,7 @@ function editCell(td) {
 }
 function sig(sv) { const R = runQuery(sv.q); return JSON.stringify([R.rows, R.cols, [...R.cell].map(([k, fs]) => [k, fs.reduce((a, f) => a + f.v, 0)])]); }
 function renderSaved() {
+  queueMicrotask(renderHome);
   const list = S.saved.filter(s => s.scope === 'all' || showMine).sort((a, b) => b.fav - a.fav);
   $('saved').innerHTML = list.length ? list.map(s => { const changed = s.seen && s.seen !== sig(s);
     return `<div class="sv${s.id === curSaved ? ' cur' : ''}"><button class="star${s.fav ? ' on' : ''}" data-sfav="${s.id}" aria-label="お気に入り">${s.fav ? '\u2605\uFE0E' : '\u2606'}</button><span class="nm" data-open="${s.id}">${esc(s.name)} ${s.scope === 'mine' ? '<span class="pill mine">マイリスト</span>' : ''}</span>${changed ? '<span class="badge">更新あり</span>' : '<span></span>'}<button class="x small" data-del="${s.id}" aria-label="消す">×</button></div>`; }).join('')
@@ -644,7 +714,7 @@ function mockBook(url) {
     { fn: 'copyMonthlyTab', trig: '毎月1日 6時', text: '前の月のタブを複製して次の月のタブ(auPAY_YYYY-MM)を作り、数字を消す', plan: '月ごとにタブを増やす代わりに、まとめたシートへ次の月の行を足す' },
     { fn: 'onEdit', trig: '編集したとき', text: '店舗コードを入れて売上金額が空のままなら、その行を黄色にする', plan: '入力のルール(空欄の注意)としてシートに持つ' }] };
 }
-function readBook() { book = mockBook($('bookUrl').value.trim() || 'sheet'); renderBook(); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+function readBook() { book = mockBook($('bookUrl').value.trim() || 'sheet'); renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
 function renderBook() {
   const sec = $('bookSec'); sec.hidden = !book; if (!book) return;
@@ -686,7 +756,7 @@ function importBook() {
     S.saved.push(sv);
     S.history.push({ id: 'h' + Date.now().toString(36) + 'c', at: today(), kind: '取り込み', title: `${b.name} › ${t.name} の関数を「まとめる」に置き換えた`, lines: Object.values(t.formulas).map(f => `${f.f.replace('{r}', 'n')} → モール=au PAY・月=2026-09・科目=売上 を ショップごとに`), sources: [{ book: b.name, tab: t.name, range: 'B2:B' }], results: [] }); });
   book = null; queue = items.slice(1); pending = items[0] || null; save(); renderAll();
-  if (pending) $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (pending) go('import'), $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ---------- シート(スプシを模した表) ----------
@@ -730,6 +800,7 @@ function mergeSheets(list) {
 
 // ---------- 履歴(議事録) ----------
 function renderHist() {
+  queueMicrotask(renderHome);
   $('hist').innerHTML = [...S.history].reverse().map(h => `<details class="he"><summary><span class="pill cube">${esc(h.kind)}</span> ${esc(h.at)} ${esc(h.title)}${h.results.length ? ' → ' + h.results.map(id => sheetById(id) ? esc(sheetById(id).name) : '(今はないシート)').join('・') : ''}</summary>
     ${h.sources.length ? `<div class="src">元: ${h.sources.map(s => esc([s.book, s.tab, s.range].filter(Boolean).join(' › '))).join(' / ')}</div>` : ''}<ul>${h.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul></details>`).join('');
 }
@@ -1028,7 +1099,7 @@ function paint() {
   const span = Math.max(total, ...tops.map(sizeOf));
   if (fitted !== span) { fitted = span; cam.dist = Math.max(12, Math.min(120, span * 1.25 + 6)); }
 }
-function resize() { const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
+function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
 let drag = null;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 // 押した所の箱・キューブ。キューブを優先する
@@ -1093,6 +1164,31 @@ $('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
 $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
 $('bookRead').onclick = readBook;
 $('viewClose').onclick = () => { viewId = null; renderView(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && viewId) $('viewClose').click(); });
+
+// ---------- ダッシュボードの画面切り替え ----------
+// 左のメニュー(と data-go を持つボタン)で画面を1つだけ見せる。開いていた画面は次に開いたときも同じ(ブラウザに覚える)
+const VIEWS = { home: 'ホーム', gather: 'まとめる', import: 'シートを入れる', dict: '軸の辞書', history: '履歴', settings: '設定' };
+function go(v) {
+  if (!VIEWS[v]) v = 'home';
+  document.querySelectorAll('.view').forEach(e => e.hidden = e.dataset.view !== v);
+  document.querySelectorAll('.nv').forEach(b => { b.classList.toggle('on', b.dataset.go === v); b.toggleAttribute('aria-current', b.dataset.go === v); });
+  $('crumb').textContent = VIEWS[v]; document.querySelector('.content').scrollTop = 0;
+  try { localStorage.setItem(KEY + ':view', v); } catch (e) {}
+  if (v === 'home') requestAnimationFrame(resize);
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
+// ホームの数字(押すとその画面へ)・最近の履歴・メニューの印(承認待ち・更新ありのまとめ)
+function renderHome() {
+  const nb = S.boxes.filter(b => b.kind === 'box').length, nc = S.boxes.filter(b => b.kind === 'cube').length;
+  const wait = (pending ? 1 : 0) + queue.length, upd = S.saved.filter(x => x.seen && x.seen !== sig(x)).length;
+  const K = [['home', '箱', nb, '法人などの入れ物'], ['home', 'キューブ', nc, '3軸が決まったもの'], ['home', 'シート', S.sheets.length, 'キューブに入っている'],
+    ['dict', '軸', S.axes.filter(visibleAxis).length, '辞書の言い換え ' + S.dict.length + ' 件'], ['gather', '保存したまとめ', S.saved.length, upd ? '更新あり ' + upd + ' 件' : 'すべて見た'], ['import', '承認待ち', wait, wait ? '押して承認へ' : 'ありません']];
+  $('kpis').innerHTML = K.map(([v, k, n, sub]) => `<button class="kpi" data-go="${v}"><span class="k">${k}</span><span class="v">${n}</span><span class="s">${esc(sub)}</span></button>`).join('');
+  $('recent').innerHTML = S.history.length ? [...S.history].reverse().slice(0, 4).map(h => `<div class="ri"><span class="pill cube">${esc(h.kind)}</span><span class="t" title="${esc(h.title)}">${esc(h.title)}</span><span class="at">${esc(h.at)}</span></div>`).join('') : '<span class="muted">まだありません</span>';
+  [['import', wait], ['gather', upd]].forEach(([v, n]) => { const e = $('nb-' + v); e.hidden = !n; e.textContent = n; });
+}
+
 $('save').onclick = saveQuery;
 // ここで選んだら、その場で固定する(法人単位を選ぶ=法人の箱を全部固定して視点を正面で止める)
 $('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); focusSel(); };
@@ -1113,7 +1209,7 @@ $('faceSheet').onclick = () => {
   const dv = valuesOf(depth, facts()); if (dv.length) q.fix[depth] = dv[0];
   curSaved = null; renderGather(); renderSaved();
   $('cmdMsg').textContent = `${unitOf(u)} の${f.name}をシートにしました(行=${ax(q.row).name}、列=${ax(q.col).name}、${ax(depth).name}=${q.fix[depth] || 'すべて'})。下の「縦横を入れ替える」で行と列を入れ替えられます`;
-  $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  go('gather'); $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
 $('cmdGo').onclick = () => { $('cmdMsg').textContent = runCmd($('cmd').value); };
 $('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) $('cmdGo').click(); };
@@ -1121,6 +1217,6 @@ $('addMonth').onclick = addMonth;
 $('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
 $('preset').onchange = e => fillPreset(+e.target.value);
 S.saved.forEach(s => { if (!s.seen) s.seen = sig(s); });
-renderAll(); fillPreset(0); resize(); loop();
+renderAll(); fillPreset(0); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
 })();
 </script>
