@@ -79,6 +79,10 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 button.pin{white-space:nowrap}
 button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#move{position:absolute;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,auto);gap:3px;align-items:center;font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:8px;padding:5px}
+#move button{min-width:2.4em;padding:1px 4px;font-size:12px}
+#move .ax{font-weight:700;text-align:center}
+#move .wide{grid-column:1/4}
 #legend{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;pointer-events:none}
 #legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
 /* 軸の読み取りと承認 */
@@ -178,7 +182,8 @@ tfoot td{font-weight:700}
   </section>
 </aside>
 <main>
-  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
+  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
+    <div id="move" aria-label="画面を動かす"><button data-mv="x-1" title="左へ">◀</button><span class="ax" style="color:var(--ax)">X</span><button data-mv="x1" title="右へ">▶</button><button data-mv="y-1" title="下へ">▼</button><span class="ax" style="color:var(--ay)">Y</span><button data-mv="y1" title="上へ">▲</button><button data-mv="z-1" title="奥へ">奥</button><span class="ax" style="color:var(--az)">Z</span><button data-mv="z1" title="手前へ">前</button><button data-mv="zoom-1" title="近づく">＋</button><span class="ax">ズーム</span><button data-mv="zoom1" title="離れる">－</button><button class="wide" data-mv="home" title="全体が入る位置に戻す">全体に戻す</button></div></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
@@ -735,6 +740,17 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); rend
 const scene = new THREE.Scene(), persp = new THREE.PerspectiveCamera(40, 1, .1, 200);
 // 箱を固定している間は、ドラッグしても箱の角度(視点)を変えない
 const camera = persp;
+// 見る中心。ふだんは全体の真ん中。選んだ箱・キューブがあればそこを中心にズームする。右下の操作キーで X・Y・Z に動かせる
+const tgt = new THREE.Vector3(), tgtGoal = new THREE.Vector3();
+let focused = null;
+function focusSel() {
+  if (sel === focused) return; focused = sel;
+  const ids = selUnits().map(b => b.id), gs = groups.filter(x => ids.includes(x.u.id));
+  if (!gs.length) return;
+  const c = new THREE.Vector3(), v = new THREE.Vector3(); gs.forEach(x => c.add(x.g.getWorldPosition(v))); tgtGoal.copy(c.divideScalar(gs.length));
+  const one = gs.length === 1 && gs[0].u.kind === 'cube'; cam.dist = Math.min(cam.dist, one ? 7 : gs.length === 1 ? sizeOfUnit(gs[0].u) * 1.6 + 3 : cam.dist);
+}
+let sizeOfUnit = () => 10;
 const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
 scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
 let world = new THREE.Group(); scene.add(world);
@@ -778,7 +794,7 @@ function applyPin(b, face) {
 function unpin(b) { delete b.pin; if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin && c.pin.byBox) delete c.pin; }); }
 function setFace(id, face) { const b = box(id); if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, face); refreshPins(); }
 function togglePin(id) { const c = box(id); if (c.pin) unpin(c); else applyPin(c); sel = id; refreshPins(); }
-function select(id) { sel = id; renderTree(); paint(); renderPinBar(); }
+function select(id) { sel = id; renderTree(); paint(); renderPinBar(); focusSel(); }
 function renderShowRow() {
   const Ls = [...new Set(S.boxes.filter(b => b.kind === 'box').map(levelOf))];
   $('showRow').innerHTML = '<b>箱の中に見せるもの</b>' + Ls.map(L => `<label>${esc(L)}単位の箱<select data-show="${esc(L)}">${SHOW.map(([v, t]) => `<option value="${v}"${showOf(L) === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`).join('');
@@ -948,6 +964,7 @@ function paint() {
     return { items, cols, rows, slot, size: Math.max(cols, rows) * slot + .3 };
   };
   const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) memo[L] = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); return memo[L]; };
+  sizeOfUnit = sizeOf;
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
     // 「○○だけ」はひとつ上の段と一緒に見せる。シートだけ=シートとそのキューブ(箱の枠は出さない)、キューブだけ・中の箱だけ=その外側のこの箱
@@ -1034,13 +1051,14 @@ renderer.domElement.addEventListener('pointerup', () => {
   drag = null;
 });
 renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
-renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   // 固定するときは必ずどこかの面を正面にする。箱は必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
   // 遠近はそのままなので、箱の奥行き(中の壁)とキューブの立体感は残る。キューブは選んだ目を正面に向ける
   const th = boxLocked() ? 0 : cam.th, ph = boxLocked() ? 0 : cam.ph;
-  camera.position.set(cam.dist * Math.cos(ph) * Math.sin(th), cam.dist * Math.sin(ph), cam.dist * Math.cos(ph) * Math.cos(th));
-  camera.lookAt(0, 0, 0);
+  tgt.lerp(tgtGoal, .2);   // 見る中心(選んだ箱・キューブか、操作キーで動かした位置)へなめらかに寄る
+  camera.position.set(tgt.x + cam.dist * Math.cos(ph) * Math.sin(th), tgt.y + cam.dist * Math.sin(ph), tgt.z + cam.dist * Math.cos(ph) * Math.cos(th));
+  camera.lookAt(tgt);
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
   // 中のキューブは箱の中の自分のマスから動かず、固定したキューブ(箱で固定した中身も)はその場で選んだ目をこちらに向ける
@@ -1064,7 +1082,13 @@ $('bookRead').onclick = readBook;
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
 // ここで選んだら、その場で固定する(法人単位を選ぶ=法人の箱を全部固定して視点を正面で止める)
-$('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); };
+$('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); focusSel(); };
+$('move').querySelectorAll('[data-mv]').forEach(b => b.onclick = () => {
+  const k = b.dataset.mv, step = Math.max(.6, cam.dist * .12);
+  if (k === 'home') { tgtGoal.set(0, 0, 0); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
+  if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(120, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
+  tgtGoal[k[0]] += step * +k.slice(1);
+});
 $('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
 $('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
 $('selFace').onchange = e => { if (!e.target.value) return; selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
