@@ -156,9 +156,9 @@
     mir.rotation.x = -Math.PI / 2; mir.position.set(R.x || 0, (R.y || 0) - 0.004, R.z || 0); scene.add(mir);
     root.traverse((o) => { if (o.isMesh && o.name === (R.group || "floor")) Object.assign(o.material, { transparent: true, opacity: R.opacity ?? 0.85 }); });
   }
-  // 影を受けるだけの面(作品の影を地面に)
+  // 影を受けるだけの面(作品の影を地面に)。奥行きを書かず最後に描く(半透明の床が見る向きによって消えないように)
   const shadowY = info.shadowY ?? 0;
-  if (!info.fly) { const sh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.25 })); sh.rotation.x = -Math.PI / 2; sh.position.y = shadowY + 0.003; sh.receiveShadow = true; scene.add(sh); }
+  if (!info.fly) { const sh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.ShadowMaterial({ opacity: 0.25, depthWrite: false })); sh.renderOrder = 1; sh.rotation.x = -Math.PI / 2; sh.position.y = shadowY + 0.003; sh.receiveShadow = true; scene.add(sh); }
 
   // 金属の映り込み(建物を一度だけ写す)
   const cube = new THREE.CubeCamera(0.1, 200, new THREE.WebGLCubeRenderTarget(256, { encoding: THREE.sRGBEncoding, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }));
