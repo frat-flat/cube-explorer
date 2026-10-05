@@ -733,9 +733,8 @@ function renderHist() {
 const stage = $('stage'), css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); stage.prepend(renderer.domElement);
 const scene = new THREE.Scene(), persp = new THREE.PerspectiveCamera(40, 1, .1, 200);
-// 箱を固定したら視点は正面で固定する(箱のほかの面は見えない)。奥行きで形がゆがまないように正面からまっすぐ写す
-const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 400);
-let camera = persp;
+// 箱を固定している間は、ドラッグしても箱の角度(視点)を変えない
+const camera = persp;
 const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
 scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
 let world = new THREE.Group(); scene.add(world);
@@ -788,7 +787,7 @@ function renderShowRow() {
 function renderPinBar() {
   renderShowRow();
   const n = units().filter(b => b.pin).length;
-  $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: 視点は正面で固定(ほかの面は見えません)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
+  $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: ドラッグしても箱の角度は変わりません(ズームはできます)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
   $('pinHint').hidden = !n; $('unpinAll').hidden = !n;
   $('selUnit').innerHTML = '<option value="">(固定するものを選ぶ)</option>'
     + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
@@ -997,15 +996,9 @@ renderer.domElement.addEventListener('pointerup', () => {
 renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
-  if (boxLocked()) {
-    camera = ortho; const hh = cam.dist * Math.tan(THREE.MathUtils.degToRad(20)) * .7, hw = hh * persp.aspect;
-    if (ortho.top !== hh || ortho.right !== hw) { ortho.left = -hw; ortho.right = hw; ortho.top = hh; ortho.bottom = -hh; ortho.updateProjectionMatrix(); }
-    ortho.position.set(0, 0, 200); ortho.lookAt(0, 0, 0);
-  } else {
-    camera = persp;
-    camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
-    camera.lookAt(0, 0, 0);
-  }
+  // 箱を固定してもその時の角度のまま写す(立体感は残す)。固定中はドラッグで箱の角度が変わらないだけ
+  camera.position.set(cam.dist * Math.cos(cam.ph) * Math.sin(cam.th), cam.dist * Math.sin(cam.ph), cam.dist * Math.cos(cam.ph) * Math.cos(cam.th));
+  camera.lookAt(0, 0, 0);
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
   // 中のキューブは箱の中の自分のマスから動かず、固定したキューブ(箱で固定した中身も)はその場で選んだ目をこちらに向ける
