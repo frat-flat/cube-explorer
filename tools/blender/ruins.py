@@ -504,7 +504,8 @@ for i, (sx, sz) in enumerate(SITES):
             continue
         sz_ = rnd.uniform(1.5, 3.2)
         rubble("cols", (sz_ * 1.4, sz_, sz_), (x, sz_ * 0.3, z), M["rubble"], rot=(rnd.uniform(-0.3, 0.3), rnd.uniform(-0.3, 0.3), rnd.uniform(0, 3)), jit=0.08)
-    w.spot(x=sx, y=TOP, z=sz, face=math.pi / 2 if sx < 0 else -math.pi / 2, dist=3.3, r=17.5, scale=SC, lift=0.0)
+    # 見る位置は参道の柱の列より内側(外から見ると柱が視線をふさぐ)
+    w.spot(x=sx, y=TOP, z=sz, face=(math.pi / 2 - 0.12) * (1 if sx < 0 else -1), dist=2.2, r=17.5, scale=SC, lift=0.0)
 
 # 砂漠に散らばる遺構(半ば埋もれた石・折れたオベリスク)
 for k in range(26):
