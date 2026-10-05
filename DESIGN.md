@@ -941,3 +941,5 @@ create table cube_meta.placements (
 ## 古いモデルの撤去(2026-10-05 ユーザー指定)
 
 ユーザーの指示で、新しい「軸の辞書と箱」のダッシュボードを本番の入口(`/`)にし、古いモデルをすべて外した。外したのは、入金キューブ(`/`)と面ビュー(`/face`)とその部品、キューブ組み立て(`/builder`)と展示の世界(`public/worlds`、Blender の作成スクリプト `tools/blender`)、シートの器の試作(`/sheets` の index.html)、データ取り込み(`/import`)と入金データ・キューブ・メタデータの API。この文書のそれより前の章は、その時点の設計の記録として残す。コードは git の履歴から戻せる。Neon の表(入金データ・cube_meta)は消すと戻せないため、別に確認してから扱う。
+
+2026-10-05 ユーザーの選択で、Neon の古い表(public の業務サンプル表・cube_meta・app_migrations)も消した。消す前の中身は Neon のブランチ `backup-old-model-2026-10-05`(br-dawn-cell-b39p9qxt)に残してある。ログインの表(neon_auth)はそのまま。DB の準備スクリプト(supabase/・scripts/db-setup.mjs)と postgres の依存も外した。
