@@ -245,11 +245,12 @@ tfoot td{font-weight:700}
     <div class="row"><span class="muted">このシート全体の値</span><select id="tagAxis" aria-label="シート全体の軸"></select><input type="text" id="tagVal" size="9" aria-label="シート全体の値"></div>
     <input type="text" id="newName" placeholder="シート名" aria-label="シート名">
     <textarea id="newData" aria-label="シートの中身(1行目が列名、カンマかタブ区切り)"></textarea>
-    <button class="primary" id="read">軸を読み取って候補を出す</button>
+    <div class="row"><button class="primary" id="read">軸を読み取って候補を出す</button><button id="readUnits">行から箱・キューブを作る</button></div>
   </section>
   </div>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
     <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
+  <section id="unitSec" hidden><h2>シートの行から箱・キューブを作る</h2><div id="unitForm"></div></section>
   <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
 </div>
 <div class="view" data-view="dict" hidden>
@@ -519,6 +520,48 @@ function readSheet() {
     picks: pickCols(cols, rows) };
   renderMatches();
 }
+// 貼り付けたシートの行から箱・キューブを作る(1行=1つ。名前に使う列と単位の名前を選ぶ)
+function readUnits() {
+  const txt = $('newData').value.trim(); if (!txt) { note('シートの中身を貼り付けてください'); return; }
+  const lines = txt.split(/\r?\n/).filter(x => x.trim()), sep = lines[0].includes('\t') ? '\t' : ',';
+  const grid = lines.map(x => x.split(sep).map(v => v.trim())), cols = grid[0], rows = grid.slice(1).map(r => cols.map((_, i) => r[i] ?? ''));
+  openUnits({ name: $('newName').value.trim() || 'シート', cols, rows });
+}
+let unitSrc = null;
+function openUnits(src) { unitSrc = { kind: 'box', nameCols: [0], unit: '', parent: '', ...src }; renderUnits(); go('import'); $('unitSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+const unitName = (u, r) => u.nameCols.map(i => r[i]).filter(Boolean).join(' ');
+function renderUnits() {
+  const sec = $('unitSec'); sec.hidden = !unitSrc; if (!unitSrc) return;
+  const u = unitSrc, names = u.rows.map(r => unitName(u, r)).filter(Boolean), uniq = [...new Set(names)];
+  const parents = S.boxes.filter(b => b.kind === 'box');
+  $('unitForm').innerHTML = `<p class="muted">元: ${esc(u.name)}(${u.rows.length} 行)。1行を1つの箱(またはキューブ)にします。行のほかの列は、その箱の情報として持ちます。</p>
+    <div class="row"><span class="muted">作るもの</span><label><input type="radio" name="uKind" value="box"${u.kind === 'box' ? ' checked' : ''}> 箱</label><label><input type="radio" name="uKind" value="cube"${u.kind === 'cube' ? ' checked' : ''}> キューブ(3軸: ${esc(curPref('cubeAxes').map(a => ax(a).name).join('×'))})</label></div>
+    <div class="row"><span class="muted">名前に使う列</span>${u.cols.map((c, i) => `<label><input type="checkbox" data-ncol="${i}"${u.nameCols.includes(i) ? ' checked' : ''}> ${colL(i)} ${esc(c)}</label>`).join('')}</div>
+    <div class="row"><span class="muted">単位の名前</span><input type="text" id="uUnit" value="${esc(u.unit)}" placeholder="例: お客様" aria-label="単位の名前"></div>
+    <div class="row"><span class="muted">入れる先</span><select id="uParent" aria-label="入れる先"><option value="">いちばん上</option>${parents.map(b => `<option value="${b.id}"${u.parent === b.id ? ' selected' : ''}>箱 ${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('')}</select></div>
+    <p class="muted" id="uPreview">${uniq.length} 個できます${names.length > uniq.length ? `(同じ名前の ${names.length - uniq.length} 行は1つにまとめます)` : ''}。例: ${esc(uniq.slice(0, 4).join(' / ') || 'なし')}</p>
+    <div class="row"><button class="primary" id="uMake"${uniq.length && u.unit.trim() ? '' : ' disabled'}>この内容で作る</button><button id="uCancel">やめる</button><span class="muted" id="uHint"${u.unit.trim() ? ' hidden' : ''}>単位の名前を入れてください</span></div>`;
+  $('unitForm').querySelectorAll('input[name=uKind]').forEach(x => x.onchange = () => { u.kind = x.value; renderUnits(); });
+  $('unitForm').querySelectorAll('[data-ncol]').forEach(x => x.onchange = () => { u.nameCols = [...$('unitForm').querySelectorAll('[data-ncol]:checked')].map(y => +y.dataset.ncol); renderUnits(); });
+  // 打つたびに作り直すと入力中の欄やボタンが消えるので、ボタンと案内だけ切り替える
+  $('uUnit').oninput = e => { u.unit = e.target.value; $('uMake').disabled = !(uniq.length && u.unit.trim()); $('uHint').hidden = !!u.unit.trim(); };
+  $('uParent').onchange = e => { u.parent = e.target.value; };
+  $('uMake').onclick = makeUnits; $('uCancel').onclick = () => { unitSrc = null; renderUnits(); };
+}
+function makeUnits() {
+  const u = unitSrc, unit = u.unit.trim(), parent = u.parent || null, made = [], seen = new Set(S.boxes.filter(b => b.parent === parent).map(b => b.kind + '\u0001' + b.name));
+  u.rows.forEach((r, ri) => {
+    const name = unitName(u, r), k = u.kind + '\u0001' + name; if (!name || seen.has(k)) return; seen.add(k);
+    const info = Object.fromEntries(u.cols.map((c, i) => [c, r[i]]));
+    const b = { id: (u.kind === 'box' ? 'u' : 'k') + Date.now().toString(36) + ri, kind: u.kind, name, own: {}, levelName: unit, parent, info, from: { sheet: u.name, row: ri + 2 } };
+    if (u.kind === 'cube') b.axes = [...curPref('cubeAxes')];
+    S.boxes.push(b); made.push(name);
+  });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${u.name} の行から${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作った(単位: ${unit})`,
+    lines: [`名前に使った列: ${u.nameCols.map(i => colL(i) + ' ' + u.cols[i]).join('・')}`, `入れた先: ${parent ? box(parent).name : 'いちばん上'}`, `作ったもの: ${made.slice(0, 10).join(' / ')}${made.length > 10 ? ' ほか' : ''}`], sources: [{ book: u.name, tab: '', range: 'A2:' + colL(u.cols.length - 1) + (u.rows.length + 1) }], results: [] });
+  unitSrc = null; renderUnits(); numberUnits(); save(); renderAll(); paint();
+  note(`${unit}の${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作りました`);
+}
 const pickCols = (cols, rows) => cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', rel: null, note: '', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; });
 function renderMatches() {
   queueMicrotask(renderHome);
@@ -764,6 +807,8 @@ function renderBook() {
     ${t.cf.map(c => `<span class="d">条件付き書式: ${esc(c.text)} → 同じ表示ルールを再現</span>`).join('')}
     ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}</label>`).join('');
   h += '</div>';
+  const dataIdx = book.tabs.map((t, i) => [t, i]).filter(([t]) => t.kind === 'data');
+  if (dataIdx.length) h += `<div class="row"><span class="muted">行から箱・キューブを作る:</span>${dataIdx.map(([t, i]) => `<button class="small" data-units="${i}">${esc(t.name)}</button>`).join('')}</div>`;
   h += book.gas.map(g => `<div class="gas"><b>GAS <code>${esc(g.fn)}</code></b> <span class="muted">(${esc(g.trig)})</span><br>AIの読み取り: ${esc(g.text)}<br>置き換え案: ${esc(g.plan)} <span class="muted">(GAS 自体は自動では動かしません)</span></div>`).join('');
   if (book.real && book.merge) h += `<div class="ai"><b class="h">まとめる提案(列とタブ名から判定)</b>
     <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、タブ名に年月があります。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
@@ -777,6 +822,7 @@ function renderBook() {
   $('book').innerHTML = h;
   $('book').querySelectorAll('[data-use]').forEach(c => c.onchange = () => { book.tabs[+c.dataset.use].use = c.checked; });
   $('book').querySelectorAll('input[name=merge]').forEach(r => r.onchange = () => { book.merge = r.value === '1'; });
+  $('book').querySelectorAll('[data-units]').forEach(x => x.onclick = () => { const t = book.tabs[+x.dataset.units]; openUnits({ name: book.name + ' › ' + t.name, cols: t.cols, rows: t.rows }); });
   $('bookGo').onclick = importBook; $('bookCancel').onclick = () => { book = null; renderBook(); };
 }
 function importBook() {
@@ -1204,6 +1250,7 @@ new ResizeObserver(resize).observe(stage);
 // ---------- つなぐ ----------
 function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
 $('read').onclick = readSheet;
+$('readUnits').onclick = readUnits;
 $('approve').onclick = approve;
 $('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
 $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
