@@ -363,6 +363,7 @@ for side in (1, -1):
     outer = [bm.verts.new((math.cos(a) * PL_R * 2.05, math.sin(a) * PL_R * 2.05, side * 0.05)) for a in [k / seg * math.tau for k in range(seg)]]
     for k in range(seg):
         f = bm.faces.new((inner[k], outer[k], outer[(k + 1) % seg], inner[(k + 1) % seg]))
+        f.normal_update()  # 作ったばかりの面は法線が未計算。上の面は上、下の面は下へ向ける(内向きだと互いの影で真っ黒に焼ける)
         if (f.normal.z > 0) != (side > 0):
             f.normal_flip()
     place(bm, PL_C, PL_ROT)

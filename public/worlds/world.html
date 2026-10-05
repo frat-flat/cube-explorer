@@ -46,7 +46,10 @@
     sel.innerHTML = LIST.map((w) => `<option value="${w.id}"${w.id === W ? " selected" : ""}>${w.title}</option>`).join("");
     sel.onchange = () => { location.hash = sel.value; location.reload(); };
     document.querySelector(".top").appendChild(sel);
-    await new Promise((ok, ng) => { const sc = document.createElement("script"); sc.src = `${W}.data.js`; sc.onload = ok; sc.onerror = () => ng(new Error(`${W}.data.js`)); document.head.appendChild(sc); });
+    const load = (u) => new Promise((ok, ng) => { const sc = document.createElement("script"); sc.src = u; sc.onload = ok; sc.onerror = () => ng(new Error(u)); document.head.appendChild(sc); });
+    await load(`${W}.data.js`);
+    // 1 ファイル 16MB までなので、大きい GLB は <w>.data1.js, data2.js … に分けて後ろへつなぐ
+    for (let i = 1; i <= (window.WORLD_FILES.more || 0); i++) await load(`${W}.data${i}.js`);
   }
   const FILES = window.WORLD_FILES || {};
   const src = (name) => FILES[name] || name;
