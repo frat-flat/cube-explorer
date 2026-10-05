@@ -70,6 +70,7 @@ input[type=text]{min-width:0}
 #filters select,#filters button{font-size:12.5px;padding:1px 6px;background:var(--panel)}
 #filters .lb{color:var(--muted)}
 #filters button.on{background:var(--stack);border-color:var(--stack);color:#fff}
+#filters input{font:inherit;font-size:12.5px;width:7.5em;padding:1px 6px}
 #filters .chip{border-color:var(--hl);background:var(--hlSoft)}
 tfoot td{font-weight:700;background:var(--paper2);cursor:default}
 td.sum{font-weight:700}
@@ -235,6 +236,11 @@ function viewSlots() {
       let shs = sl.sheets;
       if (f.z) shs = shs.filter(x => x.member === f.z);
       if (f.y) shs = shs.map(x => { const c = { ...x, id: x.id + '~' + f.y, rows: x.rows.filter(r => r[0] === f.y) }; virt.set(c.id, c); return c; });
+      if (f.min != null) {   // 値の条件:行の計(値の列の合計)が min 以上の行だけ残す。行が残らない目盛りは外す
+        shs = shs.map(x => { const vc = x.valueCols || x.cols.map((_, i) => i).slice(1);
+          const c = { ...x, id: x.id + '~m' + f.min, rows: x.rows.filter(r => vc.reduce((a, k) => a + num(r[k]), 0) >= f.min) }; virt.set(c.id, c); return c; })
+          .filter(x => x.rows.length);
+      }
       return { ...sl, sheets: shs };
     });
   }
@@ -313,11 +319,16 @@ function renderFilters() {
   const opt = (k, label, vals) => `<span class="lb">${esc(label)}で絞る:</span><select data-f="${k}" aria-label="${esc(label)}で絞る"><option value="">すべて</option>${vals.map(v => `<option${f[k] === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
   if (ys.length > 1) h += opt('y', f0.cols[0], ys);
   if (zs.length > 1) h += opt('z', sl.stack.axis, zs);
+  h += `<span class="lb">計が</span><input id="fMin" type="text" inputmode="numeric" placeholder="例 1,000,000" value="${f.min != null ? fmt(f.min) : ''}" aria-label="計の下限"><span class="lb">以上</span>`;
   for (const k of ['y', 'z']) if (f[k]) h += `<button class="chip" data-x="${k}">${esc(k === 'y' ? f0.cols[0] : sl.stack.axis)} = ${esc(f[k])} ×</button>`;
+  if (f.min != null) h += `<button class="chip" data-x="min">計 ≥ ${fmt(f.min)} ×</button>`;
   el.innerHTML = h;
   el.querySelectorAll('[data-m]').forEach(b => b.onclick = () => setMonth(+b.dataset.m));
   el.querySelectorAll('select').forEach(x => x.onchange = () => { f[x.dataset.f] = x.value || null; sel = new Map(); selCell = null; viewChanged(); });
   el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => { f[b.dataset.x] = null; sel = new Map(); selCell = null; viewChanged(); });
+  const mi = document.getElementById('fMin');
+  mi.onchange = () => { const v = mi.value.replace(/[^\d.]/g, ''); f.min = v === '' ? null : +v; sel = new Map(); selCell = null; viewChanged(); };
+  mi.onkeydown = ev => { if (ev.key === 'Enter') mi.onchange(); };
 }
 function goUp(n) { path.length = n; sel = new Map(); selCell = null; const v = viewSlots(); active = (v[0] && v[0].sheets[0] || {}).id; viewChanged(); }
 function renderCrumbs() {
@@ -384,9 +395,10 @@ const sun = new THREE.DirectionalLight(0xffffff, .45); sun.position.set(4, 9, 6)
 // 潜った先の重ねを、子のキューブとして描く。X=値の列(週など)、Y=行(カテゴリなど)、Z=重ねの軸(月)
 function buildChildCube(slot) {
   const shs = slot.sheets, f = shs[0];
-  const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), ys = f.rows.map(r => r[0]);
+  if (!f) { const sp = textSprite('条件に合うものはありません', css('--muted'), .5); world.add(sp); return; }
+  const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), ys = [...new Set(shs.flatMap(x => x.rows.map(r => r[0])))];
   // 絞って行が1つになったら、重ねの軸を縦に回して1枚の面に畳む(例:衣料だけ → ショップ×週)
-  const fold = ys.length === 1 && shs.length > 1;
+  const fold = ys.length === 1 && shs.length > 1 && shs.every(x => x.rows.length === 1);
   const rowNames = fold ? shs.map(x => x.member) : ys;
   const nx = vc.length, ny = rowNames.length, nz = fold ? 1 : shs.length;
   const u = Math.min(6.4 / nx, 6.4 / ny, 6.4 / nz, 1.5), W = nx * u, H = ny * u, D = nz * u;
@@ -396,7 +408,7 @@ function buildChildCube(slot) {
   shs.forEach((sh, k) => sh.rows.forEach((r, ri) => vc.forEach((c, xi) => {
     const t = max ? num(r[c]) / max : 0, col = lo.clone().lerp(hi, .12 + .88 * t);
     const m = new THREE.Mesh(new THREE.BoxGeometry(u * .78, u * .78, u * .78), new THREE.MeshLambertMaterial({ color: col }));
-    m.position.set(-W / 2 + (xi + .5) * u, H / 2 - ((fold ? k : ri) + .5) * u, fold ? 0 : D / 2 - (k + .5) * u);
+    m.position.set(-W / 2 + (xi + .5) * u, H / 2 - ((fold ? k : ys.indexOf(r[0])) + .5) * u, fold ? 0 : D / 2 - (k + .5) * u);
     m.userData.cell = { sid: sh.id, r: ri, c, base: col };
     g.add(m); blocks.push(m);
     const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: new THREE.Color(css('--frame')), transparent: true, opacity: .55 }));
@@ -411,7 +423,7 @@ function buildChildCube(slot) {
   if (nz > 1) names.push([`Z: ${slot.stack.axis}`, cz, [W / 2 + 1.2, -H / 2 - .8, 0]]);
   names.forEach(([t, c, pos]) => { const sp = textSprite(t, c, .38); sp.position.set(...pos); g.add(sp); });
   const pe = path[path.length - 1] || {}, fl = pe.filters || {};
-  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fold ? '(面に畳んだ)' : '(子のキューブ)'), cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
+  const ttl = textSprite(pe.label + (fl.y ? '・' + fl.y + 'だけ' : '') + (fl.z ? '・' + fl.z + 'だけ' : '') + (fl.min != null ? '・計' + fmt(fl.min) + '以上' : '') + (fold ? '(面に畳んだ)' : '(子のキューブ)'), cz, .42); ttl.position.set(0, H / 2 + .75, 0); g.add(ttl);
   styleBlocks();
 }
 function blockWorld(sid, r, c) {
@@ -763,13 +775,17 @@ $('shapeCyl').onclick = () => { S.shape = 'cyl'; save(); renderAll(); };
 // ---------- 下の表とつながりの説明 ----------
 // 子のキューブを見ているときは、下の表を「面の表」にする(重ねの目盛り × 行 × 値の列、合計つき)
 function renderPivot(t) {
-  const sl = viewSlots()[0], shs = sl.sheets, f = shs[0]; if (!f) { t.innerHTML = ''; return; }
+  const sl = viewSlots()[0], shs = sl.sheets, f = shs[0];
+  if (!f) { t.innerHTML = '<tbody><tr><td>条件に合うものはありません。「計が ○○ 以上」の値を下げるか、× で条件を外してください。</td></tr></tbody>'; return; }
+  const fl = (path[path.length - 1] || {}).filters || {};
   const vc = f.valueCols || f.cols.map((_, i) => i).slice(1), multi = sl.stack && shs.length > 1;
   const tot = vc.map(() => 0); let all = 0;
-  const body = shs.flatMap(sh => sh.rows.map((r, ri) => {
+  const items = shs.flatMap(sh => sh.rows.map((r, ri) => ({ sh, r, ri, total: (f.valueCols || []).reduce((a, c) => a + num(r[c]), 0) })));
+  if (fl.min != null) items.sort((a, b) => b.total - a.total);   // 値で絞ったときは計の大きい順のリストにする
+  const body = items.map(({ sh, r, ri }) => {
     const sum = vc.reduce((a, c) => a + num(r[c]), 0); vc.forEach((c, i) => { tot[i] += num(r[c]); }); all += sum;
     return `<tr class="${isSel(sh.id, ri) ? 'hl' : ''}" data-s="${sh.id}" data-r="${ri}">${multi ? `<td>${esc(sh.member)}</td>` : ''}<td>${esc(r[0])}</td>${vc.map(c => `<td data-c="${c}" tabindex="0"><span class="v">${esc(r[c])}</span>${sh.drill && sh.drill[c] ? '<button class="dv" title="このマスの内訳へ潜る">▸ 内訳</button>' : ''}</td>`).join('')}<td class="sum">${fmt(sum)}</td></tr>`;
-  })).join('');
+  }).join('');
   t.innerHTML = `<thead><tr>${multi ? `<th>${esc(sl.stack.axis)}</th>` : ''}<th>${esc(f.cols[0])}</th>${vc.map(c => `<th>${esc(f.cols[c])}</th>`).join('')}<th>計</th></tr></thead><tbody>${body}</tbody>
     <tfoot><tr>${multi ? '<td></td>' : ''}<td>合計</td>${tot.map(x => `<td>${fmt(x)}</td>`).join('')}<td>${fmt(all)}</td></tr></tfoot>`;
 }
