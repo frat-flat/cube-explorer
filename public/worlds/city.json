@@ -1,0 +1,187 @@
+{
+ "groups": {
+  "sky": {
+   "rough": 0.8,
+   "metal": 0.0,
+   "unlit": true,
+   "nofog": true
+  },
+  "ground": {
+   "rough": 0.9,
+   "metal": 0.0,
+   "light": "city_ground_light.jpg",
+   "lightScale": 2.2183315753936768
+  },
+  "road": {
+   "rough": 0.85,
+   "metal": 0.0,
+   "light": "city_road_light.jpg",
+   "lightScale": 1.5745983123779297
+  },
+  "pave": {
+   "rough": 0.55,
+   "metal": 0.0,
+   "light": "city_pave_light.jpg",
+   "lightScale": 1.5881593227386475
+  },
+  "towers": {
+   "rough": 0.35,
+   "metal": 0.0,
+   "light": "city_towers_light.jpg",
+   "lightScale": 1.3518046140670776
+  },
+  "towers_far": {
+   "rough": 0.4,
+   "metal": 0.0,
+   "light": "city_towers_far_light.jpg",
+   "lightScale": 1.3558276891708374
+  },
+  "props": {
+   "rough": 0.5,
+   "metal": 0.0,
+   "light": "city_props_light.jpg",
+   "lightScale": 1.545824408531189
+  },
+  "green": {
+   "vcol": true,
+   "lightScale": 0.2234189361333847,
+   "rough": 0.9,
+   "metal": 0
+  }
+ },
+ "spots": [
+  {
+   "x": -34,
+   "y": 1.2,
+   "z": -10,
+   "face": 1.5707963267948966,
+   "dist": 2.6,
+   "r": 12.5,
+   "scale": 10,
+   "lift": 0.0
+  },
+  {
+   "x": 34,
+   "y": 1.2,
+   "z": -10,
+   "face": -1.5707963267948966,
+   "dist": 2.6,
+   "r": 12.5,
+   "scale": 10,
+   "lift": 0.0
+  },
+  {
+   "x": -34,
+   "y": 1.2,
+   "z": -70,
+   "face": 1.5707963267948966,
+   "dist": 2.6,
+   "r": 12.5,
+   "scale": 10,
+   "lift": 0.0
+  },
+  {
+   "x": 34,
+   "y": 1.2,
+   "z": -70,
+   "face": -1.5707963267948966,
+   "dist": 2.6,
+   "r": 12.5,
+   "scale": 10,
+   "lift": 0.0
+  }
+ ],
+ "title": "摩天楼の街",
+ "tip": "キューブが超高層ビルの大きさで建つ街です。歩行者天国の大通りを歩いて見上げます。",
+ "start": {
+  "x": 0,
+  "z": 52,
+  "yaw": 0,
+  "pitch": 0.14
+ },
+ "walk": [
+  {
+   "t": "rect",
+   "x0": -13.2,
+   "z0": -107,
+   "x1": 13.2,
+   "z1": 58
+  },
+  {
+   "t": "rect",
+   "x0": -70,
+   "z0": 12.5,
+   "x1": 70,
+   "z1": 27.5
+  },
+  {
+   "t": "rect",
+   "x0": -70,
+   "z0": -47.5,
+   "x1": 70,
+   "z1": -32.5
+  },
+  {
+   "t": "rect",
+   "x0": -70,
+   "z0": -107.5,
+   "x1": 70,
+   "z1": -92.5
+  },
+  {
+   "t": "rect",
+   "x0": -57,
+   "z0": -31,
+   "x1": -14,
+   "z1": 11
+  },
+  {
+   "t": "rect",
+   "x0": 14,
+   "z0": -31,
+   "x1": 57,
+   "z1": 11
+  },
+  {
+   "t": "rect",
+   "x0": -57,
+   "z0": -91,
+   "x1": -14,
+   "z1": -49
+  },
+  {
+   "t": "rect",
+   "x0": 14,
+   "z0": -91,
+   "x1": 57,
+   "z1": -49
+  }
+ ],
+ "speed": 7,
+ "bg": "#c9d6e3",
+ "fog": [
+  "#c6d3df",
+  0.0016
+ ],
+ "exposure": 1.0,
+ "far": 3200,
+ "hemi": [
+  "#dfefff",
+  "#6a6a64",
+  0.6
+ ],
+ "sun": {
+  "dir": [
+   0.4141399649265254,
+   0.8381404052084442,
+   0.3549771127941646
+  ],
+  "color": "#fff1dc",
+  "intensity": 1.5,
+  "box": 150
+ },
+ "palette": [
+  "#cfd8df",
+  "#2a5f8a"
+ ]
+}
