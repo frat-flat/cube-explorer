@@ -65,6 +65,48 @@ test("シートの行から箱を作る", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+// スプシから読んだものは、反映するまで Saving に置く。反映の直前に元を読み直し、最新の内容で作る
+test("読み取ったものは Saving に置き、反映の前に最新を読み直す", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const rows = [["0001", "法人C", "山田"], ["0002", "法人D", "佐藤"]];
+  let reads = 0;
+  await page.route("**/api/sheets/read**", (r) => {
+    reads++;
+    const tab = { name: "顧客", kind: "data", use: true, cols: ["顧客番号", "法人名", "代表者名"], rows, size: { rows: rows.length + 1, cols: 3 }, cf: [], dv: [], formulas: {} };
+    return r.fulfill({ json: { book: { name: "顧客台帳", url: "https://docs.google.com/spreadsheets/d/x/edit", real: true, merge: false, gas: [], tabs: [tab] }, serviceAccount: "sa@example.iam.gserviceaccount.com" } });
+  });
+  await page.goto("/");
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/x/edit");
+  await page.locator("#bookRead").click();
+  await expect(page.locator("#bookSec")).toBeVisible();
+  // まだ反映していないので Saving に1件
+  await expect(page.locator("#nb-saving")).toHaveText("1");
+  await page.locator('.nv[data-go="saving"]').click();
+  await expect(page.locator(".stash")).toContainText("顧客台帳 › 顧客");
+  await expect(page.locator(".stash")).toContainText("まだ反映していない行 2 行");
+  // スプシ側で行が増えた。反映の直前に読み直すので、増えた行も箱になる
+  rows.push(["0003", "法人E", "鈴木"]);
+  const before = reads;
+  await page.locator("[data-svu]").click();
+  await expect(page.locator("#unitSec")).toBeVisible();
+  await page.locator('[data-ncol="1"]').check();
+  await page.locator('[data-ncol="2"]').check();
+  await page.locator("#uUnit").fill("お客様");
+  await page.locator("#uMake").click();
+  await expect(page.locator("#unitSec")).toBeHidden();
+  expect(reads).toBe(before + 1);
+  await page.locator('.nv[data-go="home"]').click();
+  await expect(page.locator("#tree")).toContainText("0003 法人E 鈴木");
+  // 全部の列と行を反映したので Saving から外れる
+  await expect(page.locator("#nb-saving")).toBeHidden();
+  await page.locator('.nv[data-go="saving"]').click();
+  await expect(page.locator("#savingList")).toContainText("まだ反映していないものはありません");
+  expect(errors).toEqual([]);
+});
+
 // 立体は World の画面だけに出し、設定で選んだ世界(Blender で作った世界)をまわりに映す
 test("World で設定した世界の中に立体を並べる", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
