@@ -79,10 +79,10 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 button.pin{white-space:nowrap}
 button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
-#move{position:absolute;right:8px;bottom:8px;display:grid;grid-template-columns:repeat(3,auto);gap:3px;align-items:center;font-size:12px;background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:8px;padding:5px}
-#move button{min-width:2.4em;padding:1px 4px;font-size:12px}
-#move .ax{font-weight:700;text-align:center}
-#move .wide{grid-column:1/4}
+#gizmo{position:absolute;right:6px;bottom:6px;width:76px;height:76px;overflow:visible}
+#gizmo .end{cursor:pointer}
+#gizmo .end:hover circle{stroke:var(--ink);stroke-width:2}
+#gizmo text{font:700 10px var(--sans);fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central}
 #legend{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;pointer-events:none}
 #legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
 /* 軸の読み取りと承認 */
@@ -183,7 +183,7 @@ tfoot td{font-weight:700}
 </aside>
 <main>
   <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
-    <div id="move" aria-label="画面を動かす"><button data-mv="x-1" title="左へ">◀</button><span class="ax" style="color:var(--ax)">X</span><button data-mv="x1" title="右へ">▶</button><button data-mv="y-1" title="下へ">▼</button><span class="ax" style="color:var(--ay)">Y</span><button data-mv="y1" title="上へ">▲</button><button data-mv="z-1" title="奥へ">奥</button><span class="ax" style="color:var(--az)">Z</span><button data-mv="z1" title="手前へ">前</button><button data-mv="zoom-1" title="近づく">＋</button><span class="ax">ズーム</span><button data-mv="zoom1" title="離れる">－</button><button class="wide" data-mv="home" title="全体が入る位置に戻す">全体に戻す</button></div></div>
+    <svg id="gizmo" viewBox="-38 -38 76 76" aria-label="見る中心を X・Y・Z に動かす(軸の先を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x-1"><title>X のマイナス方向へ</title><circle id="gnx" r="5" style="fill:var(--panel);stroke:var(--ax);stroke-width:1.5"/></g><g class="end" data-mv="x1"><title>X のプラス方向へ</title><circle id="gpx" r="8" style="fill:var(--ax)"/><text id="gtx">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス方向へ</title><circle id="gny" r="5" style="fill:var(--panel);stroke:var(--ay);stroke-width:1.5"/></g><g class="end" data-mv="y1"><title>Y のプラス方向へ</title><circle id="gpy" r="8" style="fill:var(--ay)"/><text id="gty">Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス方向へ</title><circle id="gnz" r="5" style="fill:var(--panel);stroke:var(--az);stroke-width:1.5"/></g><g class="end" data-mv="z1"><title>Z のプラス方向へ</title><circle id="gpz" r="8" style="fill:var(--az)"/><text id="gtz">Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="4.5" style="fill:var(--muted)"/></g></svg></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
@@ -741,7 +741,7 @@ const scene = new THREE.Scene(), persp = new THREE.PerspectiveCamera(40, 1, .1, 
 // 箱を固定している間は、ドラッグしても箱の角度(視点)を変えない
 const camera = persp;
 // 見る中心。ふだんは全体の真ん中。選んだ箱・キューブがあればそこを中心にズームする。右下の操作キーで X・Y・Z に動かせる
-const tgt = new THREE.Vector3(), tgtGoal = new THREE.Vector3();
+const tgt = new THREE.Vector3(), tgtGoal = new THREE.Vector3(), invQ2 = new THREE.Quaternion(), gv = new THREE.Vector3();
 let focused = null;
 function focusSel() {
   if (sel === focused) return; focused = sel;
@@ -1059,6 +1059,13 @@ function loop() {
   tgt.lerp(tgtGoal, .2);   // 見る中心(選んだ箱・キューブか、操作キーで動かした位置)へなめらかに寄る
   camera.position.set(tgt.x + cam.dist * Math.cos(ph) * Math.sin(th), tgt.y + cam.dist * Math.sin(ph), tgt.z + cam.dist * Math.cos(ph) * Math.cos(th));
   camera.lookAt(tgt);
+  // 右下の小さな3軸は、今の向きで X・Y・Z が画面のどちらを向いているかを示す
+  invQ2.copy(camera.quaternion).invert();
+  ['x', 'y', 'z'].map(k => { gv.set(k === 'x' ? 1 : 0, k === 'y' ? 1 : 0, k === 'z' ? 1 : 0).applyQuaternion(invQ2); return [k, gv.x * 26, -gv.y * 26]; }).forEach(([k, x, y]) => {
+      $('gl' + k).setAttribute('x1', -x); $('gl' + k).setAttribute('y1', -y); $('gl' + k).setAttribute('x2', x); $('gl' + k).setAttribute('y2', y);
+      $('gp' + k).setAttribute('cx', x); $('gp' + k).setAttribute('cy', y); $('gt' + k).setAttribute('x', x); $('gt' + k).setAttribute('y', y);
+      $('gn' + k).setAttribute('cx', -x); $('gn' + k).setAttribute('cy', -y);
+    });
   // 箱を先に、その中のキューブを後に向ける。固定したキューブは親の箱の向きを打ち消して画面に合わせる
   // 箱は固定してもしなくても置き場所はそのまま(Version 2 の見え方)。画面を回すと箱もふつうに回り、ほかの面が見える。
   // 中のキューブは箱の中の自分のマスから動かず、固定したキューブ(箱で固定した中身も)はその場で選んだ目をこちらに向ける
@@ -1083,7 +1090,7 @@ $('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
 // ここで選んだら、その場で固定する(法人単位を選ぶ=法人の箱を全部固定して視点を正面で止める)
 $('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); focusSel(); };
-$('move').querySelectorAll('[data-mv]').forEach(b => b.onclick = () => {
+document.querySelectorAll('#gizmo [data-mv]').forEach(b => b.onclick = () => {
   const k = b.dataset.mv, step = Math.max(.6, cam.dist * .12);
   if (k === 'home') { tgtGoal.set(0, 0, 0); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
   if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(120, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
