@@ -1,8 +1,11 @@
+import { requireUser } from "@/lib/auth";
 import { getFace } from "@/lib/cube/engine";
 import { CubeError } from "@/lib/cube/validate";
 
 // POST /api/cube/face : FaceRequest → 面のデータ(設計書 9. API設計)
 export async function POST(request: Request) {
+  const denied = await requireUser();
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await request.json();

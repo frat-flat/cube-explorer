@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 // スプリント1の完了条件:「店舗 × 月(奥行き:商品カテゴリを集約)」の売上合計が表で見られ、
 // 行・列・奥行きの軸を入れ替えられる
 test("店舗 × 月 の売上合計を表示し、軸を入れ替えられる", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/face");
   const face = page.getByTestId("face");
 
   // 既定:行=店舗、列=月、奥行き=商品カテゴリを集約
