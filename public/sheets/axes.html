@@ -180,7 +180,7 @@ tfoot td{font-weight:700}
 <main>
   <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div></div>
   <div id="pinCtl">
-    <div class="row"><b>選ぶ</b><select id="selUnit" aria-label="箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
+    <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
     <div class="row" id="showRow"></div>
     <div class="row"><label class="muted"><input type="checkbox" id="advFaces"> ②④⑥(縦横を入れ替えた目)も選べるようにする(上級)</label></div>
     <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
@@ -790,7 +790,7 @@ function renderPinBar() {
   const n = units().filter(b => b.pin).length;
   $('pinHint').textContent = !n ? '' : boxLocked() ? `箱を固定中: 視点は正面で固定(ほかの面は見えません)。中のキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る` : `固定 ${n}個: 画面を回しても向きはそのまま。固定したキューブはドラッグでそれだけ回り、ダブルクリックで選んだ目に戻る`;
   $('pinHint').hidden = !n; $('unpinAll').hidden = !n;
-  $('selUnit').innerHTML = '<option value="">(箱かキューブを選ぶ)</option>'
+  $('selUnit').innerHTML = '<option value="">(固定するものを選ぶ)</option>'
     + '<optgroup label="単位でまとめて">' + levels().map(L => { const us = units().filter(b => levelOf(b) === L); return `<option value="lv:${esc(L)}">${esc(L)}単位(${us.map(unitOf).join('・')})${us.every(b => b.pin) ? '(固定中)' : ''}</option>`; }).join('') + '</optgroup>'
     + '<optgroup label="1つずつ">' + units().map(b => `<option value="${b.id}">${unitOf(b)} ${esc(b.name)}(${esc(levelOf(b))}単位)${b.pin ? '(固定中)' : ''}</option>`).join('') + '</optgroup>';
   $('selUnit').value = sel || '';
@@ -998,7 +998,7 @@ renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if 
 renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(8, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   if (boxLocked()) {
-    camera = ortho; const hh = cam.dist * Math.tan(THREE.MathUtils.degToRad(20)), hw = hh * persp.aspect;
+    camera = ortho; const hh = cam.dist * Math.tan(THREE.MathUtils.degToRad(20)) * .7, hw = hh * persp.aspect;
     if (ortho.top !== hh || ortho.right !== hw) { ortho.left = -hw; ortho.right = hw; ortho.top = hh; ortho.bottom = -hh; ortho.updateProjectionMatrix(); }
     ortho.position.set(0, 0, 200); ortho.lookAt(0, 0, 0);
   } else {
@@ -1028,7 +1028,8 @@ $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = 
 $('bookRead').onclick = readBook;
 $('viewClose').onclick = () => { viewId = null; renderView(); };
 $('save').onclick = saveQuery;
-$('selUnit').onchange = e => select(e.target.value || null);
+// ここで選んだら、その場で固定する(法人単位を選ぶ=法人の箱を全部固定して視点を正面で止める)
+$('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (id) selUnits().forEach(b => { if (!b.pin) applyPin(b); }); refreshPins(); };
 $('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
 $('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
 $('selFace').onchange = e => { if (!e.target.value) return; selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
