@@ -64,3 +64,27 @@ test("シートの行から箱を作る", async ({ page }) => {
   expect(n).toBe(2);
   expect(errors).toEqual([]);
 });
+
+// 立体は World の画面だけに出し、設定で選んだ世界(Blender で作った世界)をまわりに映す
+test("World で設定した世界の中に立体を並べる", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  await page.route("**/GLTFLoader.js", (r) => r.fulfill({ path: "node_modules/three/examples/js/loaders/GLTFLoader.js", contentType: "text/javascript" }));
+  await page.route("**/meshopt_decoder.js", (r) => r.fulfill({ path: "node_modules/three/examples/js/libs/meshopt_decoder.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  // ホームには立体を置かない
+  await expect(page.locator('.view[data-view="home"] #stage')).toHaveCount(0);
+  await page.locator('.nv[data-go="world"]').click();
+  await expect(page.locator("#crumb")).toHaveText("World");
+  await expect(page.locator("#stage canvas")).toBeVisible();
+  await expect(page.locator("#worldNow")).toHaveText("今の世界: 標準(無地)");
+  await page.locator('.nv[data-go="settings"]').click();
+  await page.locator("#pWorld").selectOption("zen");
+  await page.locator('.nv[data-go="world"]').click();
+  await expect(page.locator("#worldNow")).toHaveText("今の世界: 和の庭");
+  // 読み込み中の表示が消えれば世界が入っている
+  await expect(page.locator("#worldMsg")).toBeHidden({ timeout: 30_000 });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}").prefs?.world)).toBe("zen");
+  expect(errors).toEqual([]);
+});

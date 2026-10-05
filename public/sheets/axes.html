@@ -58,7 +58,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 .kpi .k{font-size:12px;color:var(--muted)}
 .kpi .v{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1.2}
 .kpi .s{font-size:11.5px;color:var(--muted)}
-.home{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+.home{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
 .home .col{display:flex;flex-direction:column;gap:14px;min-width:0}
 .two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
 .two.wide{grid-template-columns:minmax(0,1fr) 340px}
@@ -98,7 +98,7 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 .axis .al{grid-column:2/4;color:var(--muted);font-size:12px}
 .axis.mine{border-style:dashed;border-color:var(--mine)}
 /* 立体 */
-#stage{position:relative;height:clamp(360px,calc(100vh - 380px),720px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
+#stage{position:relative;height:clamp(380px,calc(100vh - 300px),900px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
 #pinBar{position:absolute;right:8px;top:8px;max-width:calc(100% - 16px);font-size:12px;color:var(--muted);pointer-events:none}
 #pinBar button{pointer-events:auto}
 #pinBar .hint{background:var(--stage);padding:1px 4px;border-radius:4px}
@@ -116,7 +116,8 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #gizmo .end{cursor:pointer}
 #gizmo text{font:700 13px var(--sans);text-anchor:middle;dominant-baseline:central;cursor:pointer}
 #gizmo .end:hover text{text-decoration:underline}
-#legend{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;pointer-events:none}
+#worldMsg{position:absolute;left:50%;top:10px;transform:translateX(-50%);font-size:12px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:2px 8px;pointer-events:none}
+#legend{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);background:var(--panel);border-radius:6px;padding:1px 8px;display:flex;gap:12px;flex-wrap:wrap;pointer-events:none}
 #legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
 /* 軸の読み取りと承認 */
 .match{border:1px solid var(--line);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:4px}
@@ -195,14 +196,20 @@ tfoot td{font-weight:700}
   <span class="cloud" id="cloud" hidden></span>
   <a class="out" id="logout" href="/auth/signout" hidden>ログアウト</a>
 </header>
-<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
+<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><button class="nv" data-go="gather"><span class="ic" aria-hidden="true">▦</span><span class="lb">まとめる</span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">シートを入れる</span><span class="nb" id="nb-import" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">軸の辞書</span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
 <div class="content">
 <div class="view" data-view="home">
   <div class="vhead"><h1>ホーム</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を軸の辞書に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
   <div class="kpis" id="kpis"></div>
   <div class="home">
-    <section class="stagecard"><h2>立体(箱・キューブ・シート)</h2>
-  <div id="stage"><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
+    <section><h2>箱とキューブ<span class="sp"></span><button class="small" data-go="world">World で見る</button></h2><div class="tree" id="tree"></div></section>
+    <section><h2>最近の履歴<span class="sp"></span><button class="small" data-go="history">すべて見る</button></h2><div class="recent" id="recent"></div></section>
+  </div>
+</div>
+<div class="view" data-view="world" hidden>
+  <div class="vhead"><h1>World</h1><p class="lead">箱とキューブを立体で並べます。まわりの世界は <button class="small" data-go="settings">設定</button> で選べます。<span id="worldNow" style="white-space:nowrap"></span></p></div>
+    <section class="stagecard">
+  <div id="stage"><div id="worldMsg" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
     <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div>
   <div id="pinCtl">
     <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
@@ -212,11 +219,6 @@ tfoot td{font-weight:700}
     <div class="row"><span id="cmdMsg">立体の箱やキューブを押しても選べます。ふだん使う目は ①横X・縦Y ③横Z・縦Y ⑤横X・縦Z。②④⑥は縦横を入れ替えた目(上級)</span></div>
   </div>
     </section>
-    <div class="col">
-      <section><h2>箱とキューブ</h2><div class="tree" id="tree"></div></section>
-      <section><h2>最近の履歴<span class="sp"></span><button class="small" data-go="history">すべて見る</button></h2><div class="recent" id="recent"></div></section>
-    </div>
-  </div>
 </div>
 <div class="view" data-view="gather" hidden>
   <div class="vhead"><h1>まとめる</h1><p class="lead">箱とキューブを渡り歩いて、条件に合う値を1枚のシートにします。保存したまとめは、データが入ると自動で更新されます。</p></div>
@@ -287,6 +289,10 @@ tfoot td{font-weight:700}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- World のまわりの世界(Blender で作って光を焼き込んだもの、/worlds/)を読む部品。読めなければ標準の背景のまま -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
+<script src="/worlds/blender-world.js"></script>
 <script>
 (() => {
 // ---------- データ ----------
@@ -381,7 +387,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let showMine = true;
 // システムの初期値。画面からは変えられない(秩序のもと)。自分の設定は S.prefs に別で持つ
-const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']) });
+const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']), world: 'none' });
 const SHADES = { view: '表示中の最大値で割る', global: 'その科目の全期間の最大値で割る(絞っても色が変わらない)', row: '行ごとの最大値で割る', share: '行の合計に占める割合' };
 const curPref = k => (S.prefs && S.prefs[k] != null ? S.prefs[k] : SYSTEM[k]);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -710,14 +716,19 @@ function renderPrefs() {
     <div class="muted">初期値: ${SHADES[SYSTEM.shade]} ${own('shade') ? '<button class="small" data-reset="shade">初期値に戻す</button>' : ''}</div>
     <div class="relrow"><b>新しいキューブの3軸</b> <span class="pill ${own('cubeAxes') ? 'mine' : 'cube'}">${own('cubeAxes') ? '自分の設定' : '初期値'}</span></div>
     <div class="row">${[0, 1, 2].map(i => `<select data-ca="${i}" aria-label="${'XYZ'[i]}軸">${axOpts(ca[i])}</select>`).join('×')}</div>
-    <div class="muted">初期値: ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')} ${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">初期値に戻す</button>' : ''}</div>`;
+    <div class="muted">初期値: ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')} ${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">初期値に戻す</button>' : ''}</div>
+    <div class="relrow"><b>World の世界</b> <span class="pill ${own('world') ? 'mine' : 'cube'}">${own('world') ? '自分の設定' : '初期値'}</span></div>
+    <select id="pWorld" aria-label="World の世界">${Object.entries(WORLDS).map(([k, t]) => `<option value="${k}"${curPref('world') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    <div class="muted">World の箱とキューブのまわりに映す世界(Blender で作った世界)。初期値: ${WORLDS[SYSTEM.world]} ${own('world') ? '<button class="small" data-reset="world">初期値に戻す</button>' : ''}</div>`;
   const log = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '設定', title: t, lines: l, sources: [], results: [] });
   $('pShade').onchange = e => { const v = e.target.value; if (v === SYSTEM.shade) delete S.prefs.shade; else S.prefs.shade = v; log('濃淡の基準を変えた', [`${SHADES[v]}(初期値は ${SHADES[SYSTEM.shade]})`]); save(); renderAll(); };
   $('prefs').querySelectorAll('[data-ca]').forEach(x => x.onchange = () => { const v = [...$('prefs').querySelectorAll('[data-ca]')].map(y => y.value);
     if (new Set(v).size < 3) { note('3つの軸は別々のものを選んでください'); renderPrefs(); return; }
     if (v.join() === SYSTEM.cubeAxes.join()) delete S.prefs.cubeAxes; else S.prefs.cubeAxes = v;
     log('新しいキューブの3軸を変えた', [`${v.map(a => ax(a).name).join('×')}(初期値は ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')}。今あるキューブの軸は変えない)`]); save(); renderAll(); });
-  $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を初期値に戻した', [b.dataset.reset === 'shade' ? '濃淡の基準' : '新しいキューブの3軸']); save(); renderAll(); });
+  $('pWorld').onchange = e => { const v = WORLDS[e.target.value] ? e.target.value : SYSTEM.world; if (v === SYSTEM.world) delete S.prefs.world; else S.prefs.world = v; log('World の世界を変えた', [`${WORLDS[v]}(初期値は ${WORLDS[SYSTEM.world]})`]); save(); renderAll(); };
+  $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を初期値に戻した', [{ shade: '濃淡の基準', cubeAxes: '新しいキューブの3軸', world: 'World の世界' }[b.dataset.reset]]); save(); renderAll(); });
+  setWorld(curPref('world'));
 }
 // 箱の中に箱を足す(法人の中のグループなど)。単位は「グループ」
 function addBox(boxId) {
@@ -1188,7 +1199,8 @@ function paint() {
   for (const b of tops) { const W = sizeOf(b); drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
   // 全体の大きさが変わったときだけ、全体が入る距離に引く(ふだんのズームは触らない)
   const span = Math.max(total, ...tops.map(sizeOf));
-  if (fitted !== span) { fitted = span; cam.dist = Math.max(12, Math.min(120, span * 1.25 + 6)); }
+  extent = { span, bottom: -Math.max(1, ...tops.map(sizeOf)) / 2 - .2 }; placeEnv();
+  if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
 }
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
 let drag = null;
@@ -1214,7 +1226,7 @@ renderer.domElement.addEventListener('pointerup', () => {
   drag = null;
 });
 renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
-renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(120, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   // 固定するときは必ずどこかの面を正面にする。箱は必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
   // 遠近はそのままなので、箱の奥行き(中の壁)とキューブの立体感は残る。キューブは選んだ目を正面に向ける
@@ -1247,6 +1259,49 @@ function loop() {
 }
 new ResizeObserver(resize).observe(stage);
 
+// ---------- World のまわりの世界 ----------
+// 設定で選んだ世界(public/worlds/<名前>.glb・.json、Blender で光を焼き込んだもの)を、箱とキューブのまわりに映す。
+// 箱とキューブは原点のまま動かさず、世界の方を動かす: 部屋の真ん中を原点に、床を立体の下に、長い方を箱の並ぶ向き(X)に合わせ、
+// 全体が見える距離までカメラを引いても部屋の中に収まる大きさに広げる。ズームの上限も部屋の中まで
+const WORLDS = { none: '標準(無地)', modern: '白い現代美術館', european: '宮殿を改装した欧州の美術館', heist: '夜の美術館', zen: '和の庭', rpg: 'RPGの森', game: 'ゲームの世界', city: '摩天楼の街', ruins: '砂漠の巨大遺跡', cyber: 'ネオン街の屋上', underwater: '海の底', space: '宇宙空間' };
+const envCache = {}; let env = null, envName = null, envLimit = 120, extent = { span: 10, bottom: -5 };
+function fitDist(span) { return Math.max(12, Math.min(120, span * 1.25 + 6)); }
+function worldMsg(t) { $('worldMsg').textContent = t || ''; $('worldMsg').hidden = !t; }
+function setWorld(name) {
+  if (!WORLDS[name]) name = 'none';
+  $('worldNow').textContent = '今の世界: ' + WORLDS[name];
+  if (name === envName) return;
+  envName = name;
+  if (env) { scene.remove(env.g); env = null; }
+  scene.background = null; scene.fog = null; envLimit = 120; persp.far = 200; persp.updateProjectionMatrix(); renderer.outputEncoding = THREE.LinearEncoding;
+  if (name === 'none') { worldMsg(''); return; }
+  if (!window.BlenderWorld || !THREE.GLTFLoader) { worldMsg('世界を読む部品を読み込めませんでした。標準で表示しています'); envName = null; return; }
+  worldMsg(WORLDS[name] + ' を読み込み中…');
+  (envCache[name] = envCache[name] || BlenderWorld.load(name, { base: '/worlds/' })).then(({ info, root }) => {
+    if (envName !== name) return;
+    const g = new THREE.Group(); g.add(root); env = { g, info }; scene.add(g); placeEnv(); worldMsg('');
+  }).catch(e => { delete envCache[name]; console.error('世界を読み込めませんでした', name, e); if (envName === name) { envName = null; worldMsg('世界を読み込めませんでした。標準で表示しています'); } });
+}
+// 歩ける範囲(json の walk の1つ目)を部屋とみなす。宇宙・海の底のように無い世界は原点のまわり
+function roomOf(info) {
+  const w = info.walk && info.walk[0];
+  if (w && w.t === 'rect') return { cx: (w.x0 + w.x1) / 2, cz: (w.z0 + w.z1) / 2, hx: (w.x1 - w.x0) / 2, hz: (w.z1 - w.z0) / 2 };
+  if (w && w.t === 'circ') return { cx: w.x || 0, cz: w.z || 0, hx: w.r, hz: w.r };
+  const L = Math.min(info.limit || 20, 20); return { cx: 0, cz: 0, hx: L, hz: L };
+}
+function placeEnv() {
+  if (!env) return;
+  const { g, info } = env, r = roomOf(info), short = Math.min(r.hx, r.hz), k = Math.max(1, fitDist(extent.span) * 1.15 / short);
+  g.rotation.y = r.hz > r.hx ? Math.PI / 2 : 0; g.scale.setScalar(k);
+  const c = new THREE.Vector3(r.cx, 0, r.cz).applyAxisAngle(new THREE.Vector3(0, 1, 0), g.rotation.y).multiplyScalar(k);
+  g.position.set(-c.x, extent.bottom - c.y, -c.z);
+  envLimit = Math.max(12, short * k * .95); cam.dist = Math.min(cam.dist, envLimit);
+  scene.background = new THREE.Color(info.bg || '#0b0d10');
+  scene.fog = info.fog ? new THREE.FogExp2(info.fog[0], info.fog[1] / k) : null;
+  persp.far = Math.max(200, (info.far || 400) * k); persp.updateProjectionMatrix();
+  renderer.outputEncoding = THREE.sRGBEncoding;
+}
+
 // ---------- つなぐ ----------
 function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); }
 $('read').onclick = readSheet;
@@ -1262,21 +1317,21 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && viewId) $(
 
 // ---------- ダッシュボードの画面切り替え ----------
 // 左のメニュー(と data-go を持つボタン)で画面を1つだけ見せる。開いていた画面は次に開いたときも同じ(ブラウザに覚える)
-const VIEWS = { home: 'ホーム', gather: 'まとめる', import: 'シートを入れる', dict: '軸の辞書', history: '履歴', settings: '設定' };
+const VIEWS = { home: 'ホーム', world: 'World', gather: 'まとめる', import: 'シートを入れる', dict: '軸の辞書', history: '履歴', settings: '設定' };
 function go(v) {
   if (!VIEWS[v]) v = 'home';
   document.querySelectorAll('.view').forEach(e => e.hidden = e.dataset.view !== v);
   document.querySelectorAll('.nv').forEach(b => { b.classList.toggle('on', b.dataset.go === v); b.toggleAttribute('aria-current', b.dataset.go === v); });
   $('crumb').textContent = VIEWS[v]; document.querySelector('.content').scrollTop = 0;
   try { localStorage.setItem(KEY + ':view', v); } catch (e) {}
-  if (v === 'home') requestAnimationFrame(resize);
+  if (v === 'world') requestAnimationFrame(resize);
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
 // ホームの数字(押すとその画面へ)・最近の履歴・メニューの印(承認待ち・更新ありのまとめ)
 function renderHome() {
   const nb = S.boxes.filter(b => b.kind === 'box').length, nc = S.boxes.filter(b => b.kind === 'cube').length;
   const wait = (pending ? 1 : 0) + queue.length, upd = S.saved.filter(x => x.seen && x.seen !== sig(x)).length;
-  const K = [['home', '箱', nb, '法人などの入れ物'], ['home', 'キューブ', nc, '3軸が決まったもの'], ['home', 'シート', S.sheets.length, 'キューブに入っている'],
+  const K = [['world', '箱', nb, '法人などの入れ物'], ['world', 'キューブ', nc, '3軸が決まったもの'], ['world', 'シート', S.sheets.length, 'キューブに入っている'],
     ['dict', '軸', S.axes.filter(visibleAxis).length, '辞書の言い換え ' + S.dict.length + ' 件'], ['gather', '保存したまとめ', S.saved.length, upd ? '更新あり ' + upd + ' 件' : 'すべて見た'], ['import', '承認待ち', wait, wait ? '押して承認へ' : 'ありません']];
   $('kpis').innerHTML = K.map(([v, k, n, sub]) => `<button class="kpi" data-go="${v}"><span class="k">${k}</span><span class="v">${n}</span><span class="s">${esc(sub)}</span></button>`).join('');
   $('recent').innerHTML = S.history.length ? [...S.history].reverse().slice(0, 4).map(h => `<div class="ri"><span class="pill cube">${esc(h.kind)}</span><span class="t" title="${esc(h.title)}">${esc(h.title)}</span><span class="at">${esc(h.at)}</span></div>`).join('') : '<span class="muted">まだありません</span>';
@@ -1289,7 +1344,7 @@ $('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (
 document.querySelectorAll('#gizmo [data-mv]').forEach(b => b.onclick = () => {
   const k = b.dataset.mv, step = Math.max(.6, cam.dist * .12);
   if (k === 'home') { tgtGoal.set(0, 0, 0); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
-  if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(120, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
+  if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
   tgtGoal[k[0]] += step * +k.slice(1);
 });
 $('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
