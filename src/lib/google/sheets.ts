@@ -75,11 +75,12 @@ export type Cell = {
   dataValidation?: { condition?: Condition; strict?: boolean };
 };
 type Condition = { type?: string; values?: { userEnteredValue?: string }[] };
-type GridRange = { startColumnIndex?: number };
+type GridRange = { startRowIndex?: number; endRowIndex?: number; startColumnIndex?: number; endColumnIndex?: number };
 type RawSheet = {
   properties?: { title?: string; gridProperties?: { rowCount?: number; columnCount?: number } };
   conditionalFormats?: { ranges?: GridRange[]; booleanRule?: { condition?: Condition }; gradientRule?: unknown }[];
   data?: { rowData?: { values?: Cell[] }[] }[];
+  merges?: GridRange[];
 };
 export type RawSpreadsheet = { properties?: { title?: string }; sheets?: RawSheet[] };
 
@@ -90,6 +91,10 @@ export type BookTab = {
   month?: string;
   cols: string[];
   rows: string[][];
+  /** 1行目からそのままの表(空の行も含む)。何行目を列名にするかは画面で選ぶ */
+  grid: string[][];
+  /** 上のほうの行の結合セル(グループ名の行を読むため)。行・列は 0 から、終わりは含まない */
+  merges: { r0: number; r1: number; c0: number; c1: number }[];
   size: { rows: number; cols: number };
   truncated: boolean;
   formulas: Record<string, { f: string; text: string }>;
@@ -172,6 +177,10 @@ export function toBook(url: string, raw: RawSpreadsheet): Book {
       month: monthOf(name),
       cols,
       rows,
+      grid: text.map((r) => r.slice(0, w)),
+      merges: (sh.merges ?? [])
+        .map((m) => ({ r0: m.startRowIndex ?? 0, r1: m.endRowIndex ?? 0, c0: m.startColumnIndex ?? 0, c1: Math.min(m.endColumnIndex ?? 0, w) }))
+        .filter((m) => m.r0 < 20 && m.c1 > m.c0),
       size: { rows: gp.rowCount ?? rows.length + 1, cols: gp.columnCount ?? cols.length },
       truncated: (gp.rowCount ?? 0) > MAX_ROWS && grid.length >= MAX_ROWS,
       formulas,
@@ -197,7 +206,7 @@ export async function readSpreadsheet(urlOrId: string): Promise<Book> {
   const q = new URLSearchParams({
     includeGridData: "true",
     fields:
-      "properties.title,sheets(properties(title,gridProperties(rowCount,columnCount)),conditionalFormats(ranges(startColumnIndex),booleanRule(condition),gradientRule),data(rowData(values(formattedValue,userEnteredValue.formulaValue,dataValidation))))",
+      "properties.title,sheets(properties(title,gridProperties(rowCount,columnCount)),conditionalFormats(ranges(startColumnIndex),booleanRule(condition),gradientRule),merges,data(rowData(values(formattedValue,userEnteredValue.formulaValue,dataValidation))))",
   });
   titles.forEach((t) => q.append("ranges", `'${t.replace(/'/g, "''")}'!A1:${letter(MAX_COLS - 1)}${MAX_ROWS}`));
   const raw = (await get(token, `${API}/${id}?${q}`, sa.client_email)) as RawSpreadsheet;
