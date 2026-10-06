@@ -244,6 +244,9 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await page.locator('[data-wm="japan"]').click();
   await expect(page.locator("#jmap .leaflet-interactive")).toHaveCount(5, { timeout: 30_000 });
   await expect(page.locator("#stageWrap > #guide")).toContainText("ピン 5 件");
+  // 白地図は地理院タイルを読まず、陸・県境・都市部だけを描く
+  await expect(page.locator("#jmap .leaflet-tile")).toHaveCount(0);
+  await expect(page.locator("#jmap .leaflet-jland-pane path")).toHaveCount(1);
   await page.locator('#guide [data-js="photo"]').click();
   await expect(page.locator("#jmap .leaflet-tile").first()).toHaveAttribute("src", /seamlessphoto/);
   await page.locator("#jmap .leaflet-interactive").first().dblclick();
