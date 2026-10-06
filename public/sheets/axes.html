@@ -494,12 +494,17 @@ const SAMPLE = () => {
   const saved = [{ id: 'v1', name: '各店舗の楽天の9月の売上', q: { fix: { mall: '楽天', month: '2026-09', item: '売上' }, row: 'shop', col: 'item' }, fav: true, scope: 'all', seen: '' },
     { id: 'v2', name: 'S-01 の月別売上(モールごと)', q: { fix: { shop: 'S-01', item: '売上' }, row: 'month', col: 'mall' }, fav: false, scope: 'all', seen: '' }];
   const history = [{ id: 'h0', at: '2026-10-01', kind: '承認', title: 'S-03 の楽天の売上 を入れた', lines: ['対象月 → 月(＝)。値は「9月」のように年なしなので、このシートだけの呼び名として 7月・8月・9月 を 2026-07〜09 と登録', '売上高 → 科目=売上(＝)', '手数料 → 科目=手数料(＝)'], sources: [], results: ['sh3'] }];
-  return { axes, boxes, sheets, saved, dict, history, nextMonth: 10, sampleV: 3 };
+  return { axes, boxes, sheets, saved, dict, history, nextMonth: 10, sampleV: 3, demo: true };
 };
+// はじめは空(2026-10-06 ユーザー指定: ダミーと実データが混ざるので見本は入れない)。軸の辞書の基本の軸と、列の呼び名の言い換えだけ持つ
+// 見本(SAMPLE)はテストの時だけ(このブラウザに KEY + ':demo' がある時)使う
+const DEMO = (() => { try { return localStorage.getItem('axis-boxes-v2:demo') === '1'; } catch (e) { return false; } })();
+const EMPTY = () => { const x = SAMPLE(); return { axes: x.axes, boxes: [], sheets: [], saved: [], dict: x.dict.filter(d => d.scope === 'all'), history: [], nextMonth: 10, sampleV: 4 }; };
+const START = () => DEMO ? SAMPLE() : EMPTY();
 const KEY = 'axis-boxes-v2';
 let S;
 const validState = x => !!(x && x.axes && x.boxes && x.sheets && x.saved && x.dict && x.history);
-try { S = JSON.parse(localStorage.getItem(KEY)); if (!validState(S)) S = SAMPLE(); } catch (e) { S = SAMPLE(); }
+try { S = JSON.parse(localStorage.getItem(KEY)); if (!validState(S)) S = START(); } catch (e) { S = START(); }
 // 箱とキューブには必ず番号(箱1・キューブ1…)を振る。指示で呼べるように一度振った番号は変えない
 const unitOf = b => (b.kind === 'box' ? '箱' : 'キューブ') + b.no;
 // 単位=段(法人単位・ショップ単位)。箱・キューブが持つ軸の名前で決まる
@@ -507,6 +512,7 @@ const levelOf = b => { if (b.levelName) return b.levelName; const k = Object.key
 function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, ...S.boxes.filter(b => b.kind === k && b.no).map(b => b.no)); S.boxes.filter(b => b.kind === k && !b.no).forEach(b => b.no = ++n); } }
 // 前の見本(法人A・法人B がいちばん外の箱)のままなら、代理店・申込者の箱の中に法人を並べる形に一度だけ直す
 function upgradeSample() {
+  if (!S.demo) { dropSample(); return; }
   if (!(S.sampleV >= 2)) { S.sampleV = 2; upgradeSample2(); }
   // 見本の法人に、時刻まである日付(面談日時)と何月までの日付(開始予定)を足す(カレンダーの日・年の表示で使う)
   if (!(S.sampleV >= 3)) {
@@ -515,6 +521,33 @@ function upgradeSample() {
     add.forEach(([c, b]) => { b.info = { ...c.info, ...b.info }; });
     if (add.length) S.history.push({ id: 'h' + Date.now().toString(36), at: new Date().toISOString().slice(0, 10), kind: '作成', title: '見本の法人に面談日時・開始予定を足した', lines: ['カレンダーの日の表示(時刻あり・なし)と年の表示(何月まで)で使う'], sources: [], results: [] });
   }
+}
+// 2026-10-06 ユーザー指定: 見本(ダミー)の箱・キューブ・シート・まとめ・履歴を消す。実データは残す。
+// 見本の箱の中に作った実データの箱はいちばん上へ。見本のキューブに入れた実データのシートは Saving に戻す(入れ直せる)
+function dropSample() {
+  if (S.sampleV >= 4) return;
+  S.sampleV = 4; S.__drop = true;   // 開いたあと保存し直す(Supabase にも送る)
+  const keys = new Set([...SAMPLE_TOPS, ...SAMPLE_CORPS, { id: 'c1', name: 'S-01' }, { id: 'c2', name: 'S-02' }, { id: 'c3', name: 'S-03' }].map(b => b.id + '\u0001' + b.name));
+  const gone = new Set(S.boxes.filter(b => keys.has(b.id + '\u0001' + b.name)).map(b => b.id));
+  const sampleSheet = x => /^sh[0-4]$/.test(x.id) && gone.has(x.cube) && /の売上$/.test(x.name);
+  const moved = [], back = [], now = new Date().toISOString();
+  S.boxes.forEach(b => { if (!gone.has(b.id) && gone.has(b.parent)) { b.parent = null; moved.push(b.name); } });
+  S.sheets.filter(x => gone.has(x.cube) && !sampleSheet(x)).forEach(x => {
+    back.push(x.name);
+    if (!S.saving.some(e => e.name === x.name)) S.saving.push({ id: 'sv' + Date.now().toString(36) + S.saving.length, src: 'paste', name: x.name, L: { raw: [x.cols, ...x.rows], hr: 0, gr: -1, merges: [] }, cols: [...x.cols], rows: x.rows.map(r => [...r]), colsDone: [], rowsDone: [], at: now });
+  });
+  S.sheets = S.sheets.filter(x => !gone.has(x.cube));
+  S.boxes = S.boxes.filter(b => !gone.has(b.id));
+  const ids = new Set(S.sheets.map(x => x.id));
+  S.dict = S.dict.filter(d => d.scope === 'all' || d.scope === 'mine' || ids.has(d.scope));
+  const SAVED = { v1: '各店舗の楽天の9月の売上', v2: 'S-01 の月別売上(モールごと)' };
+  const savedGone = S.saved.filter(v => SAVED[v.id] === v.name).length;
+  S.saved = S.saved.filter(v => SAVED[v.id] !== v.name);
+  S.history = S.history.filter(h => !(h.id === 'h0' && h.title === 'S-03 の楽天の売上 を入れた') && !/^見本/.test(h.title));
+  if (!gone.size && !savedGone) return;
+  S.history.push({ id: 'h' + Date.now().toString(36), at: now.slice(0, 10), kind: '作成', title: '見本(ダミー)のデータを消した',
+    lines: [`見本の箱・キューブ ${gone.size} 個と、その中の見本のシート・まとめを消した`, ...(moved.length ? [`見本の箱の中にあった ${moved.length} 個(${moved.slice(0, 5).join(' / ')}${moved.length > 5 ? ' ほか' : ''})は、いちばん上に移した`] : []),
+      ...(back.length ? [`見本のキューブに入れていたシート ${back.join('・')} は Saving に戻した(入れ直せます)`] : [])], sources: [], results: [] });
 }
 function upgradeSample2() {
   const b1 = S.boxes.find(b => b.id === 'b1'), b2 = S.boxes.find(b => b.id === 'b2');
@@ -611,6 +644,7 @@ function renderTree() {
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
   });
   walk(null, 0);
+  if (!S.boxes.length) h = '<p class="muted">まだ箱もキューブもありません。「シートを入れる」でスプシを読み取り、シートごとに「1行ずつ箱にする」などを選ぶとここに並びます。</p>';
   el.innerHTML = h;
   el.querySelectorAll('[data-pin]').forEach(n => n.onclick = e => { e.stopPropagation(); togglePin(n.dataset.pin); });
   el.querySelectorAll('[data-unit]').forEach(n => n.onclick = () => select(n.dataset.unit));
@@ -666,7 +700,7 @@ function renderInputs() {
   const link = S.saving.filter(e => e.url), pasted = S.saving.filter(e => !e.url);
   $('preset').innerHTML = (link.length ? `<optgroup label="読み取ったスプシのシート">${link.map(e => `<option value="sv:${e.id}">${esc(e.name)}</option>`).join('')}</optgroup>` : '')
     + (pasted.length ? `<optgroup label="前に貼り付けたシート">${pasted.map(e => `<option value="sv:${e.id}">${esc(e.name)}</option>`).join('')}</optgroup>` : '')
-    + `<option value="paste">自分で貼り付ける</option><optgroup label="例">${PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('')}</optgroup>`;
+    + `<option value="paste">自分で貼り付ける</option>` + (DEMO ? `<optgroup label="例">${PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('')}</optgroup>` : '');
   renderTarget();
   $('dAxis').innerHTML = S.axes.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
   $('dScope').innerHTML = '<option value="all">全体で使う</option>' + S.sheets.map(s => `<option value="${s.id}">このシートだけ: ${esc(where(s))}</option>`).join('');
@@ -793,6 +827,7 @@ function nextStep() {
 }
 const queueTxt = () => { const a = queue.filter(x => !x.unit).length, b = queue.length - a; return queue.length ? `このあと ${[a ? `シートの承認 ${a} 枚` : '', b ? `行から作るもの ${b} 枚` : ''].filter(Boolean).join('・')} が続きます` : ''; };
 function readSheet() {
+  if ($('pAct').value === 'sheet' && !$('target').value) { note('入れる先のキューブがまだありません。先に「1行ずつキューブにする」などでキューブを作ってください'); return; }
   const se = pickedStash();
   if (se) { if ($('pAct').value === 'sheet') sheetFromStash(se, $('target').value, $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}); else unitsFromStash(se, $('pAct').value, $('target').value); return; }
   if ($('pAct').value !== 'sheet') { readUnits(); return; }
@@ -1121,7 +1156,7 @@ async function readBook() {
   book.url = book.url || url; stashBook(book); save(); renderSaving();
   // タブごとの初期値: データのタブはシートとして最初のキューブへ。何にするか・入れる先はタブごとに選び直せる
   book.canMerge = !!book.merge;
-  book.tabs.forEach(t => { if (t.kind === 'data') { t.act = t.use === false ? 'none' : 'sheet'; t.dest = firstCube(); } });
+  book.tabs.forEach(t => { if (t.kind === 'data') { t.act = t.use === false || !firstCube() ? 'none' : 'sheet'; t.dest = firstCube(); } });
   renderInputs(); { const e = S.saving.find(x => x.url === book.url); if (e) { $('preset').value = 'sv:' + e.id; pickSheet(); } }
   renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -1132,7 +1167,7 @@ function renderBook() {
   let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・${book.real ? 'GAS は読めません' : 'GAS ' + book.gas.length + ' 個'}</p><div class="tabs">`;
   h += book.tabs.map((t, i) => (t.kind === 'data'
     ? `<div class="tab tabd" data-tab="${i}"><b>${esc(t.name)} <span class="muted">データのタブ</span></b>
-    <div class="row"><span class="muted">何にする</span><select data-act="${i}" aria-label="${esc(t.name)} を何にする">${Object.entries(ACTS).map(([k, v]) => `<option value="${k}"${t.act === k ? ' selected' : ''}${k === 'sheet' && !firstCube() ? ' disabled' : ''}>${v}</option>`).join('')}</select>
+    <div class="row"><span class="muted">何にする</span><select data-act="${i}" aria-label="${esc(t.name)} を何にする">${Object.entries(ACTS).map(([k, v]) => `<option value="${k}"${t.act === k ? ' selected' : ''}${k === 'sheet' && !firstCube() ? ' disabled' : ''}>${v}${k === 'sheet' && !firstCube() ? '(キューブがまだありません)' : ''}</option>`).join('')}</select>
     ${t.act === 'none' ? '' : `<span class="muted">入れる先</span><select data-dest="${i}" aria-label="${esc(t.name)} の入れる先">${destOpts(t.act, t.dest)}</select>`}</div>
     ${t.act === 'box' || t.act === 'cube' ? `<span class="d">1行を1つの${t.act === 'box' ? '箱' : 'キューブ'}にします。名前に使う列と単位の名前は、このあとの画面で選びます</span>` : ''}`
     : `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : 'その他'}</span></b>`) + `
@@ -1248,6 +1283,7 @@ const whenTxt = iso => { const d = new Date(iso); return isNaN(d) ? '' : `${d.ge
 // Saving のシート(読み取ったスプシのタブ・貼り付け)を、列を軸にしてキューブに入れる / 行から箱・キューブを作る
 const stashSrc = e => e.url ? { url: e.url, tabs: [e.tab], merge: false } : null;
 function sheetFromStash(e, cube, tag) {
+  if (!(cube || firstCube())) { note('入れる先のキューブがまだありません。先に「行から箱・キューブを作る」でキューブを作ってください'); return; }
   pending = newPending({ name: e.name, cube: cube || firstCube(), tag: { ...(e.month ? { month: e.month } : {}), ...(tag || {}) }, L: copyL(e.L), src: stashSrc(e), stash: [{ id: e.id, off: 0 }],
     origin: e.url ? { text: e.name, short: 'スプシから', minutes: [`Saving の「${e.name}」(${e.url})から入れた`], sources: [{ book: e.book, tab: e.tab, range: 'A1:' + colL(e.cols.length - 1) + (e.L.raw.length) }] } : null });
   // 反映済みの列は「使わない」を初期値にする
@@ -2427,18 +2463,19 @@ $('faceSheet').onclick = () => {
 };
 $('cmdGo').onclick = () => { $('cmdMsg').textContent = runCmd($('cmd').value); };
 $('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) $('cmdGo').click(); };
-$('addMonth').onclick = addMonth;
+$('addMonth').onclick = addMonth; $('addMonth').hidden = !DEMO;   // 見本の月を足す試しの道具なので、テストの時だけ
 $('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
 $('preset').onchange = pickSheet;
 S.saved.forEach(s => { if (!s.seen) s.seen = sig(s); });
-renderAll(); $('preset').value = '0'; pickSheet(); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
+if (S.__drop) { delete S.__drop; save(); }
+renderAll(); $('preset').value = DEMO ? '0' : 'paste'; pickSheet(); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
 // Supabase に保存があればそれを正として開き直す。まだ無ければ、いまの中身を最初の保存として送る
 fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.status === 404 ? null : r.json().then(j => ({ ...j, ok: r.ok })).catch(() => ({ ok: false, error: '応答 ' + r.status }))).then(j => {
   if (!j) return;
   if (!j.ok) { cloudMark('Supabase に読めません(' + (j.error || '') + ')', true); return; }
   if (!j.configured) { cloudMark('このブラウザにだけ保存(Supabase は未設定)'); return; }
   cloud = true;
-  if (validState(j.state)) { adopt(j.state); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} renderAll(); cloudMark('Supabase から読み込みました'); }
+  if (validState(j.state)) { adopt(j.state); const dropped = S.__drop; delete S.__drop; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} if (dropped) pushCloud(); renderAll(); cloudMark('Supabase から読み込みました'); }
   else pushCloud();
 }).catch(() => {});
 })();
