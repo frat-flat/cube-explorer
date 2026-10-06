@@ -1304,6 +1304,10 @@ async function approve() {
   if (p.L) lines.push(`列名の行: ${p.L.hr + 1}行目${p.L.gr >= 0 ? `・グループ名の行: ${p.L.gr + 1}行目` : ''}`);
   p.groups.forEach(g => lines.push(`${g.cols.map(i => p.baseCols[i]).join('・')} を同じ項目「${g.name}」にまとめた(${g.mode === 'first' ? 'どれか1つ' : '組み合わせ'})`));
   lines.push(...markDone(p.stash, p.baseCols.map((_, i) => !!bind[i] || p.groups.some((g, k) => bind[p.baseCols.length + k] && g.cols.includes(i)))));
+  // 3軸がまだそろっていないCube(軸の登録がないうちに作ったもの)は、このSheetの分類の列で埋める
+  const cb = box(p.cube);
+  if (cb && cb.kind === 'cube') { const have = (cb.axes || []).filter(ax), add = [...new Set(bind.filter(b => b && b.value == null && ax(b.axis) && ax(b.axis).kind === 'key').map(b => b.axis))].filter(a => !have.includes(a));
+    if (have.length < 3 && add.length) { cb.axes = [...have, ...add].slice(0, 3); lines.push(`Cube ${cb.name} の3軸: ${cb.axes.map(a => ax(a).name).join('×')}`); } }
   S.sheets.push({ id, cube: p.cube, name: p.name, tag: p.tag, cols: p.cols, rows: p.rows, bind, origin: p.origin ? { text: p.origin.text, short: p.origin.short } : null, cf: p.cf || [], dv: p.dv || [], formulas: p.formulas || {} });
   S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: p.origin ? '取り込み' : '承認', title: `${where({ cube: p.cube, name: p.name })} を入れた`,
     lines: [...(p.origin ? p.origin.minutes : []), ...lines], sources: p.origin ? p.origin.sources : [], results: [id] });
@@ -1848,7 +1852,7 @@ const PIN0 = { yaw: 0, pitch: 0, roll: 0, face: 'd1' };
 const advOn = () => !!S.advFaces;
 const faceUsable = f => !f.adv || advOn();
 const faceOf = id => FACES.find(f => f.id === id) || FACES[0];
-const faceAxes = (f, c) => f.h == null || c.kind !== 'cube' ? '' : `横${ax(c.axes[f.h]).name}・縦${ax(c.axes[f.v]).name}`;
+const faceAxes = (f, c) => f.h == null || c.kind !== 'cube' || !ax((c.axes || [])[f.h]) || !ax((c.axes || [])[f.v]) ? '' : `横${ax(c.axes[f.h]).name}・縦${ax(c.axes[f.v]).name}`;
 const faceOpt = (f, c) => f.name + (faceAxes(f, c) ? '(' + faceAxes(f, c) + ')' : '');
 const pinTo = id => { const f = faceOf(id); return { yaw: f.yaw, pitch: f.pitch, roll: f.roll, face: f.id }; };
 const pinQ = new THREE.Quaternion(), pinE = new THREE.Euler(), invQ = new THREE.Quaternion(), boxV = new THREE.Vector3();
@@ -2140,11 +2144,12 @@ function paint() {
       cg.add(edges(s, s, s, new THREE.Color(css('--accent')), false, .9));
       const axLine = (from, to, col) => { const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]); cg.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: new THREE.Color(css(col)) }))); };
       const h = s / 2 + .02; axLine([-h, -h, h], [h, -h, h], '--ax'); axLine([-h, -h, h], [-h, h, h], '--ay'); axLine([-h, -h, h], [-h, -h, -h], '--az');
-      const names = c.axes.map(a => ax(a).name);
+      const names = [0, 1, 2].map(i => ax((c.axes || [])[i]) ? ax(c.axes[i]).name : '');
       const t1 = textSprite(names[0], css('--ax'), .26); t1.position.set(0, -h - .25, h); cg.add(t1);
       const t2 = textSprite(names[1], css('--ay'), .26); t2.position.set(-h - .1 - t2.scale.x / 2, 0, h); cg.add(t2);
       const t3 = textSprite(names[2], css('--az'), .26); t3.position.set(-h - .1, -h - .25, 0); cg.add(t3);
-      if (!showSheets) addTables(cg, c, s, allFacts);
+      // 面の表は3軸がそろったCubeだけ(分類の列が足りないSheetのCubeは、枠と名前だけ出す)
+      if (!showSheets && [0, 1, 2].every(i => ax((c.axes || [])[i]))) addTables(cg, c, s, allFacts);
       addDice(cg, c, s, s, s);
       const cl = textSprite(unitOf(c) + ' ' + c.name + (c.pin ? '(固定 ' + faceOf(c.pin.face).name + ')' : ''), css(c.pin ? '--hl' : '--accent'), .32); cl.position.set(0, h + .3, 0); cg.add(cl);
       // Sheetは「Sheetだけ」のときだけCubeの中に出す。ふだんはCubeの面に軸で並べたデータを出す
@@ -2156,14 +2161,16 @@ function paint() {
         uprights.push({ pv, mats: { 0: m.material, 1: m.material }, mat: () => m.material, lay: () => {}, k: -1 });
       });
   };
-  const tops = S.boxes.filter(b => !b.parent && b.kind === 'box'), gap = 1.2;
-  const total = tops.reduce((a, b) => a + sizeOf(b), 0) + gap * (tops.length - 1);
+  // いちばん上に置いたBoxとCube(Sheetを入れるために作ったCubeは、Boxに入れなければいちばん上にある)
+  const tops = S.boxes.filter(b => !b.parent && (b.kind === 'box' || b.kind === 'cube')), gap = 1.2;
+  const topW = b => b.kind === 'cube' ? cubeW : sizeOf(b);
+  const total = tops.reduce((a, b) => a + topW(b), 0) + gap * (tops.length - 1);
   let x0 = -total / 2;
-  for (const b of tops) { const W = sizeOf(b); drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
+  for (const b of tops) { const W = topW(b); if (b.kind === 'cube') drawCube(b, world, [x0 + W / 2, 0, 0], false); else drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
   // 全体の大きさが変わったときだけ、全体が入る距離に引く(ふだんのズームは触らない)
-  const span = Math.max(total, ...tops.map(sizeOf));
+  const span = Math.max(total, ...tops.map(topW));
   setHome();
-  extent = { span, bottom: -Math.max(1, ...tops.map(sizeOf)) / 2 - .2 }; placeEnv(); renderWorldUi();
+  extent = { span, bottom: -Math.max(1, ...tops.map(topW)) / 2 - .2 }; placeEnv(); renderWorldUi();
   if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
 }
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
