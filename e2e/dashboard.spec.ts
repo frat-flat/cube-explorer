@@ -773,3 +773,41 @@ test("見本なし: Library は種類から実体へたどり、Column Registry 
   expect(st.axes.find((a: { name: string }) => a.name === "法人コード")).toMatchObject({ status: "deprecated" });
   expect(errors).toEqual([]);
 });
+
+// 軸がまだないところで Sheet を「新しい Cube」に入れても、その Cube が World に出て、Library から開ける
+test("見本なし: Sheet を入れるために作った Cube が World に出て、Library から開ける", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#newName").fill("全顧客");
+  await page.locator("#newData").fill("顧客番号\t代表者名\t営業マン\n0001\t山田\t佐藤\n0002\t田中\t鈴木");
+  await page.locator("#pasteRead").click();
+  await page.locator("#pickCards [data-pact]").selectOption("sheet");
+  await page.locator("#pickGo").click();
+  await page.locator("#approve").click();
+  await expect(page.locator("#matchSec")).toBeHidden();
+  // Cube の3軸は、Sheet の分類の列から埋める(数の列「顧客番号」は軸にしない)
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  const cube = st.boxes.find((b: { kind: string }) => b.kind === "cube");
+  expect(cube.parent).toBeNull();
+  expect(cube.axes.map((a: string) => st.axes.find((x: { id: string }) => x.id === a).name)).toEqual(["代表者名", "営業マン"]);
+  // Library の Cube の種類から開くと、World でその Cube を選んだ状態になる
+  await page.locator('.nv[data-go="library"]').click();
+  await page.locator('[data-lbk="cube"]').click();
+  await page.locator("[data-def]").first().click();
+  await page.locator("[data-iopen]").first().click();
+  await expect(page.locator('.view[data-view="world"]')).toBeVisible();
+  await expect(page.locator("#selUnit")).toHaveValue(cube.id);
+  // Sheet の種類から開くと、Sheet の中身が出る
+  await page.locator('.nv[data-go="library"]').click();
+  await page.locator('[data-lbtop]').click();
+  await page.locator('[data-lbk="sheet"]').click();
+  await page.locator("[data-def]").first().click();
+  await page.locator("[data-iopen]").first().click();
+  await expect(page.locator("#viewSec")).toBeVisible();
+  await expect(page.locator("#viewGrid")).toContainText("山田");
+  await page.waitForTimeout(500);
+  expect(errors).toEqual([]);
+});
