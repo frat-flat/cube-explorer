@@ -48,7 +48,8 @@ test("シートの行から箱を作る", async ({ page }) => {
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#newName").fill("顧客一覧");
   await page.locator("#newData").fill("顧客番号,法人名,代表者名,電話\n0001,法人C,山田,03-1\n0002,法人D,佐藤,03-2\n0002,法人D,佐藤,03-2");
-  await page.locator("#readUnits").click();
+  await page.locator("#pAct").selectOption("box");
+  await page.locator("#read").click();
   await expect(page.locator("#unitSec")).toBeVisible();
   await page.locator('[data-ncol="1"]').check();
   await page.locator('[data-ncol="2"]').check();
@@ -262,5 +263,51 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await expect(page.locator("#gFind")).toBeVisible();
   await page.locator("#navToggle").click();
   await expect(page.locator(".shell")).toHaveClass(/navc/);
+  expect(errors).toEqual([]);
+});
+
+// スプシのリンクを読んだら、シート(タブ)ごとに何にするか(シートとしてキューブへ・1行ずつ箱・1行ずつキューブ・まだ使わない)と入れる先を選ぶ
+test("読み取ったシートごとに、何にするかと入れる先を選ぶ", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const tab = (name: string, cols: string[], rows: string[][]) => ({ name, kind: "data", use: true, cols, rows, size: { rows: rows.length + 1, cols: cols.length }, cf: [], dv: [], formulas: {} });
+  await page.route("**/api/sheets/read**", (r) =>
+    r.fulfill({ json: { book: { name: "全顧客データ", url: "https://docs.google.com/spreadsheets/d/y/edit", real: true, merge: false, gas: [], tabs: [
+      tab("売上", ["年月", "売上金額"], [["2026-07", "1000"], ["2026-08", "1200"]]),
+      tab("顧客", ["顧客番号", "法人名"], [["0101", "法人X"], ["0102", "法人Y"]]),
+      tab("メモ", ["メモ"], [["あとで"]]),
+    ] } } }));
+  await page.goto("/");
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/y/edit");
+  await page.locator("#bookRead").click();
+  await expect(page.locator("#bookSec")).toBeVisible();
+  // 売上はシートとしてキューブ S-02 へ、顧客は1行ずつ箱にして代理店「東京ネット販売」の中へ、メモはまだ使わない
+  await page.locator('[data-dest="0"]').selectOption("c2");
+  await page.locator('[data-act="1"]').selectOption("box");
+  await page.locator('[data-dest="1"]').selectOption("a1");
+  await page.locator('[data-act="2"]').selectOption("none");
+  await expect(page.locator('[data-dest="2"]')).toHaveCount(0);
+  await page.locator("#bookGo").click();
+  // 1枚目: 売上をキューブ S-02 に承認
+  await expect(page.locator("#matchSec")).toBeVisible();
+  await expect(page.locator("#pCube")).toHaveValue("c2");
+  await expect(page.locator("#queueInfo")).toContainText("行から作るもの 1 枚");
+  await page.locator("#approve").click();
+  // 2枚目: 顧客の行から箱(入れる先は選んだ箱)
+  await expect(page.locator("#unitSec")).toBeVisible();
+  await expect(page.locator('input[name=uKind][value="box"]')).toBeChecked();
+  await expect(page.locator("#uParent")).toHaveValue("a1");
+  await page.locator('[data-ncol="1"]').check();
+  await page.locator("#uUnit").fill("お客様");
+  await page.locator("#uMake").click();
+  await expect(page.locator("#unitSec")).toBeHidden();
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.sheets.at(-1).cube).toBe("c2");
+  expect(st.boxes.filter((b: { parent?: string; levelName?: string }) => b.parent === "a1" && b.levelName === "お客様").map((b: { name: string }) => b.name)).toEqual(["0101 法人X", "0102 法人Y"]);
+  // メモは使っていないので Saving に残る
+  await page.locator('.nv[data-go="saving"]').click();
+  await expect(page.locator("#savingList")).toContainText("全顧客データ › メモ");
   expect(errors).toEqual([]);
 });

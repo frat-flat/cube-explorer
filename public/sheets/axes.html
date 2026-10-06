@@ -284,6 +284,9 @@ tfoot td{font-weight:700}
 .stash .cols span.left{border-color:var(--mine);color:var(--mine)}
 .tab{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;font-size:13px}
 .tab .d{grid-column:2;color:var(--muted);font-size:12.5px}
+.tabd{grid-template-columns:minmax(0,1fr)}
+.tabd .d,.tabd .row{grid-column:1}
+.tabd select{max-width:100%}
 .tab code,.gas code{font-family:var(--mono);font-size:12px}
 .ai{border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:13px;display:flex;flex-direction:column;gap:4px}
 .ai b.h{color:var(--accent)}
@@ -366,23 +369,23 @@ tfoot td{font-weight:700}
   <div class="two">
   <section><h2>スプシのリンクで登録</h2>
     <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
-    <div class="row"><span class="muted">入れる先</span><select id="bookTarget" aria-label="入れる先"></select></div>
     <button class="primary" id="bookRead">読み取る</button>
     <p class="msg" id="bookMsg" hidden></p>
-    <p class="muted">スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
-  <section><h2>シートを入れる</h2>
+    <p class="muted">読み取ると、下にシート(タブ)ごとに「何にするか(シートとしてキューブに入れる・1行ずつ箱にする・1行ずつキューブにする)」と「入れる先」を選ぶ欄が出ます。スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
+  <section><h2>貼り付けたシートを入れる</h2>
     <div class="row"><select id="preset" aria-label="例のシート"></select></div>
-    <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先のキューブ"></select></div>
-    <div class="row"><span class="muted">このシート全体の値</span><select id="tagAxis" aria-label="シート全体の軸"></select><input type="text" id="tagVal" size="9" aria-label="シート全体の値"></div>
+    <div class="row"><span class="muted">何にする</span><select id="pAct" aria-label="何にする"><option value="sheet">シートとしてキューブに入れる(列を軸にする)</option><option value="box">1行ずつ箱にする</option><option value="cube">1行ずつキューブにする</option></select></div>
+    <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先"></select></div>
+    <div class="row" id="tagRow"><span class="muted">このシート全体の値</span><select id="tagAxis" aria-label="シート全体の軸"></select><input type="text" id="tagVal" size="9" aria-label="シート全体の値"></div>
     <input type="text" id="newName" placeholder="シート名" aria-label="シート名">
     <textarea id="newData" aria-label="シートの中身(1行目が列名、カンマかタブ区切り)"></textarea>
-    <div class="row"><button class="primary" id="read">軸を読み取って候補を出す</button><button id="readUnits">行から箱・キューブを作る</button></div>
+    <div class="row"><button class="primary" id="read">読み取って次へ</button></div>
   </section>
   </div>
+  <section id="bookSec" hidden><h2>スプシの読み取り結果(シートごとに、何にするかと入れる先を選ぶ)</h2><div id="book"></div></section>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
     <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
   <section id="unitSec" hidden><h2>シートの行から箱・キューブを作る</h2><div id="unitForm"></div></section>
-  <section id="bookSec" hidden><h2>スプシの読み取り結果(使うタブを選んで承認)</h2><div id="book"></div></section>
 </div>
 <div class="view" data-view="saving" hidden>
   <div class="vhead"><h1>Saving</h1><p class="lead">読み取ったけれど、まだ箱・キューブに反映していないシート・列・行の置き場です。箱・キューブに反映するときは、必ず元のスプシから最新を読み直してから入れます。</p></div>
@@ -635,13 +638,21 @@ const PRESETS = [
 ];
 function fillPreset(i) {
   const p = PRESETS[i]; $('newName').value = p.name; $('newData').value = p.data;
-  $('target').value = p.target; $('tagAxis').value = p.tag[0]; $('tagVal').value = p.tag[1];
+  $('pAct').value = 'sheet'; renderTarget(); $('target').value = p.target; $('tagAxis').value = p.tag[0]; $('tagVal').value = p.tag[1];
 }
+// 何にするか: シートとしてキューブに入れる(列を軸に)・1行ずつ箱にする・1行ずつキューブにする・まだ使わない(Saving に置く)
+const ACTS = { sheet: 'シートとしてキューブに入れる(列を軸にする)', box: '1行ずつ箱にする', cube: '1行ずつキューブにする', none: 'まだ使わない(Saving に置いておく)' };
+const pathTxt = id => esc(pathOf(id).map(x => x.name).join(' › '));
+const firstCube = () => (S.boxes.find(b => b.kind === 'cube') || {}).id || '';
+// 入れる先: シートはキューブの中に、箱・キューブにするときは「いちばん上」か箱の中に
+const destOpts = (act, sel) => act === 'sheet'
+  ? S.boxes.filter(b => b.kind === 'cube').map(b => `<option value="${b.id}"${b.id === sel ? ' selected' : ''}>キューブ ${pathTxt(b.id)}</option>`).join('')
+  : `<option value="">いちばん上</option>` + S.boxes.filter(b => b.kind === 'box').map(b => `<option value="${b.id}"${b.id === sel ? ' selected' : ''}>箱 ${pathTxt(b.id)}</option>`).join('');
+function renderTarget() { const v = $('target').value, act = $('pAct').value; $('target').innerHTML = destOpts(act, v); if (act === 'sheet' && !$('target').value) $('target').value = firstCube(); $('tagRow').hidden = act !== 'sheet'; }
 function renderInputs() {
-  const keep = ['preset', 'target', 'tagAxis', 'bookTarget', 'dAxis', 'dScope'].map(id => [id, $(id).value]);
+  const keep = ['preset', 'tagAxis', 'dAxis', 'dScope'].map(id => [id, $(id).value]);
   $('preset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('');
-  const tg = S.boxes.map(b => `<option value="${b.id}">${b.kind === 'box' ? '箱 ' : 'キューブ '}${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('');
-  $('target').innerHTML = tg; $('bookTarget').innerHTML = tg;
+  renderTarget();
   $('dAxis').innerHTML = S.axes.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
   $('dScope').innerHTML = '<option value="all">全体で使う</option>' + S.sheets.map(s => `<option value="${s.id}">このシートだけ: ${esc(where(s))}</option>`).join('');
   $('tagAxis').innerHTML = '<option value="">なし</option>' + S.axes.filter(a => a.kind === 'key').map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
@@ -758,7 +769,15 @@ function bindGroups(p) {
 }
 const pasteGrid = () => { const txt = $('newData').value.replace(/\s+$/, ''); if (!txt.trim()) return null; const lines = txt.split(/\r?\n/), sep = (lines.find(x => x.trim()) || '').includes('\t') ? '\t' : ','; return lines.map(x => x.split(sep).map(v => v.trim())); };
 let pending = null, queue = [];
+// 次の1件へ。queue にはシートの承認(pending)と、行から箱・キューブを作るもの({ unit })が並ぶ
+function nextStep() {
+  const it = queue.shift(); pending = null; unitSrc = null;
+  if (!it) return;
+  if (it.unit) openUnits(it.unit); else pending = it;
+}
+const queueTxt = () => { const a = queue.filter(x => !x.unit).length, b = queue.length - a; return queue.length ? `このあと ${[a ? `シートの承認 ${a} 枚` : '', b ? `行から作るもの ${b} 枚` : ''].filter(Boolean).join('・')} が続きます` : ''; };
 function readSheet() {
+  if ($('pAct').value !== 'sheet') { readUnits(); return; }
   const raw = pasteGrid(); if (!raw) return;
   const name = $('newName').value.trim() || 'シート', e = stash({ src: 'paste', name, L: mkLayout(raw) });
   pending = newPending({ name, cube: $('target').value, tag: $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}, L: copyL(e.L), stash: [{ id: e.id, off: 0 }] });
@@ -768,7 +787,7 @@ function readSheet() {
 function readUnits() {
   const raw = pasteGrid(); if (!raw) { note('シートの中身を貼り付けてください'); return; }
   const name = $('newName').value.trim() || 'シート', e = stash({ src: 'paste', name, L: mkLayout(raw) });
-  save(); openUnits({ name, L: copyL(e.L), stash: e.id });
+  save(); queue = []; openUnits({ name, L: copyL(e.L), stash: e.id, kind: $('pAct').value === 'cube' ? 'cube' : 'box', parent: $('target').value });
 }
 let unitSrc = null;
 function ushape(u) { if (u.L) { const sh = shapeGrid(u.L); u.cols = sh.cols; u.rows = sh.rows; } u.nameCols = u.nameCols.filter(i => i < u.cols.length); return u; }
@@ -785,6 +804,7 @@ function renderUnits() {
     <div class="row"><span class="muted">複数の列を選んだとき</span><select id="uMode" aria-label="複数の列の使い方"><option value="join"${u.nameMode !== 'first' ? ' selected' : ''}>組み合わせる(例: 0001 法人C 山田)</option><option value="first"${u.nameMode === 'first' ? ' selected' : ''}>どれか1つ(左から最初に値がある列)</option></select></div>
     <div class="row"><span class="muted">単位の名前</span><input type="text" id="uUnit" value="${esc(u.unit)}" placeholder="例: お客様" aria-label="単位の名前"></div>
     <div class="row"><span class="muted">入れる先</span><select id="uParent" aria-label="入れる先"><option value="">いちばん上</option>${parents.map(b => `<option value="${b.id}"${u.parent === b.id ? ' selected' : ''}>箱 ${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('')}</select></div>
+    ${queue.length ? `<p class="muted">${queueTxt()}</p>` : ''}
     <p class="muted" id="uPreview">${uniq.length} 個できます${names.length > uniq.length ? `(同じ名前の ${names.length - uniq.length} 行は1つにまとめます)` : ''}。例: ${esc(uniq.slice(0, 4).join(' / ') || 'なし')}</p>
     <div class="row"><button class="primary" id="uMake"${uniq.length && u.unit.trim() ? '' : ' disabled'}>この内容で作る</button><button id="uCancel">やめる</button><span class="muted" id="uHint"${u.unit.trim() ? ' hidden' : ''}>単位の名前を入れてください</span></div>`;
   $('uMode').onchange = e => { u.nameMode = e.target.value; renderUnits(); };
@@ -794,7 +814,7 @@ function renderUnits() {
   // 打つたびに作り直すと入力中の欄やボタンが消えるので、ボタンと案内だけ切り替える
   $('uUnit').oninput = e => { u.unit = e.target.value; $('uMake').disabled = !(uniq.length && u.unit.trim()); $('uHint').hidden = !!u.unit.trim(); };
   $('uParent').onchange = e => { u.parent = e.target.value; };
-  $('uMake').onclick = makeUnits; $('uCancel').onclick = () => { unitSrc = null; renderUnits(); };
+  $('uMake').onclick = makeUnits; $('uCancel').onclick = () => { nextStep(); renderUnits(); renderMatches(); };
 }
 async function makeUnits() {
   const u0 = unitSrc; if (!u0) return;
@@ -820,7 +840,7 @@ async function makeUnits() {
   S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${u.name} の行から${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作った(単位: ${unit})`,
     lines: [...(fresh ? [fresh] : []), `名前に使った列: ${u.nameCols.map(i => colL(i) + ' ' + u.cols[i]).join('・')}${u.nameCols.length > 1 ? (u.nameMode === 'first' ? '(どれか1つ: 左から最初に値がある列)' : '(組み合わせ)') : ''}`, ...(u.L ? [`列名の行: ${u.L.hr + 1}行目${u.L.gr >= 0 ? `・グループ名の行: ${u.L.gr + 1}行目` : ''}`] : []), `入れた先: ${parent ? box(parent).name : 'いちばん上'}`, `作ったもの: ${made.slice(0, 10).join(' / ')}${made.length > 10 ? ' ほか' : ''}`,
       ...markDone(u.stash ? [{ id: u.stash, off: 0 }] : [], u.cols.map(() => true), u.rows.map((r, i) => unitName(u, r) ? i : -1).filter(i => i >= 0))], sources: [{ book: u.name, tab: '', range: 'A2:' + colL(u.cols.length - 1) + (u.rows.length + 1) }], results: [] });
-  unitSrc = null; renderUnits(); numberUnits(); save(); renderAll(); paint();
+  nextStep(); renderUnits(); numberUnits(); save(); renderAll(); paint();
   note(`${unit}の${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作りました`);
 }
 const pickCols = (cols, rows) => cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', rel: null, note: '', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; });
@@ -828,7 +848,7 @@ function renderMatches() {
   queueMicrotask(renderHome);
   const sec = $('matchSec'); sec.hidden = !pending; if (!pending) return;
   const p = pending;
-  $('matches').innerHTML = (p.origin ? `<p class="muted">元: ${esc(p.origin.text)}</p>` : '') + `<p class="muted">入れる先: ${esc(pathOf(p.cube).map(b => b.name).join(' › '))} ・ シート「${esc(p.name)}」${Object.entries(p.tag).map(([a, v]) => ' ・ ' + esc(ax(a).name) + '=' + esc(v)).join('')}。列ごとに、過去に登録した軸と同じ意味か別かを選んでください。候補はすべて並べています。</p>` +
+  $('matches').innerHTML = (p.origin ? `<p class="muted">元: ${esc(p.origin.text)}</p>` : '') + `<div class="row"><span class="muted">入れる先</span><select id="pCube" aria-label="入れる先のキューブ">${destOpts('sheet', p.cube)}</select></div><p class="muted">シート「${esc(p.name)}」${Object.entries(p.tag).map(([a, v]) => ' ・ ' + esc(ax(a).name) + '=' + esc(v)).join('')}。列ごとに、過去に登録した軸と同じ意味か別かを選んでください。候補はすべて並べています。</p>` +
     p.cols.map((c, i) => { const m = p.picks[i], ex = p.rows.slice(0, 3).map(r => r[i]).join(', ');
       const opt = (val, label, why, extra = '') => `<label class="cand"><input type="radio" name="m${i}" value="${val}"${String(m.pick) === String(val) ? ' checked' : ''}><span>${label}${extra}</span><span class="why">${why}</span></label>`;
       return `<div class="match"><div class="col">${esc(c)} <code>例: ${esc(ex)}</code> <span class="muted">候補 ${m.cands.length}件</span></div>` +
@@ -840,10 +860,11 @@ function renderMatches() {
   $('matches').insertAdjacentHTML('afterbegin', (p.L ? headUi(p.L, 'p') : '') + groupUi(p));
   if (p.L) bindHead($('matches'), p.L, () => { reshape(p); if (p.stash && p.stash.length === 1) headToStash(p.stash[0].id, p.L); renderMatches(); });
   bindGroups(p);
+  $('pCube').onchange = e => { p.cube = e.target.value; };
   $('matches').querySelectorAll('input[type=radio]').forEach(r => r.onchange = () => { const i = +r.name.slice(1); p.picks[i].pick = isNaN(+r.value) ? r.value : +r.value; p.picks[i].rel = null; p.picks[i].note = ''; renderMatches(); });
   $('matches').querySelectorAll('[data-rel]').forEach(x => x.onchange = () => { p.picks[+x.dataset.rel].rel = x.value; });
   $('matches').querySelectorAll('[data-note]').forEach(x => x.oninput = () => { p.picks[+x.dataset.note].note = x.value; });
-  $('queueInfo').textContent = queue.length ? `このあと ${queue.length} 枚の承認が続きます` : '';
+  $('queueInfo').textContent = queueTxt();
 }
 async function approve() {
   const p = pending; if (!p) return;
@@ -887,7 +908,7 @@ async function approve() {
   S.sheets.push({ id, cube: p.cube, name: p.name, tag: p.tag, cols: p.cols, rows: p.rows, bind, origin: p.origin ? { text: p.origin.text, short: p.origin.short } : null, cf: p.cf || [], dv: p.dv || [], formulas: p.formulas || {} });
   S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: p.origin ? '取り込み' : '承認', title: `${where({ cube: p.cube, name: p.name })} を入れた`,
     lines: [...(p.origin ? p.origin.minutes : []), ...lines], sources: p.origin ? p.origin.sources : [], results: [id] });
-  pending = queue.shift() || null; save(); note('シート「' + p.name + '」を入れました。保存したまとめは自動で更新されます');
+  nextStep(); save(); note('シート「' + p.name + '」を入れました。保存したまとめは自動で更新されます');
   renderAll();
 }
 
@@ -1076,10 +1097,13 @@ async function readBook() {
   try { const r = await fetch('/api/sheets/read?url=' + encodeURIComponent(url), { credentials: 'same-origin' }); if ((r.headers.get('content-type') || '').includes('json')) j = await r.json(); } catch (e) {}
   $('bookRead').disabled = false;
   if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')';
-  if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。使うタブを選んで取り込んでください(反映するまでは Saving に置いておきます)`); }
+  if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。下でシートごとに、何にするかと入れる先を選んでください(反映するまでは Saving に置いておきます)`); }
   else if (j && j.error) { book = null; renderBook(); bookMsg(j.error, true); return; }
   else { book = mockBook(url); bookMsg('ここからはリンク先を読めないため、例のデータで流れを見せています。本物はアプリの画面で読めます', true); }
   book.url = book.url || url; stashBook(book); save(); renderSaving();
+  // タブごとの初期値: データのタブはシートとして最初のキューブへ。何にするか・入れる先はタブごとに選び直せる
+  book.canMerge = !!book.merge;
+  book.tabs.forEach(t => { if (t.kind === 'data') { t.act = t.use === false ? 'none' : 'sheet'; t.dest = firstCube(); } });
   renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
@@ -1087,45 +1111,51 @@ function renderBook() {
   const sec = $('bookSec'); sec.hidden = !book; if (!book) return;
   const data = book.tabs.filter(t => t.kind === 'data'), tot = data.reduce((a, t) => a + t.size.rows * t.size.cols, 0);
   let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・${book.real ? 'GAS は読めません' : 'GAS ' + book.gas.length + ' 個'}</p><div class="tabs">`;
-  h += book.tabs.map((t, i) => `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : t.kind === 'misc' ? 'その他' : 'データのタブ'}</span></b>
+  h += book.tabs.map((t, i) => (t.kind === 'data'
+    ? `<div class="tab tabd" data-tab="${i}"><b>${esc(t.name)} <span class="muted">データのタブ</span></b>
+    <div class="row"><span class="muted">何にする</span><select data-act="${i}" aria-label="${esc(t.name)} を何にする">${Object.entries(ACTS).map(([k, v]) => `<option value="${k}"${t.act === k ? ' selected' : ''}${k === 'sheet' && !firstCube() ? ' disabled' : ''}>${v}</option>`).join('')}</select>
+    ${t.act === 'none' ? '' : `<span class="muted">入れる先</span><select data-dest="${i}" aria-label="${esc(t.name)} の入れる先">${destOpts(t.act, t.dest)}</select>`}</div>
+    ${t.act === 'box' || t.act === 'cube' ? `<span class="d">1行を1つの${t.act === 'box' ? '箱' : 'キューブ'}にします。名前に使う列と単位の名前は、このあとの画面で選びます</span>` : ''}`
+    : `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : 'その他'}</span></b>`) + `
     <span class="d">実物: 約${t.size.rows.toLocaleString()}行×${t.size.cols}列(${cellsTxt(t)}セル)・列: ${esc(t.cols.join(' / ') || 'なし')}${book.real ? `・読んだ行 ${t.rows.length}${t.truncated ? '(先頭だけ)' : ''}` : ''}</span>
     ${Object.entries(t.formulas).map(([c, f]) => `<span class="d">関数 ${c}列: <code>${esc(f.f.replace('{r}', '2'))}</code> … ${esc(f.text)}${t.q ? ' → 「まとめる」の条件として再現' : ' → 同じ計算をシートに持つ'}</span>`).join('')}
     ${t.cf.map(c => `<span class="d">条件付き書式: ${esc(c.text)} → 同じ表示ルールを再現</span>`).join('')}
-    ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}</label>`).join('');
+    ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}${t.kind === 'data' ? '</div>' : '</label>'}`).join('');
   h += '</div>';
-  const dataIdx = book.tabs.map((t, i) => [t, i]).filter(([t]) => t.kind === 'data');
-  if (dataIdx.length) h += `<div class="row"><span class="muted">行から箱・キューブを作る:</span>${dataIdx.map(([t, i]) => `<button class="small" data-units="${i}">${esc(t.name)}</button>`).join('')}</div>`;
+  const asSheet = data.filter(t => t.act === 'sheet');
   h += book.gas.map(g => `<div class="gas"><b>GAS <code>${esc(g.fn)}</code></b> <span class="muted">(${esc(g.trig)})</span><br>AIの読み取り: ${esc(g.text)}<br>置き換え案: ${esc(g.plan)} <span class="muted">(GAS 自体は自動では動かしません)</span></div>`).join('');
-  if (book.real && book.merge) h += `<div class="ai"><b class="h">まとめる提案(列とタブ名から判定)</b>
-    <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、タブ名に年月があります。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
-    <label><input type="radio" name="merge" value="1" checked> 1枚にまとめる(おすすめ)</label>
-    <label><input type="radio" name="merge" value="0"> 分けたまま、タブごとにシートにする</label></div>`;
-  else if (!book.real && data.length > 1) h += `<div class="ai"><b class="h">AIの提案(試作では決まった例文)</b>
-    <span>${esc(data.map(t => t.name).join('・'))} は列が同じで、月ごとにタブを分けています。1タブ約4万行、${data.length}タブで約${Math.round(tot / 10000)}万セルあり、スプシの上限(1ファイル1,000万セル)や読み込みの重さを避けるために分けたと推定します。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
+  if (book.real && book.canMerge && asSheet.length > 1) h += `<div class="ai"><b class="h">まとめる提案(列とタブ名から判定)</b>
+    <span>${esc(asSheet.map(t => t.name).join('・'))} は列が同じで、タブ名に年月があります。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
+    <label><input type="radio" name="merge" value="1"${book.merge ? ' checked' : ''}> 1枚にまとめる(おすすめ。入れる先は「${esc(asSheet[0].name)}」で選んだキューブ)</label>
+    <label><input type="radio" name="merge" value="0"${!book.merge ? ' checked' : ''}> 分けたまま、タブごとにシートにする</label></div>`;
+  else if (!book.real && asSheet.length > 1) h += `<div class="ai"><b class="h">AIの提案(試作では決まった例文)</b>
+    <span>${esc(asSheet.map(t => t.name).join('・'))} は列が同じで、月ごとにタブを分けています。1タブ約4万行、${data.length}タブで約${Math.round(tot / 10000)}万セルあり、スプシの上限(1ファイル1,000万セル)や読み込みの重さを避けるために分けたと推定します。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
     <label><input type="radio" name="merge" value="1"${book.merge ? ' checked' : ''}> 1枚にまとめる(おすすめ)</label>
     <label><input type="radio" name="merge" value="0"${!book.merge ? ' checked' : ''}> 分けたまま、タブごとにシートにする</label></div>`;
-  h += `<div class="row"><button class="primary" id="bookGo">この内容で取り込む(このあと列ごとに承認)</button><button id="bookCancel">やめる</button></div>`;
+  h += `<div class="row"><button class="primary" id="bookGo">この内容で進める(このあと1枚ずつ確かめて反映)</button><button id="bookCancel">やめる</button></div>`;
   $('book').innerHTML = h;
   $('book').querySelectorAll('[data-use]').forEach(c => c.onchange = () => { book.tabs[+c.dataset.use].use = c.checked; });
   $('book').querySelectorAll('input[name=merge]').forEach(r => r.onchange = () => { book.merge = r.value === '1'; });
-  $('book').querySelectorAll('[data-units]').forEach(x => x.onclick = () => { const t = book.tabs[+x.dataset.units]; const e = S.saving.find(x => x.url === book.url && x.tab === t.name); openUnits({ name: book.name + ' › ' + t.name, L: e ? copyL(e.L) : tabLayout(t), src: { url: book.url, tabs: [t.name], merge: false }, stash: e && e.id }); });
+  $('book').querySelectorAll('[data-act]').forEach(x => x.onchange = () => { const t = book.tabs[+x.dataset.act], was = t.act; t.act = x.value; t.use = t.act !== 'none';
+    if ((was === 'sheet') !== (t.act === 'sheet')) t.dest = t.act === 'sheet' ? firstCube() : ''; renderBook(); });
+  $('book').querySelectorAll('[data-dest]').forEach(x => x.onchange = () => { book.tabs[+x.dataset.dest].dest = x.value; });
   $('bookGo').onclick = importBook; $('bookCancel').onclick = () => { book = null; renderBook(); };
 }
 function importBook() {
-  const b = book, target = $('bookTarget').value, data = b.tabs.filter(t => t.kind === 'data' && t.use), calc = b.tabs.filter(t => t.kind === 'calc' && t.use);
-  const skip = b.tabs.filter(t => !t.use).map(t => t.name);
+  const b = book, data = b.tabs.filter(t => t.kind === 'data' && t.act === 'sheet' && t.dest), rowTabs = b.tabs.filter(t => t.kind === 'data' && (t.act === 'box' || t.act === 'cube')), calc = b.tabs.filter(t => t.kind === 'calc' && t.use);
+  const skip = b.tabs.filter(t => t.kind === 'data' ? t.act === 'none' : !t.use).map(t => t.name);
   const head = [`「${b.name}」を読み取った(${b.url})`, ...data.map(t => `${t.name}: 1行目を列名と判断(${t.cols.join(' / ')})。A2:${colL(t.cols.length - 1)}${t.rows.length + 1} の ${t.rows.length} 行を読み取り`),
     ...data.slice(0, 1).flatMap(t => [...Object.entries(t.formulas).map(([c, f]) => `${c}列の関数 ${f.f.replace('{r}', 'n')} は「${f.text}」と読み取った`), ...t.cf.map(c => `条件付き書式「${c.text}」を表示ルールとして写した`), ...t.dv.map(c => `入力規則「${c.text}」を写した`)]),
     ...b.gas.map(g => `GAS ${g.fn}(${g.trig}): ${g.text}。自動では動かさず「${g.plan}」とする案`), ...(skip.length ? [`使わないタブ: ${skip.join('・')}`] : [])];
   const fx = t => Object.fromEntries(Object.entries(t.formulas).map(([c, f]) => [c, f]));
-  const mk = (name, cols, rows, tag, t, srcTabs, extra) => ({ name, cube: target, tag, cols, rows, picks: pickCols(cols, rows), cf: t.cf.map(c => ({ ...c, col: c.col + (extra || 0) })), dv: t.dv.map(c => ({ ...c, col: c.col + (extra || 0) })), formulas: fx(t),
+  const mk = (name, cols, rows, tag, t, srcTabs, extra) => ({ name, cube: srcTabs[0].dest, tag, cols, rows, picks: pickCols(cols, rows), cf: t.cf.map(c => ({ ...c, col: c.col + (extra || 0) })), dv: t.dv.map(c => ({ ...c, col: c.col + (extra || 0) })), formulas: fx(t),
     src: { url: b.url, tabs: srcTabs.map(x => x.name), merge: extra === 1 }, stash: srcTabs.map(x => S.saving.find(e => e.url === b.url && e.tab === x.name)).filter(Boolean).map(e => ({ id: e.id, off: extra || 0 })),
     origin: { text: b.name + ' › ' + srcTabs.map(x => x.name).join(' / '), short: srcTabs.length > 1 ? srcTabs.length + 'タブをまとめた' : 'スプシから', minutes: head, sources: srcTabs.map(x => ({ book: b.name, tab: x.name, range: 'A1:' + colL(x.cols.length - 1) + (x.rows.length + 1) })) } });
   const items = [];
   if (b.real) {   // 本物のスプシ: シート名はスプシとタブの名前、タブ名に年月があれば「月」の値にする
-    if (data.length && b.merge) { const p = mk(b.name, ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), {}, data[0], data, 1); p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(提案を承認)`]; items.push(p); }
+    if (data.length > 1 && b.merge) { const p = mk(b.name, ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), {}, data[0], data, 1); p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(提案を承認)`]; items.push(p); }
     else data.forEach(t => { const p = mk(data.length > 1 ? b.name + ' › ' + t.name : b.name, t.cols, t.rows.map(r => [...r]), t.month ? { month: t.month } : {}, t, [t], 0); p.origin.minutes = [...head, `${t.name} をタブのまま1枚のシートにした${t.month ? `。月はタブ名から「月=${t.month}」とした` : ''}`]; items.push(p); });
-  } else if (data.length && b.merge) {
+  } else if (data.length > 1 && b.merge) {
     const p = mk('au PAYの売上(' + b.name + ')', ['月', ...data[0].cols], data.flatMap(t => t.rows.map(r => [t.month, ...r])), { mall: 'au PAYマーケット' }, data[0], data, 1);
     p.origin.minutes = [...head, `${data.map(t => t.name).join('・')} を1枚にまとめ、タブ名の年月を「月」の列にした(AIの提案を承認)`];
     items.push(p);
@@ -1138,8 +1168,12 @@ function importBook() {
     if (es.length === 1 && !it.src.merge) it.L = copyL(es[0].L);
     else it.in = es.length ? { cols: it.src.merge ? ['月', ...es[0].cols] : es[0].cols, rows: it.src.merge ? es.flatMap(e => e.rows.map(r => [e.month, ...r])) : es[0].rows } : { cols: it.cols, rows: it.rows };
     it.groups = []; reshape(it); });
-  book = null; queue = items.slice(1); pending = items[0] || null; save(); renderAll();
+  // 行から箱・キューブを作るタブは、シートの承認のあとに1枚ずつ(名前に使う列と単位をそこで選ぶ)
+  rowTabs.forEach(t => { const e = S.saving.find(x => x.url === b.url && x.tab === t.name);
+    items.push({ unit: { name: b.name + ' › ' + t.name, L: e ? copyL(e.L) : tabLayout(t), src: { url: b.url, tabs: [t.name], merge: false }, stash: e && e.id, kind: t.act, parent: t.dest || '' } }); });
+  book = null; queue = items; nextStep(); save(); renderAll();
   if (pending) go('import'), $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  else if (!unitSrc) note(skip.length ? `反映するものがないので、読み取った ${skip.length} 枚は Saving に置いておきました` : '反映するものがありませんでした');
 }
 
 // ---------- Saving: 読み取ったけれど、まだ箱・キューブに反映していないシート・列・行の置き場 ----------
@@ -1210,13 +1244,13 @@ function renderSaving() {
     const src = e.url ? { url: e.url, tabs: [e.tab], merge: false } : null;
     if (q('[data-svr]')) q('[data-svr]').onclick = async () => { q('[data-svr]').disabled = true; try { await freshen(src); note(`「${e.name}」を読み直しました`); } catch (x) { note('読み直せませんでした: ' + x.message); } save(); renderSaving(); };
     q('[data-svm]').onclick = () => {
-      pending = newPending({ name: e.name, cube: $('target').value, tag: e.month ? { month: e.month } : {}, L: copyL(e.L), src, stash: [{ id: e.id, off: 0 }],
+      pending = newPending({ name: e.name, cube: $('pAct').value === 'sheet' && $('target').value || firstCube(), tag: e.month ? { month: e.month } : {}, L: copyL(e.L), src, stash: [{ id: e.id, off: 0 }],
         origin: e.url ? { text: e.name, short: 'スプシから', minutes: [`Saving の「${e.name}」(${e.url})から入れた`], sources: [{ book: e.book, tab: e.tab, range: 'A1:' + colL(e.cols.length - 1) + (e.L.raw.length) }] } : null });
       // 反映済みの列は「使わない」を初期値にする
       e.colsDone.forEach(i => { const k = pending.cols.indexOf(e.cols[i]); if (k >= 0) pending.picks[k].pick = 'skip'; });
       queue = []; renderMatches(); go('import'); $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     };
-    q('[data-svu]').onclick = () => openUnits({ name: e.name, L: copyL(e.L), src, stash: e.id });
+    q('[data-svu]').onclick = () => (queue = [], openUnits({ name: e.name, L: copyL(e.L), src, stash: e.id }));
     bindHead(card, e.L, () => { refreshEntry(e); save(); renderSaving(); });
     q('[data-svx]').onclick = () => { S.saving = S.saving.filter(x => x !== e); S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '取り込み', title: `Saving から「${e.name}」を消した`, lines: [`反映していない列 ${e.cols.length - e.colsDone.length} 個・行 ${e.rows.length - e.rowsDone.length} 行は入れずに消した`], sources: [], results: [] }); save(); renderAll(); renderHome(); };
   });
@@ -2313,9 +2347,9 @@ try { if (localStorage.getItem('axis-boxes-v2:navc')) navC(true); } catch (e) {}
 // ---------- つなぐ ----------
 function renderAll() { renderPinBar(); renderInputs(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); renderSaving(); }
 $('read').onclick = readSheet;
-$('readUnits').onclick = readUnits;
+$('pAct').onchange = renderTarget;
 $('approve').onclick = approve;
-$('cancel').onclick = () => { pending = null; queue = []; renderMatches(); };
+$('cancel').onclick = () => { pending = null; queue = []; unitSrc = null; renderMatches(); renderUnits(); };
 $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };
 $('bookRead').onclick = readBook;
 // アプリの中で開いたときだけ(読み取りの口に答えがある)ログアウトを出す
