@@ -1826,8 +1826,8 @@ function focusSel() {
   if (sel === focused) return; focused = sel;
   const ids = selUnits().map(b => b.id), gs = groups.filter(x => ids.includes(x.u.id));
   if (!gs.length) return;
-  const c = new THREE.Vector3(), v = new THREE.Vector3(); gs.forEach(x => c.add(x.g.getWorldPosition(v))); tgtGoal.copy(c.divideScalar(gs.length));
-  const one = gs.length === 1 && gs[0].u.kind === 'cube'; cam.dist = Math.min(cam.dist, one ? 7 : gs.length === 1 ? sizeOfUnit(gs[0].u) * 1.6 + 3 : cam.dist);
+  const c = new THREE.Vector3(), v = new THREE.Vector3(); gs.forEach(x => c.add(x.g.getWorldPosition(v))); c.divideScalar(gs.length); if (![c.x, c.y, c.z].every(Number.isFinite)) return; tgtGoal.copy(c);
+  const one = gs.length === 1 && gs[0].u.kind === 'cube'; const d = one ? 7 : gs.length === 1 ? sizeOfUnit(gs[0].u) * 1.6 + 3 : cam.dist; if (Number.isFinite(d)) cam.dist = Math.min(cam.dist, d);
 }
 let sizeOfUnit = () => 10;
 const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
@@ -2093,7 +2093,8 @@ function paint() {
     const slot = Math.max(cubeSlot, ...items.filter(it => it.u && it.u.kind === 'box').map(it => sizeOf(it.u) + .5));
     return { items, k, slot, size: k * slot + .3 };
   };
-  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) memo[L] = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); return memo[L]; };
+  // 同じ単位のBoxが入れ子になっていても止まらないよう、計算中は仮の大きさを置く。数にならなければ1マスの大きさ
+  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) { memo[L] = cubeSlot; const v = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); memo[L] = Number.isFinite(v) ? v : cubeSlot; } return memo[L]; };
   sizeOfUnit = sizeOf;
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
@@ -2173,6 +2174,13 @@ function paint() {
   extent = { span, bottom: -Math.max(1, ...tops.map(topW)) / 2 - .2 }; placeEnv(); renderWorldUi();
   if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
 }
+function resetCam() {
+  console.warn('視点を戻しました', JSON.stringify({ cam, tgt, tgtGoal, homeC, span: extent && extent.span }));
+  const ok = v => [v.x, v.y, v.z].every(Number.isFinite);
+  if (!ok(homeC)) homeC.set(0, 0, 0);
+  tgtGoal.copy(homeC); tgt.copy(homeC); cam.th = .45; cam.ph = .34;
+  cam.dist = Math.min(Number.isFinite(envLimit) ? envLimit : 120, fitDist(extent && Number.isFinite(extent.span) ? extent.span : 8)); fitted = 0;
+}
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
 let drag = null;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
@@ -2202,6 +2210,8 @@ function loop() {
   // 固定するときは必ずどこかの面を正面にする。Boxは必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
   // 遠近はそのままなので、Boxの奥行き(中の壁)とCubeの立体感は残る。Cubeは選んだ目を正面に向ける
   const th = boxLocked() ? 0 : cam.th, ph = boxLocked() ? 0 : cam.ph;
+  // 視点の数が壊れたら(NaN・無限)、何も映らなくなるので全体を見る位置に戻す
+  if (![cam.th, cam.ph, cam.dist, tgt.x, tgt.y, tgt.z, tgtGoal.x, tgtGoal.y, tgtGoal.z].every(Number.isFinite)) resetCam();
   tgt.lerp(tgtGoal, .2);   // 見る中心(選んだBox・Cubeか、操作キーで動かした位置)へなめらかに寄る
   camera.position.set(tgt.x + cam.dist * Math.cos(ph) * Math.sin(th), tgt.y + cam.dist * Math.sin(ph), tgt.z + cam.dist * Math.cos(ph) * Math.cos(th));
   camera.lookAt(tgt);
