@@ -107,6 +107,38 @@ test("読み取ったものは Saving に置き、反映の前に最新を読み
   expect(errors).toEqual([]);
 });
 
+// 何行目が列名かはシートによる: 表題・グループ名(口座情報)の行があっても列名の行を推定し、選び直せる。複数の列を同じ項目にまとめられる
+test("列名の行を選び、複数の列を同じ項目にまとめる", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#newName").fill("顧客台帳");
+  await page.locator("#newData").fill("顧客一覧,,,,\n,,,口座情報,\n顧客番号,PartyID,法人名,銀行名,支店名\n0001,,法人C,みずほ,本店\n,P-9,法人D,りそな,新宿");
+  await page.locator("#read").click();
+  await expect(page.locator("#matchSec")).toBeVisible();
+  // 3行目が列名、2行目がグループ名の行と推定する
+  await expect(page.locator('[data-hr="p"]')).toHaveValue("2");
+  await expect(page.locator('[data-gr="p"]')).toHaveValue("1");
+  await expect(page.locator("#matches")).toContainText("口座情報 › 銀行名");
+  // グループ名の行から「口座情報」をまとめる提案と、選んだ列を「顧客」(どれか1つ)にまとめる
+  await page.locator("[data-gsug]").first().click();
+  await page.locator('[data-gc="0"]').check();
+  await page.locator('[data-gc="1"]').check();
+  await page.locator("#gName").fill("顧客");
+  await page.locator("#gMode").selectOption("first");
+  await page.locator("#gAdd").click();
+  await expect(page.locator("#matches")).toContainText("「顧客」= A 顧客番号 + B PartyID");
+  await page.locator("#approve").click();
+  await expect(page.locator("#matchSec")).toBeHidden();
+  const sh = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}").sheets.at(-1));
+  expect(sh.cols).toEqual(["顧客番号", "PartyID", "法人名", "口座情報 › 銀行名", "口座情報 › 支店名", "口座情報", "顧客"]);
+  expect(sh.rows.map((r: string[]) => r[6])).toEqual(["0001", "P-9"]);
+  expect(sh.rows[0][5]).toBe("みずほ 本店");
+  expect(errors).toEqual([]);
+});
+
 // 立体は World の画面だけに出し、設定で選んだ世界(Blender で作った世界)をまわりに映す
 test("World で設定した世界の中に立体を並べる", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));

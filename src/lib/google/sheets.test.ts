@@ -48,4 +48,15 @@ describe("toBook", () => {
     expect(t.cf[0].text).toBe("売上金額 が 150000 未満 なら色を付ける");
     expect(b.tabs[2]).toMatchObject({ kind: "misc", use: false });
   });
+  it("表をそのまま(grid)と、上のほうの結合セル(merges)も返す。何行目を列名にするかは画面で選ぶ", () => {
+    const raw: RawSpreadsheet = {
+      sheets: [
+        { ...tab("顧客", [[cell("顧客一覧")], [cell(""), cell("口座情報"), cell("")], [cell("顧客番号"), cell("銀行名"), cell("支店名")], [cell("0001"), cell("みずほ"), cell("本店")]]),
+          merges: [{ startRowIndex: 1, endRowIndex: 2, startColumnIndex: 1, endColumnIndex: 3 }] },
+      ],
+    };
+    const [t] = toBook("u", raw).tabs;
+    expect(t.grid).toEqual([["顧客一覧", "", ""], ["", "口座情報", ""], ["顧客番号", "銀行名", "支店名"], ["0001", "みずほ", "本店"]]);
+    expect(t.merges).toEqual([{ r0: 1, r1: 2, c0: 1, c1: 3 }]);
+  });
 });
