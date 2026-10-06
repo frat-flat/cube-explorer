@@ -46,8 +46,8 @@ test("Supabase の保存から開き、変えたら送り返す", async ({ page 
   await expect(page.locator('.view[data-view="dict"]')).toContainText("雲の軸");
 });
 
-// 貼り付けたシートの行から、名前に使う列と単位を選んで箱を作る
-test("シートの行から箱を作る", async ({ page }) => {
+// 貼り付けたSheetの行から、名前に使う列と単位を選んでBoxを作る
+test("Sheetの行からBoxを作る", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   await page.goto("/");
   const errors: string[] = [];
@@ -55,8 +55,11 @@ test("シートの行から箱を作る", async ({ page }) => {
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#newName").fill("顧客一覧");
   await page.locator("#newData").fill("顧客番号,法人名,代表者名,電話\n0001,法人C,山田,03-1\n0002,法人D,佐藤,03-2\n0002,法人D,佐藤,03-2");
-  await page.locator("#pAct").selectOption("box");
-  await page.locator("#read").click();
+  await page.locator("#pasteRead").click();
+  // 貼り付けた表は「読み取った Sheet」にチェックした状態で出る
+  await expect(page.locator("#pickList .pk.on")).toHaveCount(1);
+  await page.locator("#pickCards [data-pact]").selectOption("box");
+  await page.locator("#pickGo").click();
   await expect(page.locator("#unitSec")).toBeVisible();
   await page.locator('[data-ncol="1"]').check();
   await page.locator('[data-ncol="2"]').check();
@@ -67,7 +70,7 @@ test("シートの行から箱を作る", async ({ page }) => {
   await expect(page.locator("#unitSec")).toBeHidden();
   await page.locator('.nv[data-go="home"]').click();
   await expect(page.locator("#tree")).toContainText("0001 法人C 山田");
-  await expect(page.locator("#tree")).toContainText("お客様単位・箱6");
+  await expect(page.locator("#tree")).toContainText("お客様単位・Box6");
   const n = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}").boxes.filter((b: { levelName?: string }) => b.levelName === "お客様").length);
   expect(n).toBe(2);
   expect(errors).toEqual([]);
@@ -89,13 +92,17 @@ test("読み取ったものは Saving に置き、反映の前に最新を読み
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/x/edit");
   await page.locator("#bookRead").click();
-  await expect(page.locator("#bookSec")).toBeVisible();
+  await expect(page.locator("#pickList .pk")).toHaveCount(1);
+  // 同じスプシを別の形のリンクで読み直しても、タブは重ならない
+  await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/x/edit?gid=0#gid=0");
+  await page.locator("#bookRead").click();
+  await expect(page.locator("#pickList .pk")).toHaveCount(1);
   // まだ反映していないので Saving に1件
   await expect(page.locator("#nb-saving")).toHaveText("1");
   await page.locator('.nv[data-go="saving"]').click();
   await expect(page.locator(".stash")).toContainText("顧客台帳 › 顧客");
   await expect(page.locator(".stash")).toContainText("まだ反映していない行 2 行");
-  // スプシ側で行が増えた。反映の直前に読み直すので、増えた行も箱になる
+  // スプシ側で行が増えた。反映の直前に読み直すので、増えた行もBoxになる
   rows.push(["0003", "法人E", "鈴木"]);
   const before = reads;
   await page.locator("[data-svu]").click();
@@ -115,7 +122,7 @@ test("読み取ったものは Saving に置き、反映の前に最新を読み
   expect(errors).toEqual([]);
 });
 
-// 何行目が列名かはシートによる: 表題・グループ名(口座情報)の行があっても列名の行を推定し、選び直せる。複数の列を同じ項目にまとめられる
+// 何行目が列名かはSheetによる: 表題・グループ名(口座情報)の行があっても列名の行を推定し、選び直せる。複数の列を同じ項目にまとめられる
 test("列名の行を選び、複数の列を同じ項目にまとめる", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
@@ -124,7 +131,8 @@ test("列名の行を選び、複数の列を同じ項目にまとめる", async
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#newName").fill("顧客台帳");
   await page.locator("#newData").fill("顧客一覧,,,,\n,,,口座情報,\n顧客番号,PartyID,法人名,銀行名,支店名\n0001,,法人C,みずほ,本店\n,P-9,法人D,りそな,新宿");
-  await page.locator("#read").click();
+  await page.locator("#pasteRead").click();
+  await page.locator("#pickGo").click();
   await expect(page.locator("#matchSec")).toBeVisible();
   // 3行目が列名、2行目がグループ名の行と推定する
   await expect(page.locator('[data-hr="p"]')).toHaveValue("2");
@@ -170,7 +178,7 @@ test("World で設定した世界の中に立体を並べる", async ({ page }) 
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}").prefs?.world)).toBe("zen");
   // 世界の中は展示: 凡例(文字)は出さない
   await expect(page.locator("#legend")).toBeHidden();
-  // 名前で探すと、そのキューブの中(無地)に入り、戻るボタンで世界に戻る
+  // 名前で探すと、そのCubeの中(無地)に入り、戻るボタンで世界に戻る
   // 和の庭では探す欄は立て札の中
   await expect(page.locator("#guide.sign")).toBeVisible();
   // 検索・フィルターは 3D の枠の外。枠の中は右上の小さな案内図だけ
@@ -204,7 +212,7 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  // 見本は代理店・申込者の箱の中に法人
+  // 見本は代理店・申込者のBoxの中に法人
   await expect(page.locator("#tree")).toContainText("代理店単位");
   await page.locator('.nv[data-go="world"]').click();
   // カレンダー: 法人A の申込日(2026-04-12)の札があり、ダブルクリックで中に入れる
@@ -235,7 +243,7 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await expect(page.locator("#cal .ym").nth(5)).toContainText("法人B");
   await page.locator('#cal [data-yy="2026"]').click();
   await expect(page.locator("#cal h3")).toHaveText("2026年");
-  // 立体で見る: カレンダーの並びのままキューブにする(上の帯だけ残る)
+  // 立体で見る: カレンダーの並びのままCubeにする(上の帯だけ残る)
   await page.locator("#calCube").click();
   await expect(page.locator("#cal")).toHaveClass(/bar/);
   await expect(page.locator("#stage #cal")).toHaveCount(0);
@@ -287,8 +295,8 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   expect(errors).toEqual([]);
 });
 
-// スプシのリンクを読んだら、シート(タブ)ごとに何にするか(シートとしてキューブへ・1行ずつ箱・1行ずつキューブ・まだ使わない)と入れる先を選ぶ
-test("読み取ったシートごとに、何にするかと入れる先を選ぶ", async ({ page }) => {
+// スプシのリンクを読んだら、Sheet(タブ)ごとに何にするか(SheetとしてCubeへ・1行ずつBox・1行ずつCube・まだ使わない)と入れる先を選ぶ
+test("読み取ったSheetごとに、何にするかと入れる先を選ぶ", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -303,26 +311,32 @@ test("読み取ったシートごとに、何にするかと入れる先を選�
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/y/edit");
   await page.locator("#bookRead").click();
-  await expect(page.locator("#bookSec")).toBeVisible();
-  // カードは名前・大きさ・選ぶ所だけ。列などの中身は「詳しく」を開いたときだけ。貼り付け欄は折り返さない
-  await expect(page.locator('[data-tab="0"] .sz')).toHaveText("3行 × 2列");
-  await expect(page.locator('[data-more="0"] .dt')).toBeHidden();
-  await page.locator('[data-more="0"] summary').click();
-  await expect(page.locator('[data-more="0"] .cols')).toContainText("売上金額");
+  // タブはチェックリストに並び、チェックしたものだけ下にカードで出る
+  await expect(page.locator("#pickList .pk")).toHaveCount(3);
+  await expect(page.locator("#pickList .pk.on")).toHaveCount(3);
+  await expect(page.locator("#pickList .pk").first().locator(".sz")).toHaveText("2行 × 2列");
+  const card = (n: number) => page.locator("#pickCards .tab").nth(n);
+  await expect(page.locator("#pickCards .tab")).toHaveCount(3);
+  // 何にするは Sheet・Box・Cube・Card の4つ
+  await expect(card(0).locator("[data-pact] option")).toHaveText(["Sheet として Cube に入れる(列を軸にする)", "1行ずつ Box にする", "1行ずつ Cube にする", "1行ずつ Card にする"]);
+  // 列と最初の行は開いたときだけ。貼り付け欄は折り返さない
+  await expect(card(0).locator(".pv")).toBeHidden();
+  await card(0).locator("summary").click();
+  await expect(card(0).locator(".pv")).toContainText("売上金額");
   await expect(page.locator("#newData")).toHaveAttribute("wrap", "off");
-  // 売上はシートとしてキューブ S-02 へ、顧客は1行ずつ箱にして代理店「東京ネット販売」の中へ、メモはまだ使わない
-  await page.locator('[data-dest="0"]').selectOption("c2");
-  await page.locator('[data-act="1"]').selectOption("box");
-  await page.locator('[data-dest="1"]').selectOption("a1");
-  await page.locator('[data-act="2"]').selectOption("none");
-  await expect(page.locator('[data-dest="2"]')).toHaveCount(0);
-  await page.locator("#bookGo").click();
-  // 1枚目: 売上をキューブ S-02 に承認
+  // 売上はSheetとしてCube S-02 へ、顧客は1行ずつBoxにして代理店「東京ネット販売」の中へ、メモはチェックを外す
+  await card(0).locator("[data-pdest]").selectOption("c2");
+  await card(1).locator("[data-pact]").selectOption("box");
+  await card(1).locator("[data-pdest]").selectOption("a1");
+  await page.locator("#pickList .pk", { hasText: "メモ" }).locator("input").uncheck();
+  await expect(page.locator("#pickCards .tab")).toHaveCount(2);
+  await page.locator("#pickGo").click();
+  // 1枚目: 売上をCube S-02 に承認
   await expect(page.locator("#matchSec")).toBeVisible();
   await expect(page.locator("#pCube")).toHaveValue("c2");
   await expect(page.locator("#queueInfo")).toContainText("行から作るもの 1 枚");
   await page.locator("#approve").click();
-  // 2枚目: 顧客の行から箱(入れる先は選んだ箱)
+  // 2枚目: 顧客の行からBox(入れる先は選んだBox)
   await expect(page.locator("#unitSec")).toBeVisible();
   await expect(page.locator('input[name=uKind][value="box"]')).toBeChecked();
   await expect(page.locator("#uParent")).toHaveValue("a1");
@@ -339,8 +353,8 @@ test("読み取ったシートごとに、何にするかと入れる先を選�
   expect(errors).toEqual([]);
 });
 
-// 右の「シートを選んで入れる」でも、読み取ったスプシのシートを選べる(中身は Saving のもの、反映の前に読み直す)
-test("読み取ったシートを右の欄で選んで入れる", async ({ page }) => {
+// 右の「Sheetを選んで入れる」でも、読み取ったスプシのSheetを選べる(中身は Saving のもの、反映の前に読み直す)
+test("読み取ったSheetを右の欄で選んで入れる", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -357,16 +371,13 @@ test("読み取ったシートを右の欄で選んで入れる", async ({ page 
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/z/edit");
   await page.locator("#bookRead").click();
-  await expect(page.locator("#bookSec")).toBeVisible();
-  // 読み取ったシートが右の「シート」に並び、最初のシートが選ばれている
-  await expect(page.locator("#preset optgroup[label='読み取ったスプシのシート'] option")).toHaveText(["全顧客データ › 売上", "全顧客データ › 顧客"]);
-  await expect(page.locator("#newName")).toHaveValue("全顧客データ › 売上");
-  await page.locator("#preset").selectOption({ label: "全顧客データ › 顧客" });
-  await expect(page.locator("#newData")).toHaveValue(/0201\t法人P/);
-  await expect(page.locator("#newData")).toHaveJSProperty("readOnly", true);
-  await page.locator("#pAct").selectOption("box");
-  await page.locator("#target").selectOption("a1");
-  await page.locator("#read").click();
+  // 顧客だけにチェックを残し、1行ずつBoxにする
+  await page.locator("#pickList .pk", { hasText: "売上" }).locator("input").uncheck();
+  await expect(page.locator("#pickCards .tab")).toHaveCount(1);
+  await expect(page.locator("#pickCards .tab")).toContainText("全顧客データ › 顧客");
+  await page.locator("#pickCards [data-pact]").selectOption("box");
+  await page.locator("#pickCards [data-pdest]").selectOption("a1");
+  await page.locator("#pickGo").click();
   await expect(page.locator("#unitSec")).toBeVisible();
   await expect(page.locator("#uParent")).toHaveValue("a1");
   await page.locator('[data-ncol="1"]').check();
@@ -394,16 +405,15 @@ test("見本なし: はじめは空で、前の見本は消えて実データは
     if (await nv.count()) await nv.click();
   }
   await page.locator('.nv[data-go="import"]').click();
-  await expect(page.locator("#preset")).toHaveValue("paste");
-  await expect(page.locator("#preset option", { hasText: "例:" })).toHaveCount(0);
-  // 前の見本のまま保存された中身(見本の箱の中に実データの箱、見本のキューブに実データのシート)
+  await expect(page.locator("#pickList")).toContainText("まだありません");
+  // 前の見本のまま保存された中身(見本のBoxの中に実データのBox、見本のCubeに実データのSheet)
   await page.evaluate(() => { localStorage.removeItem("axis-boxes-v2"); localStorage.setItem("axis-boxes-v2:demo", "1"); });
   await page.reload();
   const old = await page.evaluate(() => {
     const x = JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}");
     delete x.demo;
     x.boxes.push({ id: "u1", kind: "box", name: "0001 実データ", parent: "a1", own: {}, levelName: "お客様" });
-    x.sheets.push({ id: "shX", cube: "c2", name: "実シート", tag: {}, cols: ["年月", "売上金額"], rows: [["2026-07", "1"]], bind: [null, null] });
+    x.sheets.push({ id: "shX", cube: "c2", name: "実Sheet", tag: {}, cols: ["年月", "売上金額"], rows: [["2026-07", "1"]], bind: [null, null] });
     return JSON.stringify(x);
   });
   // 閉じる時の保存に上書きされないよう、開く前に入れる
@@ -413,7 +423,7 @@ test("見本なし: はじめは空で、前の見本は消えて実データは
   expect(st.boxes.map((b: { id: string; parent: string | null }) => [b.id, b.parent])).toEqual([["u1", null]]);
   expect(st.sheets).toEqual([]);
   expect(st.saved).toEqual([]);
-  expect(st.saving.map((e: { name: string }) => e.name)).toContain("実シート");
+  expect(st.saving.map((e: { name: string }) => e.name)).toContain("実Sheet");
   expect(st.history.at(-1).title).toBe("見本(ダミー)のデータを消した");
   await page.locator('.nv[data-go="home"]').click();
   await expect(page.locator("#tree")).toContainText("0001 実データ");
@@ -447,18 +457,18 @@ test("見本なし: 設定は未設定から始まり、Column Registry でカ�
   await page.locator("#axGrpAdd").click();
   await page.locator('[data-lib="month"]').click();
   await page.locator('[data-agrp="month"]').selectOption({ label: "売上の情報" });
-  await page.locator('[data-asub="month"]').fill("売上シートの計上月(申込月ではない)");
+  await page.locator('[data-asub="month"]').fill("売上Sheetの計上月(申込月ではない)");
   await page.locator('[data-asub="month"]').blur();
   await expect(page.locator("#axes .agrp")).toContainText("月");
-  await expect(page.locator('#axes .agrp [data-lib="month"] small')).toHaveText("売上シートの計上月(申込月ではない)");
+  await expect(page.locator('#axes .agrp [data-lib="month"] small')).toHaveText("売上Sheetの計上月(申込月ではない)");
   st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   expect(st.groups.map((g: { name: string }) => g.name)).toEqual(["売上の情報"]);
-  expect(st.axes.find((a: { id: string }) => a.id === "month")).toMatchObject({ group: st.groups[0].id, sub: "売上シートの計上月(申込月ではない)" });
+  expect(st.axes.find((a: { id: string }) => a.id === "month")).toMatchObject({ group: st.groups[0].id, sub: "売上Sheetの計上月(申込月ではない)" });
   // グループを消してもカラムは残る
   page.once("dialog", (d) => d.accept());
   await page.locator("[data-gdel]").click();
   await expect(page.locator("#axes .agrp")).toHaveCount(0);
-  await expect(page.locator('[data-asub="month"]')).toHaveValue("売上シートの計上月(申込月ではない)");
+  await expect(page.locator('[data-asub="month"]')).toHaveValue("売上Sheetの計上月(申込月ではない)");
   // カラムを登録し、同義をつなぐ・外す
   await page.locator("#libNew").click();
   await page.locator("#lnName").fill("申込日");
@@ -476,40 +486,40 @@ test("見本なし: 設定は未設定から始まり、Column Registry でカ�
   expect(errors).toEqual([]);
 });
 
-// 見本なし: Compose › Create でキューブ・箱・シートを1つずつ作る(シートは列を軸に照らして承認)
-test("見本なし: Create でキューブ・箱・シートを作る", async ({ page }) => {
+// 見本なし: Compose › Create でCube・Box・Sheetを1つずつ作る(Sheetは列を軸に照らして承認)
+test("見本なし: Create でCube・Box・Sheetを作る", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.locator('.nv[data-go="create"]').click();
   await expect(page.locator("#crumb")).toHaveText("Compose › Create");
-  // シートはキューブがないと作れない
+  // SheetはCubeがないと作れない
   await page.locator('[data-mk="sheet"]').click();
-  await expect(page.locator("#mkForm")).toContainText("先にキューブを作ってください");
-  // 箱
+  await expect(page.locator("#mkForm")).toContainText("先にCubeを作ってください");
+  // Box
   await page.locator('[data-mk="box"]').click();
   await page.locator("#mkName").fill("法人A");
   await page.locator("#mkUnit").fill("法人");
   await page.locator("#mkGo").click();
-  // キューブ: 3軸を選ばないと作れない
+  // Cube: 3軸を選ばないと作れない
   await page.locator('[data-mk="cube"]').click();
   await page.locator("#mkName").fill("S-01 楽天店");
-  await page.locator("#mkIn").selectOption({ label: "箱 法人A" });
+  await page.locator("#mkIn").selectOption({ label: "Box 法人A" });
   await page.locator("#mkGo").click();
   await expect(page.locator("#note")).toContainText("3軸を3つとも選んでください");
   await page.locator('[data-mka="0"]').selectOption("month");
   await page.locator('[data-mka="1"]').selectOption("mall");
   await page.locator('[data-mka="2"]').selectOption("item");
   await page.locator("#mkGo").click();
-  // 作ったら「見る」が出て、押すと World でそのキューブを選ぶ
-  await expect(page.locator("#note")).toContainText("キューブ「S-01 楽天店」を作りました");
+  // 作ったら「見る」が出て、押すと World でそのCubeを選ぶ
+  await expect(page.locator("#note")).toContainText("Cube「S-01 楽天店」を作りました");
   await expect(page.locator(".mkdone .it")).toHaveCount(2);
   let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   const a = st.boxes.find((b: { name: string }) => b.name === "法人A"), c = st.boxes.find((b: { name: string }) => b.name === "S-01 楽天店");
   expect(a).toMatchObject({ kind: "box", levelName: "法人", parent: null });
   expect(c).toMatchObject({ kind: "cube", axes: ["month", "mall", "item"], parent: a.id });
-  // シート: 列を入れると Import で軸を照らして承認する
+  // Sheet: 列を入れると Import で軸を照らして承認する
   await page.locator('[data-mk="sheet"]').click();
   await page.locator("#mkName").fill("楽天の売上");
   await page.locator("#mkCols").fill("年月, モール名, 売上金額");
@@ -531,18 +541,23 @@ test("見本なし: Create でキューブ・箱・シートを作る", async ({
   expect(errors).toEqual([]);
 });
 
-// 見本なし: 名前に使う列(列の記号の行は列名にしない・値のある列だけ・選んだ順)、シートの各行から箱、カード
-test("見本なし: 各行から箱とカードを作り、カードを見る", async ({ page }) => {
+// 見本なし: 名前に使う列(列の記号の行は列名にしない・値のある列だけ・選んだ順)、Sheetの各行からBox、Card
+test("見本なし: 各行からBoxとCardを作り、Cardを見る", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   // 1行目が列の記号(A C R …)、2行目が列名の表を貼り付けて Saving に置く
   await page.locator('.nv[data-go="import"]').click();
-  await page.locator("#pAct").selectOption("box");
   await page.locator("#newName").fill("全顧客");
   await page.locator("#newData").fill("A\tC\tR\tT\n顧客番号\t代表者名\t営業マン\t備考\n0001\t山田\t佐藤\t\n0002\t田中\t鈴木\t");
-  await page.locator("#read").click();
+  await page.locator("#pasteRead").click();
+  // Cube がまだないので、はじめは1行ずつ Box。Sheet を選ぶと入れる先は「新しい Cube を作って入れる」
+  await expect(page.locator("#pickCards [data-pact]")).toHaveValue("box");
+  await page.locator("#pickCards [data-pact]").selectOption("sheet");
+  await expect(page.locator("#pickCards [data-pdest]")).toHaveValue("@new");
+  await page.locator("#pickCards [data-pact]").selectOption("box");
+  await page.locator("#pickGo").click();
   await expect(page.locator("#unitSec")).toBeVisible();
   // 列名は2行目。値のない「備考」は出さない
   await expect(page.locator(".nch b")).toHaveText(["顧客番号", "代表者名", "営業マン"]);
@@ -562,9 +577,8 @@ test("見本なし: 各行から箱とカードを作り、カードを見る", 
   // もう1枚貼り付けて、作らずに Saving に置いておく
   await page.locator("#newName").fill("全顧客2");
   await page.locator("#newData").fill("顧客番号\t代表者名\n0001\t山田\n0002\t田中");
-  await page.locator("#read").click();
-  await page.locator("#uCancel").click();
-  // Create › カード › シートの各行から(Saving のシート)
+  await page.locator("#pasteRead").click();
+  // Create › Card › Sheetの各行から(Saving のSheet)
   await page.locator('.nv[data-go="create"]').click();
   await page.locator('[data-mk="card"]').click();
   await page.locator('[data-rows="1"]').click();
@@ -573,13 +587,13 @@ test("見本なし: 各行から箱とカードを作り、カードを見る", 
   await expect(page.locator("#unitSec")).toBeVisible();
   await expect(page.locator('input[name=uKind][value="card"]')).toBeChecked();
   await page.locator('[data-ncol="0"]').check();
-  await page.locator("#uUnit").fill("顧客カード");
+  await page.locator("#uUnit").fill("顧客Card");
   await page.locator("#uMake").click();
   await page.locator("#note button", { hasText: "見る" }).click();
   await expect(page.locator("#cardSec")).toBeVisible();
   await expect(page.locator("#cardBody dl")).toContainText("山田");
   await page.locator("#cardClose").click();
-  // カードを1枚作る
+  // Cardを1枚作る
   await page.locator('.nv[data-go="create"]').click();
   await page.locator('[data-mk="card"]').click();
   await page.locator('[data-rows="0"]').click();
@@ -593,23 +607,23 @@ test("見本なし: 各行から箱とカードを作り、カードを見る", 
   expect(errors).toEqual([]);
 });
 
-test("見本なし: 作った箱を中身ごと消す", async ({ page }) => {
+test("見本なし: 作ったBoxを中身ごと消す", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await page.locator('.nv[data-go="create"]').click();
   await page.locator('[data-mk="box"]').click();
-  await page.locator("#mkName").fill("箱X");
+  await page.locator("#mkName").fill("BoxX");
   await page.locator("#mkUnit").fill("法人");
   await page.locator("#mkGo").click();
   await page.locator('[data-mk="box"]').click();
-  await page.locator("#mkName").fill("箱Y");
+  await page.locator("#mkName").fill("BoxY");
   await page.locator("#mkUnit").fill("店");
-  await page.locator("#mkIn").selectOption({ label: "箱 箱X" });
+  await page.locator("#mkIn").selectOption({ label: "Box BoxX" });
   await page.locator("#mkGo").click();
   await page.locator('[data-mk="box"]').click();
-  await page.locator("#mkName").fill("箱Z");
+  await page.locator("#mkName").fill("BoxZ");
   await page.locator("#mkUnit").fill("法人");
   await page.locator("#mkGo").click();
   await page.locator('.nv[data-go="home"]').click();
@@ -617,20 +631,20 @@ test("見本なし: 作った箱を中身ごと消す", async ({ page }) => {
   // 確かめる文に中身の数が出る。キャンセルなら消えない
   let msg = "";
   page.once("dialog", (d) => { msg = d.message(); d.dismiss(); });
-  await page.locator('#tree [data-unit] b', { hasText: "箱X" }).locator("..").locator("[data-udel]").click();
-  expect(msg).toContain("箱「箱X」を消しますか");
-  expect(msg).toContain("箱・キューブ 1個");
+  await page.locator('#tree [data-unit] b', { hasText: "BoxX" }).locator("..").locator("[data-udel]").click();
+  expect(msg).toContain("Box「BoxX」を消しますか");
+  expect(msg).toContain("Box・Cube 1個");
   await expect(page.locator("#tree [data-udel]")).toHaveCount(3);
   page.once("dialog", (d) => d.accept());
-  await page.locator('#tree [data-unit] b', { hasText: "箱X" }).locator("..").locator("[data-udel]").click();
-  await expect(page.locator("#note")).toContainText("箱「箱X」を消しました");
+  await page.locator('#tree [data-unit] b', { hasText: "BoxX" }).locator("..").locator("[data-udel]").click();
+  await expect(page.locator("#note")).toContainText("Box「BoxX」を消しました");
   await expect(page.locator("#tree [data-udel]")).toHaveCount(1);
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
-  expect(st.boxes.map((b: { name: string }) => b.name)).toEqual(["箱Z"]);
+  expect(st.boxes.map((b: { name: string }) => b.name)).toEqual(["BoxZ"]);
   // 選んで「選んだものを消す」でも消せる
   await page.locator('.nv[data-go="world"]').click();
   await expect(page.locator("#selDel")).toBeHidden();
-  const zv = await page.locator('#selUnit optgroup[label="1つずつ"] option', { hasText: "箱Z" }).getAttribute("value");
+  const zv = await page.locator('#selUnit optgroup[label="1つずつ"] option', { hasText: "BoxZ" }).getAttribute("value");
   await page.locator("#selUnit").selectOption(zv!);
   await expect(page.locator("#selDel")).toBeVisible();
   page.once("dialog", (d) => d.accept());
