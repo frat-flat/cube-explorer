@@ -416,6 +416,8 @@ test("見本なし: はじめは空で、前の中身は一度だけすべて消
   }
   await page.locator('.nv[data-go="import"]').click();
   await expect(page.locator("#pickList")).toContainText("まだありません");
+  // リンクの欄も空(例の URL を入れておかない)
+  await expect(page.locator("#bookUrl")).toHaveValue("");
   // 前の見本のまま保存された中身(見本のBoxの中に実データのBox、見本のCubeに実データのSheet)
   await page.evaluate(() => { localStorage.removeItem("axis-boxes-v2"); localStorage.setItem("axis-boxes-v2:demo", "1"); });
   await page.reload();

@@ -508,10 +508,10 @@ tfoot td{font-weight:700}
   <div class="vhead"><h1>Import <small class="vs">Sheet</small></h1><p class="lead">スプシのリンクか、貼り付けたSheetから列を読み取り、軸の候補を出します。最後に人が承認してから入ります。</p></div>
   <div class="two">
   <section><h2>スプシのリンクで登録</h2>
-    <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
+    <input type="text" id="bookUrl" value="" placeholder="https://docs.google.com/spreadsheets/d/…/edit" aria-label="スプレッドシートのリンク">
     <button class="primary" id="bookRead">読み取る</button>
     <p class="msg" id="bookMsg" hidden></p>
-    <p class="muted">読み取ると、下の「読み取った Sheet」にタブが並びます。入れるタブにチェックを入れ、何にするかと入れる先を選びます。スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
+    <p class="muted">読み取ると、下の「読み取った Sheet」にタブが並びます。入れるタブにチェックを入れ、何にするかと入れる先を選びます。スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。</p></section>
   <section><h2>表を貼り付けて読み取る</h2>
     <p class="muted">スプシ以外(Excel など)の表は、1行目を列名にしてそのまま貼り付けます。</p>
     <input type="text" id="newName" placeholder="Sheet の名前(例: 顧客一覧)" aria-label="Sheet の名前">
@@ -1601,7 +1601,8 @@ async function readBook() {
   if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')';
   if (j && j.book) { book = j.book; bookMsg(`「${book.name}」を読み取りました。下の「読み取った Sheet」で、入れるタブにチェックを入れてください(反映するまでは Saving に置いておきます)`); }
   else if (j && j.error) { book = null; renderPick(); bookMsg(j.error, true); return; }
-  else { book = mockBook(url); bookMsg('ここからはリンク先を読めないため、例のデータで流れを見せています。本物はアプリの画面で読めます', true); }
+  else if (DEMO) { book = mockBook(url); bookMsg('ここからはリンク先を読めないため、例のデータで流れを見せています。本物はアプリの画面で読めます', true); }
+  else { book = null; renderPick(); bookMsg('読み取れませんでした。少し時間をおいてもう一度試してください', true); return; }
   book.url = book.url || url; stashBook(book); save(); renderSaving();
   // データのタブは、使う印のあるものにチェックを入れておく(何にするかは Cube があれば Sheet、なければ1行ずつ Box)
   book.canMerge = !!book.merge;
