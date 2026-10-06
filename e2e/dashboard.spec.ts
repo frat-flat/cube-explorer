@@ -311,3 +311,44 @@ test("読み取ったシートごとに、何にするかと入れる先を選�
   await expect(page.locator("#savingList")).toContainText("全顧客データ › メモ");
   expect(errors).toEqual([]);
 });
+
+// 右の「シートを選んで入れる」でも、読み取ったスプシのシートを選べる(中身は Saving のもの、反映の前に読み直す)
+test("読み取ったシートを右の欄で選んで入れる", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  let reads = 0;
+  const tab = (name: string, cols: string[], rows: string[][]) => ({ name, kind: "data", use: true, cols, rows, size: { rows: rows.length + 1, cols: cols.length }, cf: [], dv: [], formulas: {} });
+  await page.route("**/api/sheets/read**", (r) => {
+    reads++;
+    return r.fulfill({ json: { book: { name: "全顧客データ", url: "https://docs.google.com/spreadsheets/d/z/edit", real: true, merge: false, gas: [], tabs: [
+      tab("売上", ["年月", "売上金額"], [["2026-07", "1000"]]),
+      tab("顧客", ["顧客番号", "法人名"], [["0201", "法人P"], ["0202", "法人Q"]]),
+    ] } } });
+  });
+  await page.goto("/");
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/z/edit");
+  await page.locator("#bookRead").click();
+  await expect(page.locator("#bookSec")).toBeVisible();
+  // 読み取ったシートが右の「シート」に並び、最初のシートが選ばれている
+  await expect(page.locator("#preset optgroup[label='読み取ったスプシのシート'] option")).toHaveText(["全顧客データ › 売上", "全顧客データ › 顧客"]);
+  await expect(page.locator("#newName")).toHaveValue("全顧客データ › 売上");
+  await page.locator("#preset").selectOption({ label: "全顧客データ › 顧客" });
+  await expect(page.locator("#newData")).toHaveValue(/0201\t法人P/);
+  await expect(page.locator("#newData")).toHaveJSProperty("readOnly", true);
+  await page.locator("#pAct").selectOption("box");
+  await page.locator("#target").selectOption("a1");
+  await page.locator("#read").click();
+  await expect(page.locator("#unitSec")).toBeVisible();
+  await expect(page.locator("#uParent")).toHaveValue("a1");
+  await page.locator('[data-ncol="1"]').check();
+  await page.locator("#uUnit").fill("お客様");
+  const before = reads;
+  await page.locator("#uMake").click();
+  await expect(page.locator("#unitSec")).toBeHidden();
+  expect(reads).toBe(before + 1);
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.boxes.filter((b: { parent?: string; levelName?: string }) => b.parent === "a1" && b.levelName === "お客様").map((b: { name: string }) => b.name)).toEqual(["0201 法人P", "0202 法人Q"]);
+  expect(errors).toEqual([]);
+});
