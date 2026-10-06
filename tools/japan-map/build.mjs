@@ -1,5 +1,6 @@
 // World の「日本地図」で住所にピンを立てるための名前と位置(public/worlds/japan.json)を作る。作り直すときだけ使う:
-//   npm i --no-save jpn-atlas @b4moss/jp-local-gov-id-data && node tools/japan-map/build.mjs
+//   npm i --no-save jpn-atlas @b4moss/jp-local-gov-id-data world-atlas@2 topojson-client@3 && node tools/japan-map/build.mjs
+// 近隣の国の形: world-atlas(ISC、元は Natural Earth 1:50m、パブリックドメイン)
 // 位置: jpn-atlas(BSD-3-Clause)に入っている国土地理院「地球地図日本」2016 の shapefile(経度・緯度)
 // 名前: @b4moss/jp-local-gov-id-data(元は総務省「全国地方公共団体コード」)
 // 人口: tools/japan-map/population.json(population.py で作る。総務省「住民基本台帳人口」CC BY 4.0)
@@ -88,6 +89,27 @@ const dots = munis.filter((m) => geo.has(m.code.slice(0, 5)) && pop[m.code]).map
 const k23 = dots.filter((d) => d[4] === 2), s23 = k23.reduce((a, d) => a + d[2], 0);
 if (k23.length) dots.push([r4(k23.reduce((a, d) => a + d[0] * d[2], 0) / s23), r4(k23.reduce((a, d) => a + d[1] * d[2], 0) / s23), s23, "東京23区", 1]);
 dots.sort((a, b) => b[2] - a[2]);
-const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」 / 人口: 総務省「住民基本台帳人口」令和4年1月1日", pref: prefOut, city: cityOut, border, land, dots };
+// 近隣の国(韓国・北朝鮮・中国・台湾・ロシアなど)の陸: 地図の範囲の四角で切り取った輪
+const topo = require("topojson-client"), wa = JSON.parse(readFileSync(require.resolve("world-atlas/countries-50m.json"), "utf8"));
+const BB = [110, 12, 168, 56];   // 経度・緯度の範囲
+function clipRect(ring) {   // Sutherland–Hodgman で四角に切る
+  let pts = ring;
+  for (const [axis, v, keepGreater] of [[0, BB[0], 1], [0, BB[2], 0], [1, BB[1], 1], [1, BB[3], 0]]) {
+    const out = [], inside = (p) => (keepGreater ? p[axis] >= v : p[axis] <= v);
+    for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length];
+      if (inside(a)) out.push(a);
+      if (inside(a) !== inside(b)) { const t = (v - a[axis]) / (b[axis] - a[axis]); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); } }
+    pts = out; if (!pts.length) break;
+  }
+  return pts;
+}
+const near = [];
+for (const f of topo.feature(wa, wa.objects.countries).features) {
+  if (f.id === "392" || !f.geometry) continue;   // 日本は地球地図日本の形を使う
+  const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
+  for (const poly of polys) { const r = clipRect(poly[0]); if (r.length >= 4 && Math.abs(area(r)) > 0.01) near.push(r.map(([x, y]) => [r4(x), r4(y)])); }
+}
+const nearLab = [["韓国", 127.8, 36.3], ["北朝鮮", 126.9, 40.2], ["中国", 116.5, 34.5], ["台湾", 121, 23.7], ["ロシア", 135, 48.5], ["モンゴル", 112.5, 46.5], ["フィリピン", 121.5, 16.5]];
+const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」 / 人口: 総務省「住民基本台帳人口」令和4年1月1日 / 近隣の国: Natural Earth(world-atlas)", pref: prefOut, city: cityOut, border, land, near, nearLab, dots };
 writeFileSync(new URL("../../public/worlds/japan.json", import.meta.url), JSON.stringify(out));
-console.log("dots", dots.length, "23ku", k23.length, "prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "land rings", land.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
+console.log("dots", dots.length, "23ku", k23.length, "prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "land rings", land.length, "near rings", near.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
