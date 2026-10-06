@@ -592,3 +592,49 @@ test("見本なし: 各行から箱とカードを作り、カードを見る", 
   await expect(page.locator("#tree [data-card]")).toHaveCount(3);
   expect(errors).toEqual([]);
 });
+
+test("見本なし: 作った箱を中身ごと消す", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator('.nv[data-go="create"]').click();
+  await page.locator('[data-mk="box"]').click();
+  await page.locator("#mkName").fill("箱X");
+  await page.locator("#mkUnit").fill("法人");
+  await page.locator("#mkGo").click();
+  await page.locator('[data-mk="box"]').click();
+  await page.locator("#mkName").fill("箱Y");
+  await page.locator("#mkUnit").fill("店");
+  await page.locator("#mkIn").selectOption({ label: "箱 箱X" });
+  await page.locator("#mkGo").click();
+  await page.locator('[data-mk="box"]').click();
+  await page.locator("#mkName").fill("箱Z");
+  await page.locator("#mkUnit").fill("法人");
+  await page.locator("#mkGo").click();
+  await page.locator('.nv[data-go="home"]').click();
+  await expect(page.locator("#tree [data-udel]")).toHaveCount(3);
+  // 確かめる文に中身の数が出る。キャンセルなら消えない
+  let msg = "";
+  page.once("dialog", (d) => { msg = d.message(); d.dismiss(); });
+  await page.locator('#tree [data-unit] b', { hasText: "箱X" }).locator("..").locator("[data-udel]").click();
+  expect(msg).toContain("箱「箱X」を消しますか");
+  expect(msg).toContain("箱・キューブ 1個");
+  await expect(page.locator("#tree [data-udel]")).toHaveCount(3);
+  page.once("dialog", (d) => d.accept());
+  await page.locator('#tree [data-unit] b', { hasText: "箱X" }).locator("..").locator("[data-udel]").click();
+  await expect(page.locator("#note")).toContainText("箱「箱X」を消しました");
+  await expect(page.locator("#tree [data-udel]")).toHaveCount(1);
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.boxes.map((b: { name: string }) => b.name)).toEqual(["箱Z"]);
+  // 選んで「選んだものを消す」でも消せる
+  await page.locator('.nv[data-go="world"]').click();
+  await expect(page.locator("#selDel")).toBeHidden();
+  const zv = await page.locator('#selUnit optgroup[label="1つずつ"] option', { hasText: "箱Z" }).getAttribute("value");
+  await page.locator("#selUnit").selectOption(zv!);
+  await expect(page.locator("#selDel")).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await page.locator("#selDel").click();
+  await expect(page.locator("#tree [data-udel]")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

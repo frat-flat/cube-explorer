@@ -430,7 +430,7 @@ tfoot td{font-weight:700}
   <div id="stage"><div id="jmap" hidden></div><div id="miniMap" hidden></div><div id="worldMsg" hidden></div><div id="worldBar" hidden><span id="worldBarT"></span> <button class="small" id="worldBack"></button></div><div id="guide" hidden></div><div id="cal" hidden></div><div id="pinBar"><span class="hint" id="pinHint"></span> <button class="small" id="unpinAll" hidden>固定をすべて外す</button></div><div id="legend"><span><i style="border-color:var(--box);border-top-style:dashed"></i>箱(法人)</span><span><i style="border-color:var(--accent)"></i>キューブ(3軸固定)</span><span><i style="border-color:var(--hl)"></i>まとめに使ったシート</span></div>
     <svg id="gizmo" viewBox="-48 -48 96 96" aria-label="見る中心を X・Y・Z に動かす(軸の文字を押す。真ん中で全体に戻す)"><line id="glx" style="stroke:var(--ax);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="x1"><title>X の方向へ動かす</title><text id="gtx" style="fill:var(--ax)">+X</text></g><line id="gly" style="stroke:var(--ay);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="y-1"><title>Y のマイナス(下)へ動かす</title><text id="gty" style="fill:var(--ay)">−Y</text></g><line id="glz" style="stroke:var(--az);stroke-width:2.5" stroke-linecap="round"/><g class="end" data-mv="z-1"><title>Z のマイナス(奥)へ動かす</title><text id="gtz" style="fill:var(--az)">−Z</text></g><line id="glxn" class="neg" style="stroke:var(--ax)"/><g class="end" data-mv="x-1"><title>X のマイナスへ動かす</title><text id="gtxn" class="neg" style="fill:var(--ax)">−X</text></g><line id="glyn" class="neg" style="stroke:var(--ay)"/><g class="end" data-mv="y1"><title>Y のプラス(上)へ動かす</title><text id="gtyn" class="neg" style="fill:var(--ay)">+Y</text></g><line id="glzn" class="neg" style="stroke:var(--az)"/><g class="end" data-mv="z1"><title>Z のプラス(手前)へ動かす</title><text id="gtzn" class="neg" style="fill:var(--az)">+Z</text></g><g class="end" data-mv="home"><title>全体に戻す</title><circle r="3.5" style="fill:var(--muted)"/></g></svg></div></div>
   <div id="pinCtl">
-    <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button></div>
+    <div class="row"><b>固定する</b><select id="selUnit" aria-label="固定する箱かキューブを選ぶ"></select><button class="small pin" id="selPin">固定する</button><span id="selFaceWrap"><span id="selFacePre">サイコロの</span><select id="selFace" aria-label="正面にする目"></select>を正面にする</span><button class="small" id="faceSheet">この面をシートにする</button><button class="small" id="selDel" hidden>選んだものを消す</button></div>
     <div class="row" id="showRow"></div>
     <div class="row"><label class="muted"><input type="checkbox" id="advFaces"> ②④⑥(縦横を入れ替えた目)も選べるようにする(上級)</label></div>
     <div class="row"><b>指示</b><input id="cmd" placeholder="例: 法人単位を固定して②を正面 / キューブ2は③ / ショップ単位は① / 法人単位を外す"><button class="small" id="cmdGo">実行</button></div>
@@ -751,7 +751,7 @@ function renderTree() {
   const cardsIn = (p, d) => S.cards.filter(c => (c.parent || null) === p).forEach(c => h += `<div class="node ind${d}" data-card="${c.id}"><span class="pill card">カード</span><b>${esc(c.name)}</b><span class="ax">${c.fields.length}項目</span></div>`);
   const walk = (p, d) => kids(p).forEach(b => {
     const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
-    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + (b.kind === 'box' ? '中は' : '') + faceOf(b.pin.face).name : '固定'}</button></div>`;
+    h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + (b.kind === 'box' ? '中は' : '') + faceOf(b.pin.face).name : '固定'}</button><button class="x small udel" data-udel="${b.id}" aria-label="${b.kind === 'box' ? '箱' : 'キューブ'} ${esc(b.name)} を消す" title="消す">×</button></div>`;
     cardsIn(b.id, d + 1);
     S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
@@ -762,11 +762,27 @@ function renderTree() {
   if (!S.boxes.length && !S.cards.length) h = '<p class="muted">まだ箱もキューブもありません。「シートを入れる」でスプシを読み取り、シートごとに「1行ずつ箱にする」などを選ぶとここに並びます。</p>';
   el.innerHTML = h;
   el.querySelectorAll('[data-pin]').forEach(n => n.onclick = e => { e.stopPropagation(); togglePin(n.dataset.pin); });
+  el.querySelectorAll('[data-udel]').forEach(n => n.onclick = e => { e.stopPropagation(); delUnit(n.dataset.udel); });
   el.querySelectorAll('[data-unit]').forEach(n => n.onclick = () => select(n.dataset.unit));
   el.querySelectorAll('[data-addcube]').forEach(n => n.onclick = () => addCube(n.dataset.addcube));
   el.querySelectorAll('[data-addbox]').forEach(n => n.onclick = () => addBox(n.dataset.addbox));
   el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollTop = 0; });
   el.querySelectorAll('[data-card]').forEach(n => n.onclick = () => lookCard(n.dataset.card));
+}
+// 箱・キューブを消す。中の箱・キューブ・シート・カードもいっしょに消える(確かめてから)
+function delUnit(id) {
+  const b = box(id); if (!b) return;
+  const all = [b], walkD = p => S.boxes.filter(x => x.parent === p).forEach(x => { all.push(x); walkD(x.id); }); walkD(b.id);
+  const ids = new Set(all.map(x => x.id)), shs = S.sheets.filter(s => ids.has(s.cube)), cds = S.cards.filter(c => ids.has(c.parent));
+  const inner = [all.length > 1 && `箱・キューブ ${all.length - 1}個`, shs.length && `シート ${shs.length}枚`, cds.length && `カード ${cds.length}枚`].filter(Boolean);
+  const kind = b.kind === 'box' ? '箱' : 'キューブ';
+  if (!confirm(`${kind}「${b.name}」を消しますか?` + (inner.length ? `\n中の ${inner.join('・')} も消えます。` : ''))) return;
+  S.boxes = S.boxes.filter(x => !ids.has(x.id)); S.sheets = S.sheets.filter(s => !shs.includes(s)); S.cards = S.cards.filter(c => !cds.includes(c));
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${kind} ${b.name} を消した`, lines: inner.length ? ['中の ' + inner.join('・') + ' もいっしょに消した'] : [], sources: [], results: [] });
+  if (ids.has(sel)) sel = null;
+  if (shs.some(s => s.id === viewId)) viewId = null;
+  if (cds.some(c => c.id === cardId)) cardId = null;
+  save(); renderAll(); renderTree(); paint(); renderPinBar(); note(`${kind}「${b.name}」を消しました`);
 }
 // 軸のグループとサブタイトル。名前は短く、どの列のことかの細かい指定はサブタイトルに書く
 const grpOf = a => S.groups.find(g => g.id === a.group) || null;
@@ -1722,6 +1738,7 @@ function renderPinBar() {
   $('selUnit').value = sel || '';
   const us = selUnits(), u = us[0];
   $('selPin').hidden = !u; $('selFaceWrap').hidden = !u; $('faceSheet').hidden = true;
+  $('selDel').hidden = !(us.length === 1 && us[0].id === sel);
   if (!u) return;
   const allPinned = us.every(b => b.pin);
   $('selPin').textContent = allPinned ? '固定を外す' : us.length > 1 ? `${us.length}個とも固定する` : '固定する'; $('selPin').classList.toggle('on', allPinned);
@@ -2773,6 +2790,7 @@ document.querySelectorAll('#gizmo [data-mv]').forEach(b => b.onclick = () => {
 });
 $('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
 $('selPin').onclick = () => { const us = selUnits(), on = !us.every(b => b.pin); us.forEach(b => { if (!on) unpin(b); else if (!b.pin) applyPin(b); }); refreshPins(); };
+$('selDel').onclick = () => { if (sel) delUnit(sel); };
 $('selFace').onchange = e => { if (!e.target.value) return; selUnits().forEach(b => { if (b.kind === 'box') kidsOf(b).forEach(c => { if (c.pin) c.pin.byBox = true; }); applyPin(b, e.target.value); }); refreshPins(); };
 $('advFaces').onchange = e => { S.advFaces = e.target.checked; save(); paint(); renderPinBar(); };
 // 固定した面をそのままシートにする: 縦の軸を行、横の軸を列に、奥行きの軸は手前の1枚(最初の値)、そのキューブの持ち主で絞る
