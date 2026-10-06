@@ -530,3 +530,65 @@ test("見本なし: Create でキューブ・箱・シートを作る", async ({
   expect(st.sheets.map((x: { name: string; cube: string; rows: unknown[] }) => [x.name, x.cube, x.rows.length])).toEqual([["楽天の売上", c.id, 0]]);
   expect(errors).toEqual([]);
 });
+
+// 見本なし: 名前に使う列(列の記号の行は列名にしない・値のある列だけ・選んだ順)、シートの各行から箱、カード
+test("見本なし: 各行から箱とカードを作り、カードを見る", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  // 1行目が列の記号(A C R …)、2行目が列名の表を貼り付けて Saving に置く
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#pAct").selectOption("box");
+  await page.locator("#newName").fill("全顧客");
+  await page.locator("#newData").fill("A\tC\tR\tT\n顧客番号\t代表者名\t営業マン\t備考\n0001\t山田\t佐藤\t\n0002\t田中\t鈴木\t");
+  await page.locator("#read").click();
+  await expect(page.locator("#unitSec")).toBeVisible();
+  // 列名は2行目。値のない「備考」は出さない
+  await expect(page.locator(".nch b")).toHaveText(["顧客番号", "代表者名", "営業マン"]);
+  await expect(page.locator("#uMode")).toHaveCount(0);
+  // 選んだ順につなぐ(はじめは左の列が選ばれている。外して選び直すと後ろに回る)
+  await page.locator('[data-ncol="1"]').check();
+  await expect(page.locator(".nch.on i")).toHaveText(["1", "2"]);
+  await page.locator('[data-ncol="0"]').uncheck();
+  await page.locator('[data-ncol="0"]').check();
+  await expect(page.locator(".nch.on i")).toHaveText(["2", "1"]);
+  await expect(page.locator("#uMode")).toBeVisible();
+  await expect(page.locator("#uPreview")).toContainText("山田 0001");
+  await page.locator("#uUnit").fill("お客様");
+  await page.locator("#uMake").click();
+  let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.boxes.map((b: { name: string }) => b.name)).toEqual(["山田 0001", "田中 0002"]);
+  // もう1枚貼り付けて、作らずに Saving に置いておく
+  await page.locator("#newName").fill("全顧客2");
+  await page.locator("#newData").fill("顧客番号\t代表者名\n0001\t山田\n0002\t田中");
+  await page.locator("#read").click();
+  await page.locator("#uCancel").click();
+  // Create › カード › シートの各行から(Saving のシート)
+  await page.locator('.nv[data-go="create"]').click();
+  await page.locator('[data-mk="card"]').click();
+  await page.locator('[data-rows="1"]').click();
+  await expect(page.locator("#mkSrc option")).toHaveCount(1);
+  await page.locator("#mkGo").click();
+  await expect(page.locator("#unitSec")).toBeVisible();
+  await expect(page.locator('input[name=uKind][value="card"]')).toBeChecked();
+  await page.locator('[data-ncol="0"]').check();
+  await page.locator("#uUnit").fill("顧客カード");
+  await page.locator("#uMake").click();
+  await page.locator("#note button", { hasText: "見る" }).click();
+  await expect(page.locator("#cardSec")).toBeVisible();
+  await expect(page.locator("#cardBody dl")).toContainText("山田");
+  await page.locator("#cardClose").click();
+  // カードを1枚作る
+  await page.locator('.nv[data-go="create"]').click();
+  await page.locator('[data-mk="card"]').click();
+  await page.locator('[data-rows="0"]').click();
+  await page.locator("#mkName").fill("契約条件");
+  await page.locator("#mkFields").fill("担当: 山田\n契約開始：2026-10-01");
+  await page.locator("#mkGo").click();
+  st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.cards.find((c: { name: string }) => c.name === "契約条件").fields).toEqual([["担当", "山田"], ["契約開始", "2026-10-01"]]);
+  await page.locator('.nv[data-go="home"]').click();
+  await expect(page.locator("#tree [data-card]")).toHaveCount(3);
+  expect(errors).toEqual([]);
+});
