@@ -142,6 +142,7 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #miniMap[hidden]{display:none}#miniMap:hover{opacity:1}#miniMap svg{display:block;width:100%;height:auto}
 #jmap{position:absolute;inset:0;z-index:2;background:#dfe7ec;font:12px var(--sans)}
 #jmap .leaflet-tooltip{font-size:12px}
+#jmap .jcountry{font-size:14px!important;font-weight:500!important;color:#7a828c!important;letter-spacing:.15em}
 #jmap .jlab{font-size:12px;font-weight:600;color:#33373d;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;background:none;border:0}
 #guide .seg{display:inline-flex;gap:0;margin:2px 0 8px}
 #guide .seg button{border-radius:0;padding:3px 12px}
@@ -2097,7 +2098,7 @@ function geocode(addr) {
   return pf ? { lon: pf.lon, lat: pf.lat, where: pf.n } : null;
 }
 // 日本地図: 地理院タイル(淡色地図=白地図、全国最新写真=空撮)を Leaflet で重ね、住所の場所にピンを立てる。部品は日本地図を開いたときだけ読む
-// 地図は地理院タイルを使わず、Google マップのような青い海と緑の陸に、県境(点線)と主要都市(白い丸と名前)だけを描く(2026-10-06 ユーザー指定: 道路や細かい地名は出さない)
+// 地図は地理院タイルを使わず、Google マップのような青い海と白い陸(近隣の国も)に、県境(点線)と主要都市(白い丸と名前)だけを描く(2026-10-06 ユーザー指定: 道路や細かい地名は出さない)
 const JTILES = { pale: ['地図', null, ''], photo: ['空撮', 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', '全国最新写真(シームレス)'] };
 let jm = null, jTile = null, jLand = null, jPins = null, jBorder = null, jStyle = 'pale', LP = null, JPP = null;
 try { jStyle = JTILES[localStorage.getItem('axis-boxes-v2:jmap')] ? localStorage.getItem('axis-boxes-v2:jmap') : 'pale'; } catch (e) {}
@@ -2116,7 +2117,16 @@ function setJStyle(k) {
     const [, url, name] = JTILES[k];
     jm.getContainer().style.background = url ? '#dfe3e8' : '#7fd3e6';
     if (url) { jTile = L.tileLayer(url, { maxZoom: 18, maxNativeZoom: 18, attribution: `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>(${name})` }).addTo(jm); jTile.bringToBack(); }
-    else if (JP && JP.land) { if (!jm.getPane('jland')) jm.createPane('jland').style.zIndex = 250; jLand = L.polygon(JP.land.map(r => r.map(([lon, lat]) => [lat, lon])), { color: '#8cc9a0', weight: .8, fillColor: '#b8e6c6', fillOpacity: 1, interactive: false, pane: 'jland', attribution: '国土地理院「地球地図日本」' }).addTo(jm); }
+    else if (JP && JP.land) {
+      // 陸は白。近隣の国(韓国・中国など)も同じ白で形と名前だけ出す
+      if (!jm.getPane('jland')) jm.createPane('jland').style.zIndex = 250;
+      const ll = rs => rs.map(r => r.map(([lon, lat]) => [lat, lon]));
+      jLand = L.layerGroup([
+        L.polygon(ll(JP.near || []), { color: '#b9c2ca', weight: .7, fillColor: '#f7f7f5', fillOpacity: 1, interactive: false, pane: 'jland', attribution: 'Natural Earth' }),
+        L.polygon(ll(JP.land), { color: '#a9b4be', weight: .8, fillColor: '#ffffff', fillOpacity: 1, interactive: false, pane: 'jland', attribution: '国土地理院「地球地図日本」' }),
+        ...(JP.nearLab || []).map(([n, lon, lat]) => L.marker([lat, lon], { pane: 'jland', interactive: false, keyboard: false, icon: L.divIcon({ className: 'jlab jcountry', html: esc(n), iconSize: null, iconAnchor: [n.length * 7, 9] }) }))
+      ]).addTo(jm);
+    }
     // 県境の線を重ねる(空撮は黄色、白地図は灰色)
     if (jBorder) { jm.removeLayer(jBorder); jBorder = null; }
     if (JP && JP.border) jBorder = L.polyline(JP.border.map(l => l.map(([lon, lat]) => [lat, lon])), k === 'photo' ? { color: '#ffe066', weight: 1.6, opacity: .9, interactive: false } : { color: '#7f8aa3', weight: 1.1, opacity: .9, dashArray: '4 3', interactive: false }).addTo(jm);
