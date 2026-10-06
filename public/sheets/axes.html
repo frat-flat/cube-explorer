@@ -575,6 +575,8 @@ tfoot td{font-weight:700}
   <div class="vhead"><h1>設定</h1></div>
   <section><h2>設定</h2><div id="prefs"></div>
     <p class="muted">はじめは何も決めていません(未設定)。選んだ内容は「自分の設定」として持ち、いつでも外せます。変えた記録は履歴に残ります。</p></section>
+  <section><h2>データ</h2><p class="muted">Box・Cube・Sheet・Card・Saving・カラム・同義・履歴をすべて消して、空から始め直します。消す前の中身はこのブラウザに控えとして残します。</p>
+    <div class="row"><button id="wipeAll">すべて消して始め直す</button></div></section>
 </div>
 </div>
 <div id="note" class="toast" role="status" aria-live="polite" hidden></div>
@@ -658,7 +660,8 @@ const SAMPLE = () => {
 // はじめは空(2026-10-06 ユーザー指定: ダミーと実データが混ざるので見本は入れない)。軸の辞書の基本の軸と、列の呼び名の言い換えだけ持つ
 // 見本(SAMPLE)はテストの時だけ(このブラウザに KEY + ':demo' がある時)使う
 const DEMO = (() => { try { return localStorage.getItem('axis-boxes-v2:demo') === '1'; } catch (e) { return false; } })();
-const EMPTY = () => { const x = SAMPLE(); return { axes: x.axes, boxes: [], sheets: [], saved: [], dict: x.dict.filter(d => d.scope === 'all'), history: [], nextMonth: 10, sampleV: 4 }; };
+// 2026-10-06 ユーザー指定: はじめは本当に空(前の試作の EC の例の軸「法人・ショップ・モール・月・科目」と言い換えも入れない)
+const EMPTY = () => ({ axes: [], boxes: [], sheets: [], saved: [], dict: [], history: [], nextMonth: 10, sampleV: 5 });
 const START = () => DEMO ? SAMPLE() : EMPTY();
 const KEY = 'axis-boxes-v2';
 let S;
@@ -671,7 +674,7 @@ const levelOf = b => { if (b.levelName) return b.levelName; const k = Object.key
 function numberUnits() { for (const k of ['box', 'cube']) { let n = Math.max(0, ...S.boxes.filter(b => b.kind === k && b.no).map(b => b.no)); S.boxes.filter(b => b.kind === k && !b.no).forEach(b => b.no = ++n); } }
 // 前の見本(法人A・法人B がいちばん外のBox)のままなら、代理店・申込者のBoxの中に法人を並べる形に一度だけ直す
 function upgradeSample() {
-  if (!S.demo) { dropSample(); return; }
+  if (!S.demo) { dropSample(); wipeOnce(); return; }
   if (!(S.sampleV >= 2)) { S.sampleV = 2; upgradeSample2(); }
   // 見本の法人に、時刻まである日付(面談日時)と何月までの日付(開始予定)を足す(カレンダーの日・年の表示で使う)
   if (!(S.sampleV >= 3)) {
@@ -681,6 +684,14 @@ function upgradeSample() {
     if (add.length) S.history.push({ id: 'h' + Date.now().toString(36), at: new Date().toISOString().slice(0, 10), kind: '作成', title: '見本の法人に面談日時・開始予定を足した', lines: ['カレンダーの日の表示(時刻あり・なし)と年の表示(何月まで)で使う'], sources: [], results: [] });
   }
 }
+// 2026-10-06 ユーザー指定(2回目): データをすべて消して始め直す。消す前の中身はこのブラウザに控えを残す(axis-boxes-v2:backup-…)
+function wipeAll(why) {
+  try { localStorage.setItem(KEY + ':backup-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, ''), JSON.stringify(S)); } catch (e) {}
+  const keep = Object.fromEntries(Object.entries(S.prefs || {}).filter(([k]) => k === 'world' || k === 'center'));
+  Object.assign(S, EMPTY(), { prefs: keep, saving: [], groups: [], cards: [], defs: [], links: [], __drop: true });
+  S.history = [{ id: 'h' + Date.now().toString(36), at: new Date().toISOString().slice(0, 10), kind: '作成', title: 'データをすべて消した', lines: [why, '消す前の中身は、このブラウザに控えとして残した'], sources: [], results: [] }];
+}
+function wipeOnce() { if (S.sampleV >= 5) return; wipeAll('はじめから入っていた例の軸(法人・ショップ・モール・月・科目)ごと、ユーザーの指定で一度だけ消した'); }
 // 2026-10-06 ユーザー指定: 見本(ダミー)のBox・Cube・Sheet・まとめ・履歴を消す。実データは残す。
 // 見本のBoxの中に作った実データのBoxはいちばん上へ。見本のCubeに入れた実データのSheetは Saving に戻す(入れ直せる)
 function dropSample() {
@@ -1275,7 +1286,7 @@ async function approve() {
     if (m.pick === 'new' || m.pick === 'mine') {
       const scope = m.pick === 'mine' ? 'mine' : 'all';
       lines.push(`${c} → ${scope === 'mine' ? 'マイリストの' : ''}新しい${m.isNum && scope === 'all' ? '科目の値' : '軸'}として登録`);
-      if (m.isNum && scope === 'all') { const it = ax('item'); if (!it.values.includes(c)) it.values.push(c); return { axis: 'item', value: c, rel: '=' }; }
+      if (m.isNum && scope === 'all' && ax('item')) { const it = ax('item'); if (!it.values.includes(c)) it.values.push(c); return { axis: 'item', value: c, rel: '=' }; }
       const id = 'a' + Date.now().toString(36) + i;
       if (m.isNum) { S.axes.push({ id, name: c, kind: 'measure', values: [c], fav: false, scope }); return { axis: id, value: c, rel: '=' }; }
       S.axes.push({ id, name: c, kind: 'key', values: [], fav: false, scope }); return { axis: id, rel: '=' };
@@ -2882,6 +2893,7 @@ try { if (localStorage.getItem('axis-boxes-v2:navc')) navC(true); } catch (e) {}
 // ---------- つなぐ ----------
 function renderAll() { renderLibrary(); renderPinBar(); renderInputs(); renderCreate(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderPick(); renderView(); renderCard(); renderHist(); renderSaving(); }
 $('pasteRead').onclick = pasteRead;
+$('wipeAll').onclick = () => { if (!confirm('Box・Cube・Sheet・Card・Saving・カラム・同義・履歴をすべて消します。よろしいですか?')) return; wipeAll('設定の「すべて消して始め直す」で消した'); delete S.__drop; save(); location.reload(); };
 $('approve').onclick = approve;
 $('cancel').onclick = () => { pending = null; queue = []; unitSrc = null; renderMatches(); renderUnits(); };
 $('dAdd').onclick = addDict; $('dKind').onchange = () => { $('dVal').disabled = false; };

@@ -5,6 +5,16 @@ test.beforeEach(async ({ page }, info) => {
   if (!info.title.includes("見本なし")) await page.addInitScript(() => localStorage.setItem("axis-boxes-v2:demo", "1"));
 });
 
+// 軸を使うテストのための軸(本番は空から始めるので、テストの中で入れる)
+const AXES = [
+  { id: "shop", name: "ショップ", kind: "key", values: [], fav: true, scope: "all" },
+  { id: "mall", name: "モール", kind: "key", values: [], fav: true, scope: "all" },
+  { id: "month", name: "月", kind: "key", values: [], fav: true, scope: "all" },
+  { id: "item", name: "科目", kind: "measure", values: ["売上", "手数料"], fav: false, scope: "all" },
+];
+const seedAxes = (page: import("@playwright/test").Page) =>
+  page.addInitScript((a) => { if (!localStorage.getItem("axis-boxes-v2")) localStorage.setItem("axis-boxes-v2", JSON.stringify({ axes: a, boxes: [], sheets: [], saved: [], dict: [], history: [], nextMonth: 10, sampleV: 5 })); }, AXES);
+
 // 入口(/)で「軸の辞書と箱」のダッシュボードが開き、メニューで画面を切り替えられる
 test("入口でダッシュボードが開き、画面を切り替えられる", async ({ page }) => {
   // three.js は CDN ではなく手元のものを使う(ネットにつながらない所でも動くように)
@@ -392,7 +402,7 @@ test("読み取ったSheetを右の欄で選んで入れる", async ({ page }) =
 });
 
 // 見本なし: はじめは空。前に見本が入ったまま保存された中身からは見本だけを消し、実データは残す
-test("見本なし: はじめは空で、前の見本は消えて実データは残る", async ({ page }) => {
+test("見本なし: はじめは空で、前の中身は一度だけすべて消え、設定から消し直せる", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -420,19 +430,37 @@ test("見本なし: はじめは空で、前の見本は消えて実データは
   await page.addInitScript((v) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.removeItem("axis-boxes-v2:demo"); localStorage.setItem("axis-boxes-v2", v); } }, old);
   await page.reload();
   st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
-  expect(st.boxes.map((b: { id: string; parent: string | null }) => [b.id, b.parent])).toEqual([["u1", null]]);
+  // 2026-10-06 ユーザー指定: 例の軸(法人・ショップ・モール・月・科目)ごと、すべて一度だけ消す。控えはこのブラウザに残す
+  expect(st.boxes).toEqual([]);
   expect(st.sheets).toEqual([]);
   expect(st.saved).toEqual([]);
-  expect(st.saving.map((e: { name: string }) => e.name)).toContain("実Sheet");
-  expect(st.history.at(-1).title).toBe("見本(ダミー)のデータを消した");
+  expect(st.saving).toEqual([]);
+  expect(st.axes).toEqual([]);
+  expect(st.dict).toEqual([]);
+  expect(st.sampleV).toBe(5);
+  expect(st.history.map((h: { title: string }) => h.title)).toEqual(["データをすべて消した"]);
+  expect(await page.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("axis-boxes-v2:backup-")))).toBe(true);
   await page.locator('.nv[data-go="home"]').click();
-  await expect(page.locator("#tree")).toContainText("0001 実データ");
-  await expect(page.locator("#tree")).not.toContainText("東京ネット販売");
+  await expect(page.locator("#tree")).not.toContainText("0001 実データ");
+  // 作ったあとに設定の「すべて消して始め直す」で消せる。開き直しても勝手には消えない
+  await page.locator('.nv[data-go="create"]').click();
+  await page.locator('[data-mk="box"]').click();
+  await page.locator("#mkName").fill("あとで消すBox");
+  await page.locator("#mkGo").click();
+  await page.reload();
+  st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.boxes.map((b: { name: string }) => b.name)).toEqual(["あとで消すBox"]);
+  await page.locator('.nv[data-go="settings"]').click();
+  page.once("dialog", (d) => d.accept());
+  await page.locator("#wipeAll").click();
+  await page.waitForLoadState("load");
+  await expect.poll(async () => (await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"))).boxes.length).toBe(0);
   expect(errors).toEqual([]);
 });
 
 // 見本なし: 設定ははじめ何も決めていない。軸の辞書でグループとサブタイトルを作れる
 test("見本なし: 設定は未設定から始まり、Column Registry でカラムの登録・グループ・サブタイトル・同義を扱える", async ({ page }) => {
+  await seedAxes(page);
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -488,6 +516,7 @@ test("見本なし: 設定は未設定から始まり、Column Registry でカ�
 
 // 見本なし: Compose › Create でCube・Box・Sheetを1つずつ作る(Sheetは列を軸に照らして承認)
 test("見本なし: Create でCube・Box・Sheetを作る", async ({ page }) => {
+  await seedAxes(page);
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -703,8 +732,8 @@ test("見本なし: Library は種類から実体へたどり、Column Registry 
   await page.locator("#lbCol").selectOption("法人番号");
   await page.locator("#lbVal").fill("222");
   await expect(page.locator("#lbList .ir")).toHaveCount(1);
-  // 法人名は基本の呼び名で「法人」につながっている。法人番号は未登録
-  await expect(page.locator('#libCat [data-colgo]')).toContainText("法人");
+  // はじめは空なので、法人名も法人番号も未登録
+  await expect(page.locator('#libCat [data-colnew="法人名"]')).toHaveCount(1);
   await page.locator('[data-colnew="法人番号"]').click();
   await expect(page.locator("#crumb")).toHaveText("Column Registry");
   await expect(page.locator("#lnName")).toHaveValue("法人番号");
