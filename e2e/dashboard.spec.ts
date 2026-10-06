@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+// 見本(ダミー)のデータはテストの時だけ入れる。「見本なし」のテストは本番と同じく空から始める
+test.beforeEach(async ({ page }, info) => {
+  if (!info.title.includes("見本なし")) await page.addInitScript(() => localStorage.setItem("axis-boxes-v2:demo", "1"));
+});
+
 // 入口(/)で「軸の辞書と箱」のダッシュボードが開き、メニューで画面を切り替えられる
 test("入口でダッシュボードが開き、画面を切り替えられる", async ({ page }) => {
   // three.js は CDN ではなく手元のものを使う(ネットにつながらない所でも動くように)
@@ -350,5 +355,46 @@ test("読み取ったシートを右の欄で選んで入れる", async ({ page 
   expect(reads).toBe(before + 1);
   const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   expect(st.boxes.filter((b: { parent?: string; levelName?: string }) => b.parent === "a1" && b.levelName === "お客様").map((b: { name: string }) => b.name)).toEqual(["0201 法人P", "0202 法人Q"]);
+  expect(errors).toEqual([]);
+});
+
+// 見本なし: はじめは空。前に見本が入ったまま保存された中身からは見本だけを消し、実データは残す
+test("見本なし: はじめは空で、前の見本は消えて実データは残る", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.boxes ?? []).toEqual([]);
+  // どの画面も空のまま開ける
+  for (const v of ["home", "world", "gather", "import", "saving", "dict", "history"]) {
+    const nv = page.locator(`.nv[data-go="${v}"]`);
+    if (await nv.count()) await nv.click();
+  }
+  await page.locator('.nv[data-go="import"]').click();
+  await expect(page.locator("#preset")).toHaveValue("paste");
+  await expect(page.locator("#preset option", { hasText: "例:" })).toHaveCount(0);
+  // 前の見本のまま保存された中身(見本の箱の中に実データの箱、見本のキューブに実データのシート)
+  await page.evaluate(() => { localStorage.removeItem("axis-boxes-v2"); localStorage.setItem("axis-boxes-v2:demo", "1"); });
+  await page.reload();
+  const old = await page.evaluate(() => {
+    const x = JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}");
+    delete x.demo;
+    x.boxes.push({ id: "u1", kind: "box", name: "0001 実データ", parent: "a1", own: {}, levelName: "お客様" });
+    x.sheets.push({ id: "shX", cube: "c2", name: "実シート", tag: {}, cols: ["年月", "売上金額"], rows: [["2026-07", "1"]], bind: [null, null] });
+    return JSON.stringify(x);
+  });
+  // 閉じる時の保存に上書きされないよう、開く前に入れる
+  await page.addInitScript((v) => { if (!sessionStorage.getItem("seeded")) { sessionStorage.setItem("seeded", "1"); localStorage.removeItem("axis-boxes-v2:demo"); localStorage.setItem("axis-boxes-v2", v); } }, old);
+  await page.reload();
+  st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.boxes.map((b: { id: string; parent: string | null }) => [b.id, b.parent])).toEqual([["u1", null]]);
+  expect(st.sheets).toEqual([]);
+  expect(st.saved).toEqual([]);
+  expect(st.saving.map((e: { name: string }) => e.name)).toContain("実シート");
+  expect(st.history.at(-1).title).toBe("見本(ダミー)のデータを消した");
+  await page.locator('.nv[data-go="home"]').click();
+  await expect(page.locator("#tree")).toContainText("0001 実データ");
+  await expect(page.locator("#tree")).not.toContainText("東京ネット販売");
   expect(errors).toEqual([]);
 });
