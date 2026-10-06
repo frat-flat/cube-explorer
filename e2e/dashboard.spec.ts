@@ -502,6 +502,9 @@ test("見本なし: Create でキューブ・箱・シートを作る", async ({
   await page.locator('[data-mka="1"]').selectOption("mall");
   await page.locator('[data-mka="2"]').selectOption("item");
   await page.locator("#mkGo").click();
+  // 作ったら「見る」が出て、押すと World でそのキューブを選ぶ
+  await expect(page.locator("#note")).toContainText("キューブ「S-01 楽天店」を作りました");
+  await expect(page.locator(".mkdone .it")).toHaveCount(2);
   let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   const a = st.boxes.find((b: { name: string }) => b.name === "法人A"), c = st.boxes.find((b: { name: string }) => b.name === "S-01 楽天店");
   expect(a).toMatchObject({ kind: "box", levelName: "法人", parent: null });
@@ -516,6 +519,13 @@ test("見本なし: Create でキューブ・箱・シートを作る", async ({
   await expect(page.locator("#matchSec")).toBeVisible();
   await expect(page.locator("#matches .match")).toHaveCount(3);
   await page.locator("#approve").click();
+  await page.locator("#note button", { hasText: "見る" }).click();
+  await expect(page.locator("#viewSec")).toBeVisible();
+  await expect(page.locator("#viewTitle")).toContainText("楽天の売上");
+  await page.locator("#viewClose").click();
+  await page.locator('.nv[data-go="create"]').click();
+  await page.locator('.mkdone [data-look="1"]').click();
+  await expect(page.locator("#crumb")).toHaveText("World");
   st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   expect(st.sheets.map((x: { name: string; cube: string; rows: unknown[] }) => [x.name, x.cube, x.rows.length])).toEqual([["楽天の売上", c.id, 0]]);
   expect(errors).toEqual([]);
