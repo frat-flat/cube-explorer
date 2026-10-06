@@ -371,9 +371,10 @@ tfoot td{font-weight:700}
     <input type="text" id="bookUrl" value="https://docs.google.com/spreadsheets/d/1AbC/auPAY月次_法人A/edit" aria-label="スプレッドシートのリンク">
     <button class="primary" id="bookRead">読み取る</button>
     <p class="msg" id="bookMsg" hidden></p>
-    <p class="muted">読み取ると、下にシート(タブ)ごとに「何にするか(シートとしてキューブに入れる・1行ずつ箱にする・1行ずつキューブにする)」と「入れる先」を選ぶ欄が出ます。スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
-  <section><h2>貼り付けたシートを入れる</h2>
-    <div class="row"><select id="preset" aria-label="例のシート"></select></div>
+    <p class="muted">読み取ったシートは、右の「シート」でも選べます。読み取ると、下にシート(タブ)ごとに「何にするか(シートとしてキューブに入れる・1行ずつ箱にする・1行ずつキューブにする)」と「入れる先」を選ぶ欄が出ます。スプシの「共有」で、システム用のアカウント<span id="saMail"></span>を閲覧者に追加すると、タブ・関数・条件付き書式・入力規則を読み取ります。GAS はこのアカウントからは読めません。アプリの外(このページを Claude で開いたときなど)ではリンク先を読めないので、例のデータで流れだけを見せます。</p></section>
+  <section><h2>シートを選んで入れる</h2>
+    <div class="row"><span class="muted">シート</span><select id="preset" aria-label="入れるシート"></select></div>
+    <p class="muted" id="pSrc" hidden></p>
     <div class="row"><span class="muted">何にする</span><select id="pAct" aria-label="何にする"><option value="sheet">シートとしてキューブに入れる(列を軸にする)</option><option value="box">1行ずつ箱にする</option><option value="cube">1行ずつキューブにする</option></select></div>
     <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先"></select></div>
     <div class="row" id="tagRow"><span class="muted">このシート全体の値</span><select id="tagAxis" aria-label="シート全体の軸"></select><input type="text" id="tagVal" size="9" aria-label="シート全体の値"></div>
@@ -636,6 +637,16 @@ const PRESETS = [
   { name: '広告費', target: 'c1', tag: ['mall', '楽天'], data: '年月,広告媒体,広告費\n2026-07,RPP,12000\n2026-08,RPP,15500\n2026-09,クーポン,9800' },
   { name: 'Yahooの売上(店舗コードつき)', target: 'c2', tag: ['mall', 'Yahoo'], data: '対象月,店舗コード,売上高,決済手数料\n2026-07,S-02,98400,7870\n2026-08,S-02,102300,8180\n2026-09,S-02,95100,7610' }
 ];
+// 右の「シート」で選んだもの。読み取ったシートなら中身は Saving のもの(反映の直前に元のスプシを読み直す)
+const pickedStash = () => { const v = $('preset').value; return v.startsWith('sv:') ? S.saving.find(e => e.id === v.slice(3)) : null; };
+function pickSheet() {
+  const v = $('preset').value, e = pickedStash(), fixed = !!e;
+  $('newName').disabled = fixed; $('newData').readOnly = fixed; $('pSrc').hidden = !fixed;
+  if (e) { $('tagAxis').value = ''; $('tagVal').value = ''; $('newName').value = e.name; $('newData').value = e.L.raw.slice(0, 30).map(r => r.join('\t')).join('\n') + (e.L.raw.length > 30 ? '\n…' : '');
+    $('pSrc').textContent = e.url ? `スプシから読み取ったシート(${e.rows.length} 行 × ${e.cols.length} 列)。反映の直前に元のスプシを読み直します` : `前に貼り付けたシート(${e.rows.length} 行 × ${e.cols.length} 列)`; }
+  else if (v === 'paste') { $('newName').value = ''; $('newData').value = ''; }
+  else if (v !== '') fillPreset(+v);
+}
 function fillPreset(i) {
   const p = PRESETS[i]; $('newName').value = p.name; $('newData').value = p.data;
   $('pAct').value = 'sheet'; renderTarget(); $('target').value = p.target; $('tagAxis').value = p.tag[0]; $('tagVal').value = p.tag[1];
@@ -651,12 +662,17 @@ const destOpts = (act, sel) => act === 'sheet'
 function renderTarget() { const v = $('target').value, act = $('pAct').value; $('target').innerHTML = destOpts(act, v); if (act === 'sheet' && !$('target').value) $('target').value = firstCube(); $('tagRow').hidden = act !== 'sheet'; }
 function renderInputs() {
   const keep = ['preset', 'tagAxis', 'dAxis', 'dScope'].map(id => [id, $(id).value]);
-  $('preset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('');
+  // シートの選択肢: 読み取ったスプシのシート(Saving にあるもの)・自分で貼り付ける・例
+  const link = S.saving.filter(e => e.url), pasted = S.saving.filter(e => !e.url);
+  $('preset').innerHTML = (link.length ? `<optgroup label="読み取ったスプシのシート">${link.map(e => `<option value="sv:${e.id}">${esc(e.name)}</option>`).join('')}</optgroup>` : '')
+    + (pasted.length ? `<optgroup label="前に貼り付けたシート">${pasted.map(e => `<option value="sv:${e.id}">${esc(e.name)}</option>`).join('')}</optgroup>` : '')
+    + `<option value="paste">自分で貼り付ける</option><optgroup label="例">${PRESETS.map((p, i) => `<option value="${i}">例: ${esc(p.name)}</option>`).join('')}</optgroup>`;
   renderTarget();
   $('dAxis').innerHTML = S.axes.map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
   $('dScope').innerHTML = '<option value="all">全体で使う</option>' + S.sheets.map(s => `<option value="${s.id}">このシートだけ: ${esc(where(s))}</option>`).join('');
   $('tagAxis').innerHTML = '<option value="">なし</option>' + S.axes.filter(a => a.kind === 'key').map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
   keep.forEach(([id, v]) => { if (v && [...$(id).options].some(o => o.value === v)) $(id).value = v; });
+  if ($('preset').value !== keep[0][1] && keep[0][1]) pickSheet();   // 選んでいたシートが Saving から外れたら、表示を合わせる
 }
 // 文字の近さ(2文字ずつの重なり)。完全一致・含む は強め
 function sim(a, b) {
@@ -777,6 +793,8 @@ function nextStep() {
 }
 const queueTxt = () => { const a = queue.filter(x => !x.unit).length, b = queue.length - a; return queue.length ? `このあと ${[a ? `シートの承認 ${a} 枚` : '', b ? `行から作るもの ${b} 枚` : ''].filter(Boolean).join('・')} が続きます` : ''; };
 function readSheet() {
+  const se = pickedStash();
+  if (se) { if ($('pAct').value === 'sheet') sheetFromStash(se, $('target').value, $('tagAxis').value ? { [$('tagAxis').value]: $('tagVal').value.trim() } : {}); else unitsFromStash(se, $('pAct').value, $('target').value); return; }
   if ($('pAct').value !== 'sheet') { readUnits(); return; }
   const raw = pasteGrid(); if (!raw) return;
   const name = $('newName').value.trim() || 'シート', e = stash({ src: 'paste', name, L: mkLayout(raw) });
@@ -1104,6 +1122,7 @@ async function readBook() {
   // タブごとの初期値: データのタブはシートとして最初のキューブへ。何にするか・入れる先はタブごとに選び直せる
   book.canMerge = !!book.merge;
   book.tabs.forEach(t => { if (t.kind === 'data') { t.act = t.use === false ? 'none' : 'sheet'; t.dest = firstCube(); } });
+  renderInputs(); { const e = S.saving.find(x => x.url === book.url); if (e) { $('preset').value = 'sv:' + e.id; pickSheet(); } }
   renderBook(); go('import'); $('bookSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
@@ -1226,6 +1245,16 @@ function markDone(list, used, rows) {
   return out;
 }
 const whenTxt = iso => { const d = new Date(iso); return isNaN(d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+// Saving のシート(読み取ったスプシのタブ・貼り付け)を、列を軸にしてキューブに入れる / 行から箱・キューブを作る
+const stashSrc = e => e.url ? { url: e.url, tabs: [e.tab], merge: false } : null;
+function sheetFromStash(e, cube, tag) {
+  pending = newPending({ name: e.name, cube: cube || firstCube(), tag: { ...(e.month ? { month: e.month } : {}), ...(tag || {}) }, L: copyL(e.L), src: stashSrc(e), stash: [{ id: e.id, off: 0 }],
+    origin: e.url ? { text: e.name, short: 'スプシから', minutes: [`Saving の「${e.name}」(${e.url})から入れた`], sources: [{ book: e.book, tab: e.tab, range: 'A1:' + colL(e.cols.length - 1) + (e.L.raw.length) }] } : null });
+  // 反映済みの列は「使わない」を初期値にする
+  e.colsDone.forEach(i => { const k = pending.cols.indexOf(e.cols[i]); if (k >= 0) pending.picks[k].pick = 'skip'; });
+  queue = []; unitSrc = null; renderUnits(); renderMatches(); go('import'); $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function unitsFromStash(e, kind, parent) { queue = []; openUnits({ name: e.name, L: copyL(e.L), src: stashSrc(e), stash: e.id, kind: kind === 'cube' ? 'cube' : 'box', parent: parent || '' }); }
 function renderSaving() {
   const el = $('savingList'); if (!el) return;
   const nb = $('nb-saving'); if (nb) { nb.hidden = !S.saving.length; nb.textContent = S.saving.length; }
@@ -1241,16 +1270,10 @@ function renderSaving() {
   }).join('') + '<p class="muted">スプシから読んだものは、反映の直前に必ず元を読み直し、最新の内容で入れます。貼り付けたものは元が無いので、貼り付けた内容で入れます。</p>';
   el.querySelectorAll('[data-sv]').forEach(card => {
     const e = S.saving.find(x => x.id === card.dataset.sv), q = s => card.querySelector(s);
-    const src = e.url ? { url: e.url, tabs: [e.tab], merge: false } : null;
+    const src = stashSrc(e);
     if (q('[data-svr]')) q('[data-svr]').onclick = async () => { q('[data-svr]').disabled = true; try { await freshen(src); note(`「${e.name}」を読み直しました`); } catch (x) { note('読み直せませんでした: ' + x.message); } save(); renderSaving(); };
-    q('[data-svm]').onclick = () => {
-      pending = newPending({ name: e.name, cube: $('pAct').value === 'sheet' && $('target').value || firstCube(), tag: e.month ? { month: e.month } : {}, L: copyL(e.L), src, stash: [{ id: e.id, off: 0 }],
-        origin: e.url ? { text: e.name, short: 'スプシから', minutes: [`Saving の「${e.name}」(${e.url})から入れた`], sources: [{ book: e.book, tab: e.tab, range: 'A1:' + colL(e.cols.length - 1) + (e.L.raw.length) }] } : null });
-      // 反映済みの列は「使わない」を初期値にする
-      e.colsDone.forEach(i => { const k = pending.cols.indexOf(e.cols[i]); if (k >= 0) pending.picks[k].pick = 'skip'; });
-      queue = []; renderMatches(); go('import'); $('matchSec').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    };
-    q('[data-svu]').onclick = () => (queue = [], openUnits({ name: e.name, L: copyL(e.L), src, stash: e.id }));
+    q('[data-svm]').onclick = () => sheetFromStash(e, $('pAct').value === 'sheet' && $('target').value);
+    q('[data-svu]').onclick = () => unitsFromStash(e);
     bindHead(card, e.L, () => { refreshEntry(e); save(); renderSaving(); });
     q('[data-svx]').onclick = () => { S.saving = S.saving.filter(x => x !== e); S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '取り込み', title: `Saving から「${e.name}」を消した`, lines: [`反映していない列 ${e.cols.length - e.colsDone.length} 個・行 ${e.rows.length - e.rowsDone.length} 行は入れずに消した`], sources: [], results: [] }); save(); renderAll(); renderHome(); };
   });
@@ -2406,9 +2429,9 @@ $('cmdGo').onclick = () => { $('cmdMsg').textContent = runCmd($('cmd').value); }
 $('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) $('cmdGo').click(); };
 $('addMonth').onclick = addMonth;
 $('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
-$('preset').onchange = e => fillPreset(+e.target.value);
+$('preset').onchange = pickSheet;
 S.saved.forEach(s => { if (!s.seen) s.seen = sig(s); });
-renderAll(); fillPreset(0); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
+renderAll(); $('preset').value = '0'; pickSheet(); { let v = 'home'; try { v = localStorage.getItem(KEY + ':view') || 'home'; } catch (e) {} go(v); } resize(); loop();
 // Supabase に保存があればそれを正として開き直す。まだ無ければ、いまの中身を最初の保存として送る
 fetch('/api/workspace', { credentials: 'same-origin' }).then(r => r.status === 404 ? null : r.json().then(j => ({ ...j, ok: r.ok })).catch(() => ({ ok: false, error: '応答 ' + r.status }))).then(j => {
   if (!j) return;
