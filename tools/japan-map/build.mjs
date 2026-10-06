@@ -81,13 +81,13 @@ for (let i = 0; i < coast.length; i++) {
   if (Math.abs(area(ring)) < 0.0004) continue;   // ごく小さな島は省く
   const h = ring.length >> 1, sm = [...simplify(ring.slice(0, h + 1), 0.003), ...simplify(ring.slice(h), 0.003).slice(1)]; if (sm.length >= 4) land.push(sm.map(([x, y]) => [r4(x), r4(y)]));
 }
-// 白地図のドット: 地図に形がある市区町村(政令市は市でまとめ、区は除く)ごとに [経度, 緯度, 人口, 名前, 出す縮尺]
+// 白地図のドット: 地図に形がある市区町村(政令市は市でまとめ、区は除く)ごとに [経度, 緯度, 人口, 名前, 出す縮尺, 都道府県コード]
 // 出す縮尺: 0=いつも、1=日本全体のときだけ(東京23区をまとめた点)、2=寄ったときだけ(23区の一つ一つ)
 const pop = JSON.parse(readFileSync(new URL("./population.json", import.meta.url), "utf8"));
 const ku = (m) => /^131[0-2]\d$/.test(m.code.slice(0, 5)) && m.code.slice(0, 5) <= "13123";
-const dots = munis.filter((m) => geo.has(m.code.slice(0, 5)) && pop[m.code]).map((m) => { const c = geo.get(m.code.slice(0, 5)).c; return [r4(c[0]), r4(c[1]), pop[m.code], m.name, ku(m) ? 2 : 0]; });
+const dots = munis.filter((m) => geo.has(m.code.slice(0, 5)) && pop[m.code]).map((m) => { const c = geo.get(m.code.slice(0, 5)).c; return [r4(c[0]), r4(c[1]), pop[m.code], m.name, ku(m) ? 2 : 0, m.prefectureCode]; });
 const k23 = dots.filter((d) => d[4] === 2), s23 = k23.reduce((a, d) => a + d[2], 0);
-if (k23.length) dots.push([r4(k23.reduce((a, d) => a + d[0] * d[2], 0) / s23), r4(k23.reduce((a, d) => a + d[1] * d[2], 0) / s23), s23, "東京23区", 1]);
+if (k23.length) dots.push([r4(k23.reduce((a, d) => a + d[0] * d[2], 0) / s23), r4(k23.reduce((a, d) => a + d[1] * d[2], 0) / s23), s23, "東京23区", 1, "13"]);
 dots.sort((a, b) => b[2] - a[2]);
 // 近隣の国(韓国・北朝鮮・中国・台湾・ロシアなど)の陸: 地図の範囲の四角で切り取った輪
 const topo = require("topojson-client"), wa = JSON.parse(readFileSync(require.resolve("world-atlas/countries-50m.json"), "utf8"));

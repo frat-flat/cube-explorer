@@ -247,6 +247,11 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   // 白地図は地理院タイルを読まず、陸・県境・都市部だけを描く
   await expect(page.locator("#jmap .leaflet-tile")).toHaveCount(0);
   await expect(page.locator("#jmap .leaflet-jland-pane path")).toHaveCount(2);
+  // 一段寄ると、人口の少ない県(鳥取・島根)も県でいちばん大きい都市を出す
+  for (let i = 0; i < 2; i++) { await page.locator("#jmap .leaflet-control-zoom-in").click(); await page.waitForTimeout(600); }
+  await expect(page.locator("#jmap .jlab", { hasText: "鳥取" })).toHaveCount(1);
+  await expect(page.locator("#jmap .jlab", { hasText: "松江" })).toHaveCount(1);
+  for (let i = 0; i < 2; i++) { await page.locator("#jmap .leaflet-control-zoom-out").click(); await page.waitForTimeout(600); }
   await page.locator('#guide [data-js="photo"]').click();
   await expect(page.locator("#jmap .leaflet-tile").first()).toHaveAttribute("src", /seamlessphoto/);
   await page.locator("#jmap .leaflet-interactive").first().dblclick();

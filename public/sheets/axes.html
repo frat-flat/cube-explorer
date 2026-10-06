@@ -2134,7 +2134,7 @@ function setJStyle(k) {
   }
   document.querySelectorAll('[data-js]').forEach(b => b.classList.toggle('on', b.dataset.js === k));
 }
-// 白地図の都市部: 同じ大きさの小さな点と名前。日本全体では主要都市(50万人以上、東京は23区で1つ)だけ、寄るほど小さな町まで出す
+// 白地図の都市部: 同じ大きさの小さな点と名前(dots は [経度, 緯度, 人口, 名前, 出す縮尺, 都道府県コード])。日本全体では主要都市(50万人以上、東京は23区で1つ)だけ、寄るほど小さな町まで出す
 // (人口に合わせて丸の大きさを変えるのは 2026-10-06 にやめた: 何の大きさか分かりにくいため)
 let jDots = null, jDotR = null;
 function jDotsDraw() {
@@ -2144,14 +2144,29 @@ function jDotsDraw() {
   const z = jm.getZoom(), b = jm.getBounds().pad(.3), wide = z < 6.5, mid = z < 8.5;
   // Google マップのように、名前を出せる都市にだけ白い丸を置く(ほかの町の点は出さない)
   const lab = wide ? 5e5 : mid ? 2e5 : z < 10 ? 5e4 : z < 11 ? 2e4 : 0;
-  const placed = [];   // 名前は大きい市から置き、先に置いた丸や名前と重なるものは出さない
-  for (const [lon, lat, p, n, t] of JP.dots) {
-    if (p < lab || (t === 1 && !mid) || (t === 2 && mid) || !b.contains([lat, lon])) continue;
-    const name = n.replace(/23区$/, '').replace(/(.)市$/, '$1'), q = jm.latLngToContainerPoint([lat, lon]), x0 = q.x - 4, x1 = q.x + 7 + name.length * 12, y0 = q.y - 8;
-    if (placed.some(o => x0 < o[1] && x1 > o[0] && Math.abs(y0 - o[2]) < 16)) continue; placed.push([x0, x1, y0]);
+  const tierOk = t => !((t === 1 && !mid) || (t === 2 && mid));
+  // 一定まで寄ったら(日本全体より一段寄ったら)、どの都道府県も人口がいちばん多い都市を必ず1つ出す(2026-10-06 ユーザー指定)
+  const must = new Set();
+  if (z >= 6) { const seen = new Set(); for (const d of JP.dots) if (tierOk(d[4]) && !seen.has(d[5])) { seen.add(d[5]); must.add(d); } }
+  const placed = [];   // 名前は必ず出す都市から、そのあと大きい市から置き、先に置いた丸や名前と重なるものは出さない
+  // 県ごとの都市の数の上限(都道府県が見える縮尺のあいだ。2026-10-06 ユーザー指定): 北海道は5つ、関東は密集するので2つ、ほかは3つまで
+  const KANTO = new Set(['08', '09', '10', '11', '12', '13', '14']), capOn = z >= 6 && z < 9, perPref = {};
+  const cap = pc => pc === '01' ? 5 : KANTO.has(pc) ? 2 : 3;
+  const put = (d, force) => {
+    const [lon, lat, p, n, t, pc] = d;
+    if ((!force && p < lab) || !tierOk(t) || !b.contains([lat, lon])) return;
+    if (!force && capOn && (perPref[pc] || 0) >= cap(pc)) return;
+    const name = n.replace(/23区$/, '').replace(/(.)市$/, '$1'), q = jm.latLngToContainerPoint([lat, lon]), w = 7 + name.length * 12, y0 = q.y - 8;
+    // 名前は丸の右に。重なるなら左へ(必ず出す都市は、さらに上・下も)。どこも重なるときは、必ず出す都市だけ右に出す
+    const spots = [[q.x - 4, q.x + w, y0, [-6, 8]], [q.x - w, q.x + 4, y0, [w - 1, 8]], [q.x - w / 2, q.x + w / 2, y0 - 15, [w / 2 - 3, 23]], [q.x - w / 2, q.x + w / 2, y0 + 15, [w / 2 - 3, -7]]];
+    const hit = sp => placed.some(o => sp[0] < o[1] && sp[1] > o[0] && Math.abs(sp[2] - o[2]) < 15);
+    const sp = spots.slice(0, force ? 4 : 2).find(x => !hit(x)) || (force ? spots[0] : null); if (!sp) return;   // 上・下は必ず出す都市だけ
+    placed.push(sp); perPref[pc] = (perPref[pc] || 0) + 1;
     L.circleMarker([lat, lon], { pane: 'jdots', renderer: jDotR, radius: 3, color: '#4a4f57', weight: 1.2, fillColor: '#ffffff', fillOpacity: 1, interactive: false }).addTo(jDots);
-    L.marker([lat, lon], { pane: 'jdots', interactive: false, keyboard: false, icon: L.divIcon({ className: 'jlab', html: esc(name), iconSize: null, iconAnchor: [-6, 8] }) }).addTo(jDots);
-  }
+    L.marker([lat, lon], { pane: 'jdots', interactive: false, keyboard: false, icon: L.divIcon({ className: 'jlab', html: esc(name), iconSize: null, iconAnchor: sp[3] }) }).addTo(jDots);
+  };
+  must.forEach(d => put(d, true));
+  for (const d of JP.dots) if (!must.has(d)) put(d, false);
 }
 function japanPins(items) {
   Promise.all([leaflet(), loadJP()]).then(([L]) => {
