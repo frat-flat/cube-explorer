@@ -1074,3 +1074,10 @@ create table cube_meta.placements (
 ### PR #39 箱・キューブを消す(2026-10-06 ユーザー「作った箱を削除できる機能がない」)
 - Home の「箱とキューブ」の各行に ×。World の選択欄に「選んだものを消す」(1つ選んだときだけ)。
 - 中の箱・キューブ・シート・カードもいっしょに消える。確かめる文に中身の数を出し、履歴に残す。
+
+### PR #40 Library と Column Registry を分ける(2026-10-06 ユーザー指定)
+- 責務: Library = 情報の単位(Cube・Box・Sheet・Card)を探す。Column Registry = 項目(カラム)の意味・関係を管理する。名前は Synapse を使っていないので、ユーザーの仮称 Column Registry をそのまま採用(画面 id は dict のまま、Library は library)。
+- Library は「種類 → 実体」。いちばん上は種類(S.defs: kind・name・desc・key)だけを並べ、実体は種類を開いてから名前・値・カラムで探す。上の検索は中身にも当たるが、実体は並べず「中身が一致 n件」と出す。
+- 種類は自動で付ける(assignDefs): 箱・キューブ=単位(キューブで単位がなければ3軸)、シート=列の組み合わせ、カード=単位+「情報」か項目の組み合わせ。名前・説明を変えた種類は kept で、実体がなくなっても残る。
+- 種類のカラムは実体のカラムを合わせたもの。登録済みは Column Registry へ、未登録は押すと登録欄に名前が入る。
+- Column Registry: 内部名・データ型・状態(active/deprecated)・意味・定義。Alias(＝の呼び名、取り込みで読み替える)と、カラム同士の関係(S.links: Equivalent=意味が同じ別カラム、Related=関連、参照=参照先/参照元)を分ける。使用箇所で Library の種類とシートを逆引き。

@@ -422,7 +422,7 @@ test("見本なし: はじめは空で、前の見本は消えて実データは
 });
 
 // 見本なし: 設定ははじめ何も決めていない。軸の辞書でグループとサブタイトルを作れる
-test("見本なし: 設定は未設定から始まり、Library でカラムの登録・グループ・サブタイトル・同義を扱える", async ({ page }) => {
+test("見本なし: 設定は未設定から始まり、Column Registry でカラムの登録・グループ・サブタイトル・同義を扱える", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -440,9 +440,9 @@ test("見本なし: 設定は未設定から始まり、Library でカラムの�
   await expect(page.locator("#prefs .pill", { hasText: "自分の設定" })).toHaveCount(1);
   let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   expect(st.prefs.cubeAxes).toEqual(["month", "mall", "item"]);
-  // Library: グループを作り、カラムを入れ、サブタイトルを付ける
+  // Column Registry: グループを作り、カラムを入れ、サブタイトルを付ける
   await page.locator('.nv[data-go="dict"]').click();
-  await expect(page.locator("#crumb")).toHaveText("Library");
+  await expect(page.locator("#crumb")).toHaveText("Column Registry");
   await page.locator("#axGrpName").fill("売上の情報");
   await page.locator("#axGrpAdd").click();
   await page.locator('[data-lib="month"]').click();
@@ -636,5 +636,95 @@ test("見本なし: 作った箱を中身ごと消す", async ({ page }) => {
   page.once("dialog", (d) => d.accept());
   await page.locator("#selDel").click();
   await expect(page.locator("#tree [data-udel]")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("見本なし: Library は種類から実体へたどり、Column Registry と行き来できる", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator('.nv[data-go="create"]').click();
+  for (const [n, u] of [["株式会社A", "法人"], ["株式会社B", "法人"], ["渋谷店", "ショップ"]]) {
+    await page.locator('[data-mk="box"]').click();
+    await page.locator("#mkName").fill(n);
+    await page.locator("#mkUnit").fill(u);
+    await page.locator("#mkGo").click();
+  }
+  for (const [n, no] of [["Aの基本", "111"], ["Bの基本", "222"]]) {
+    await page.locator('[data-mk="card"]').click();
+    await page.locator("#mkName").fill(n);
+    await page.locator("#mkFields").fill(`法人名: ${n[0]}社\n法人番号: ${no}`);
+    await page.locator("#mkGo").click();
+  }
+  // いちばん上は種類だけ。実体(株式会社A など)は並べない
+  await page.locator('.nv[data-go="library"]').click();
+  await expect(page.locator("#crumb")).toHaveText("Library");
+  await expect(page.locator("#libCat .dfc")).toHaveCount(3);
+  await expect(page.locator("#libCat .ir")).toHaveCount(0);
+  await expect(page.locator("#libCat")).not.toContainText("株式会社A");
+  await page.locator('[data-lbk="box"]').click();
+  await expect(page.locator("#libCat .dfc")).toHaveCount(2);
+  await expect(page.locator("#libCat .dfc", { hasText: "法人" })).toContainText("2件");
+  // 中身で探すと、一致した実体を持つ種類が出る
+  await page.locator('[data-lbk="all"]').click();
+  await page.locator("#lbQ").fill("株式会社B");
+  await expect(page.locator("#libCat .dfc")).toHaveCount(1);
+  await expect(page.locator("#libCat .dfc")).toContainText("中身が一致 1件");
+  await page.locator("#libCat .dfc").click();
+  await expect(page.locator(".lbcrumb")).toContainText("Library›Box›法人");
+  await expect(page.locator("#lbList .ir")).toHaveCount(1);
+  await page.locator("#lbIQ").fill("");
+  await expect(page.locator("#lbList .ir")).toHaveCount(2);
+  // 種類の名前を変えられる
+  await page.locator("[data-defname]").fill("法人Box");
+  await page.locator("[data-defname]").blur();
+  await expect(page.locator(".lbcrumb b")).toHaveText("法人Box");
+  // Card の種類: カラムは未登録 → 押すと Column Registry で登録
+  await page.locator("[data-lbtop]").click();
+  await page.locator("#lbQ").fill("");
+  await page.locator('[data-lbk="card"]').click();
+  await page.locator("#libCat .dfc").click();
+  await expect(page.locator("#lbList .ir")).toHaveCount(2);
+  await page.locator("#lbCol").selectOption("法人番号");
+  await page.locator("#lbVal").fill("222");
+  await expect(page.locator("#lbList .ir")).toHaveCount(1);
+  // 法人名は基本の呼び名で「法人」につながっている。法人番号は未登録
+  await expect(page.locator('#libCat [data-colgo]')).toContainText("法人");
+  await page.locator('[data-colnew="法人番号"]').click();
+  await expect(page.locator("#crumb")).toHaveText("Column Registry");
+  await expect(page.locator("#lnName")).toHaveValue("法人番号");
+  await page.locator("#lnGo").click();
+  // 逆引き: 法人番号を使っている Card の種類
+  await expect(page.locator("#libUse [data-defgo]")).toHaveCount(1);
+  await expect(page.locator("#libUse [data-defgo]")).toContainText("2件");
+  // 意味・型・状態
+  await page.locator('[data-af="desc"]').fill("国税庁の13桁の法人番号");
+  await page.locator('[data-af="desc"]').blur();
+  await page.locator('[data-af="dtype"]').selectOption("ID・コード");
+  // 別カラム「法人コード」を登録し、Equivalent でつなぐ(Alias とは別)
+  await page.locator("#libNew").click();
+  await page.locator("#lnName").fill("法人コード");
+  await page.locator("#lnGo").click();
+  await page.locator("#lkRel").selectOption("equiv");
+  await page.locator("#lkTo").selectOption({ label: "法人番号" });
+  await page.locator("#lkAdd").click();
+  await expect(page.locator("#libRel .lk")).toContainText("Equivalent");
+  await expect(page.locator("#libSyn .sc2")).toHaveCount(0);
+  await page.locator('[data-af="status"]').selectOption("deprecated");
+  await expect(page.locator("#axes .li.dep")).toContainText("法人コード");
+  await page.locator("#libRel .lkn").click();
+  await expect(page.locator("#libHead h2")).toHaveText("法人番号");
+  await expect(page.locator("#libRel .lk")).toContainText("法人コード");
+  // Column Registry から Library の種類へ
+  await page.locator("#libUse [data-defgo]").click();
+  await expect(page.locator("#crumb")).toHaveText("Library");
+  await expect(page.locator(".lbcrumb")).toContainText("Card");
+  await expect(page.locator('#libCat [data-colgo]', { hasText: "法人番号" })).toHaveCount(1);
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.defs.find((d: { name: string }) => d.name === "法人Box")).toMatchObject({ kind: "box", kept: true });
+  expect(st.links).toHaveLength(1);
+  expect(st.axes.find((a: { name: string }) => a.name === "法人番号")).toMatchObject({ desc: "国税庁の13桁の法人番号", dtype: "ID・コード" });
+  expect(st.axes.find((a: { name: string }) => a.name === "法人コード")).toMatchObject({ status: "deprecated" });
   expect(errors).toEqual([]);
 });

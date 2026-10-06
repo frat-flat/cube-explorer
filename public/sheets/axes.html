@@ -299,6 +299,42 @@ tfoot td{font-weight:700}
 .cardv .memo{margin:0;white-space:pre-wrap;font-size:13px;border-left:3px solid var(--line);padding-left:10px}
 .mkdone{display:grid;gap:4px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.mkdone h3{font-size:12px;color:var(--muted);margin:0 0 2px}
 .mkdone .it{display:flex;align-items:center;gap:8px;font-size:13px}.mkdone .it .kd{flex:none}.mkdone .it b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mkdone .it button{margin-left:auto;flex:none}
+/* Library(種類 → 実体のカタログ) */
+.cat{gap:16px;padding:16px}
+.lbbar input{width:100%;max-width:520px}
+.lbk{display:grid;gap:8px}.lbk h2{font-size:15px;margin:0;display:flex;gap:8px;align-items:baseline}.lbk h2 .muted{font-size:12px;font-weight:400}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.dfc{display:grid;gap:4px;text-align:left;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel);color:var(--ink);min-width:0}
+.dfc:hover{border-color:var(--accent)}
+.dfc .dft{display:flex;justify-content:space-between;align-items:center}.dfc .n{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dfc b{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfc .ds{font-size:12px;color:var(--ink)}
+.dfc small{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dfc em{font-style:normal;font-size:11.5px;color:var(--hl);font-weight:700}
+.lbcrumb{display:flex;gap:6px;align-items:center;font-size:13px;flex-wrap:wrap}.lbcrumb button{border:0;background:none;color:var(--accent);padding:0}.lbcrumb span{color:var(--muted)}
+.dfhead{display:flex;gap:10px;align-items:center}.dfname{font-size:20px;font-weight:700;border:1px solid transparent;background:none;padding:2px 6px;min-width:0;flex:1;color:var(--ink)}.dfname:hover,.dfname:focus{border-color:var(--line)}
+.dfdesc{width:100%}
+.dfcols{display:grid;gap:6px}.dfcols h3{font-size:13px;margin:0}
+.colc{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:12.5px;background:var(--panel);color:var(--ink)}
+.colc:hover{border-color:var(--accent)}.colc i{font-style:normal;font-size:11px;color:var(--muted)}.colc.un{border-style:dashed;color:var(--muted)}
+.ifind{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr);gap:6px}
+@media (max-width:640px){.ifind{grid-template-columns:minmax(0,1fr)}}
+.ilist{display:flex;flex-direction:column}
+.ir{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--line)}
+.ir .nm{display:grid;min-width:0}.ir .nm b,.ir .nm small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ir .nm small{font-size:11.5px;color:var(--muted)}
+.ir .vs{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:12.5px;min-width:0}.ir .vs i{font-style:normal;color:var(--muted);margin-right:4px}
+@media (max-width:640px){.ir{grid-template-columns:minmax(0,1fr) auto}.ir .vs{grid-column:1/-1;grid-row:2}}
+/* Column Registry(画面 id は dict) */
+.lhd .meta.m3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:640px){.lhd .meta.m3{grid-template-columns:minmax(0,1fr)}}
+.lhd .mdesc{display:grid;gap:3px}.lhd .mdesc>span{font-size:11.5px;color:var(--muted)}.lhd .mdesc textarea{width:100%;resize:vertical}
+.kd.dep{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted)}.li.dep .nm{color:var(--muted);text-decoration:line-through}
+#libRel,#libUse{display:grid;gap:16px}
+.lk{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:3px 4px 3px 10px;font-size:12.5px;background:var(--panel)}
+.lk .r{font-size:11px;font-weight:700;color:var(--accent)}.lk.related .r{color:var(--hl)}.lk.ref .r{color:var(--mine)}.lk .s{font-size:11px;color:var(--muted)}
+.lk button[data-lkdel]{border:0;background:none;color:var(--muted);border-radius:99px;padding:0 6px;line-height:18px}
+.lkn{border:0;background:none;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}.lkn:hover{color:var(--accent)}
+.lkf{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px}
+@media (max-width:640px){.lkf{grid-template-columns:minmax(0,1fr)}}
+.uses{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:12.5px;align-items:baseline}
 /* Library */
 .lib{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:14px;align-items:start}
 @media (max-width:860px){.lib{grid-template-columns:minmax(0,1fr)}}
@@ -412,7 +448,7 @@ tfoot td{font-weight:700}
   <span class="cloud" id="cloud" hidden></span>
   <a class="out" id="logout" href="/auth/signout" hidden>ログアウト</a>
 </header>
-<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><span class="ngh" aria-hidden="true">Compose</span><button class="nv sub" data-go="create"><span class="ic" aria-hidden="true">＋</span><span class="lb">Create<small>キューブ・箱・シート・カード</small></span><span class="nb" id="nb-create" hidden></span></button><button class="nv sub" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">Import<small>シート</small></span><span class="nb" id="nb-import" hidden></span></button><button class="nv sub" data-go="gather"><span class="ic" aria-hidden="true">⇄</span><span class="lb">Remix<small>シート</small></span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="saving"><span class="ic" aria-hidden="true">▤</span><span class="lb">Saving</span><span class="nb" id="nb-saving" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">Library<small>カラム・同義</small></span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
+<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><span class="ngh" aria-hidden="true">Compose</span><button class="nv sub" data-go="create"><span class="ic" aria-hidden="true">＋</span><span class="lb">Create<small>キューブ・箱・シート・カード</small></span><span class="nb" id="nb-create" hidden></span></button><button class="nv sub" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">Import<small>シート</small></span><span class="nb" id="nb-import" hidden></span></button><button class="nv sub" data-go="gather"><span class="ic" aria-hidden="true">⇄</span><span class="lb">Remix<small>シート</small></span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="saving"><span class="ic" aria-hidden="true">▤</span><span class="lb">Saving</span><span class="nb" id="nb-saving" hidden></span></button><button class="nv" data-go="library"><span class="ic" aria-hidden="true">▦</span><span class="lb">Library<small>種類 → 実体</small></span><span class="nb" id="nb-library" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">Column Registry<small>カラムの意味・関係</small></span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
 <div class="content">
 <div class="view" data-view="home">
   <div class="vhead"><h1>ホーム</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を Library に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
@@ -486,7 +522,7 @@ tfoot td{font-weight:700}
   <section><div id="savingList"></div></section>
 </div>
 <div class="view" data-view="dict" hidden>
-  <div class="vhead"><h1>Library <small class="vs">カラムと同義</small></h1><p class="lead">シートの列(カラム)を登録し、呼び名の違う列を同義でつなぎます。つないだ列は Remix で同じカラムとして扱います。</p></div>
+  <div class="vhead"><h1>Column Registry <small class="vs">カラムの意味・関係</small></h1><p class="lead">カラム(列)が何を意味するか、ほかのカラムとどうつながるか、どこで使われているかを管理します。別名(Alias)・意味が同じ別カラム(Equivalent)・関連(Related)は分けて扱います。</p></div>
   <div class="lib">
   <section class="libL">
     <div class="libbar"><input id="libQ" type="search" placeholder="カラム・呼び名で探す" aria-label="カラム・呼び名で探す"><button class="primary small" id="libNew">＋ カラム</button></div>
@@ -502,21 +538,27 @@ tfoot td{font-weight:700}
   </section>
   <section class="libR">
     <div id="libHead"></div>
-    <div class="syn"><h3>同義をつなぐ</h3>
+    <div class="syn"><h3>呼び名をつなぐ(Alias・読み替え)</h3>
       <div class="synf">
         <select id="dKind" aria-label="種類"><option value="col">列の呼び名</option><option value="val">値の呼び名</option></select>
         <input id="dFrom" placeholder="呼び名(例: 出店先)" aria-label="呼び名">
-        <select id="dRel" aria-label="関係"><option value="=">＝ 同じ</option><option value="≒">≒ ほぼ同じ</option><option value="⊃">⊃ 含む</option><option value="⊂">⊂ 一部</option></select>
+        <select id="dRel" aria-label="関係"><option value="=">＝ Alias(別名)</option><option value="≒">≒ ほぼ同じ</option><option value="⊃">⊃ 含む</option><option value="⊂">⊂ 一部</option></select>
         <select id="dAxis" aria-label="つなぐ先のカラム" hidden></select>
         <input id="dVal" placeholder="値(例: 楽天)" aria-label="値">
         <select id="dScope" aria-label="使う範囲"></select>
         <input id="dNote" placeholder="メモ(違いなど)" aria-label="メモ">
         <button class="primary small" id="dAdd">つなぐ</button></div>
-      <p class="hint">＝は同じものとして扱います。≒・⊃・⊂は似ていても同じではない関係で、Remix で「≒・⊃も混ぜる」を選んだときだけ入ります。</p></div>
+      <p class="hint">＝は同じカラムの別名(Alias)で、取り込みでこのカラムに読み替えます。≒・⊃・⊂は似ていても同じではない呼び名で、Remix で「≒・⊃も混ぜる」を選んだときだけ入ります。登録済みのカラム同士の関係は下の「カラム同士の関係」でつなぎます。</p></div>
     <div id="libSyn"></div>
+    <div id="libRel"></div>
+    <div id="libUse"></div>
   </section>
   </div>
   <section><details><summary class="muted">すべての同義を一覧で見る</summary><div class="dict" id="dict"></div></details></section>
+</div>
+<div class="view" data-view="library" hidden>
+  <div class="vhead"><h1>Library <small class="vs">種類 → 実体</small></h1><p class="lead">どんな種類の Cube・Box・Sheet・Card があるかを先に見て、種類を開いてから1つずつを探します。</p></div>
+  <section class="cat" id="libCat"></section>
 </div>
 <div class="view" data-view="history" hidden>
   <div class="vhead"><h1>履歴</h1><p class="lead">読み取りの議事録と、まとめた・分けたシートの元をたどれます。</p></div>
@@ -672,7 +714,7 @@ function upgradeSample2() {
 }
 // 読み込んだ中身を画面で使える形にそろえる(はじめと、Supabase から読んだとき)
 function adopt(x) {
-  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || []; S.groups = S.groups || []; S.cards = S.cards || [];
+  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || []; S.groups = S.groups || []; S.cards = S.cards || []; S.defs = S.defs || []; S.links = S.links || [];
   S.saving.forEach(e => { if (!e.L) e.L = { raw: [e.cols, ...e.rows], hr: 0, gr: -1, merges: [] }; });
   upgradeSample();
   numberUnits();
@@ -792,11 +834,11 @@ let libSel = null, libQ = '';
 const synOf = id => S.dict.filter(d => d.axis === id);
 function renderAxes() {
   const fsAll = facts(), q = libQ.trim().toLowerCase();
-  const hit = a => !q || [a.name, a.sub || '', ...synOf(a.id).map(d => d.from)].some(t => t.toLowerCase().includes(q));
+  const hit = a => !q || [a.name, a.sub || '', a.phys || '', a.desc || '', ...synOf(a.id).map(d => d.from)].some(t => t.toLowerCase().includes(q));
   const list = [...S.axes].filter(visibleAxis).filter(hit).sort((a, b) => (b.fav - a.fav));
   if (!ax(libSel) || !visibleAxis(ax(libSel))) libSel = (list[0] || S.axes.filter(visibleAxis)[0] || {}).id || null;
   const li = a => { const n = synOf(a.id).length;
-    return `<button class="li${a.id === libSel ? ' on' : ''}${a.scope === 'mine' ? ' mine' : ''}" data-lib="${a.id}"><span class="nm">${a.fav ? '<i aria-label="お気に入り">★</i>' : ''}${esc(a.name)}</span><span class="cnt">${n ? '同義 ' + n : ''}</span>${a.sub ? `<small>${esc(a.sub)}</small>` : ''}</button>`; };
+    return `<button class="li${a.id === libSel ? ' on' : ''}${a.scope === 'mine' ? ' mine' : ''}${a.status === 'deprecated' ? ' dep' : ''}" data-lib="${a.id}"><span class="nm">${a.fav ? '<i aria-label="お気に入り">★</i>' : ''}${esc(a.name)}${a.status === 'deprecated' ? ' <span class="kd dep">deprecated</span>' : ''}</span><span class="cnt">${n ? '同義 ' + n : ''}</span>${a.sub ? `<small>${esc(a.sub)}</small>` : ''}</button>`; };
   const free = list.filter(a => !grpOf(a));
   $('axes').innerHTML = S.groups.map(g => { const in_ = list.filter(a => a.group === g.id); if (q && !in_.length) return '';
     return `<div class="agrp"><div class="lgh">${esc(g.name)} <span class="n">${in_.length}</span><button data-gren="${g.id}" title="名前を変える">名前を変える</button><button data-gdel="${g.id}" aria-label="グループ ${esc(g.name)} を消す">×</button></div>${in_.map(li).join('') || '<p class="hint" style="padding:0 10px">カラムを選び、右でこのグループを選ぶと入ります</p>'}</div>`; }).join('')
@@ -812,23 +854,57 @@ function renderAxes() {
   // 右: 選んだカラム
   const a = ax(libSel);
   $('lnGrp').innerHTML = `<option value="">グループなし</option>` + S.groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
-  if (!a) { $('libHead').innerHTML = '<p class="muted">左の「＋ カラム」で登録します。</p>'; $('libSyn').innerHTML = ''; return; }
+  if (!a) { $('libHead').innerHTML = '<p class="muted">左の「＋ カラム」で登録します。</p>'; $('libSyn').innerHTML = ''; $('libRel').innerHTML = ''; $('libUse').innerHTML = ''; return; }
   $('dAxis').value = a.id;
   const vals = a.kind === 'measure' ? a.values : valuesOf(a.id, fsAll);
   $('libHead').innerHTML = `<div class="lhd"><div class="tt"><h2>${esc(a.name)}</h2><span class="kd">${a.kind === 'measure' ? '数値' : '分類'}</span>${a.scope === 'mine' ? '<span class="pill mine">マイリスト</span>' : ''}<button class="star${a.fav ? ' on' : ''}" data-fav="${a.id}" aria-label="お気に入り">${a.fav ? '★︎' : '☆'}</button></div>
     <div class="meta"><label><span>サブタイトル(どの列のことかをピンポイントで)</span><input data-asub="${a.id}" value="${esc(a.sub || '')}" placeholder="例: 申込フォームの店舗コード" aria-label="${esc(a.name)} のサブタイトル"></label>
       <label><span>グループ</span><select data-agrp="${a.id}" aria-label="${esc(a.name)} のグループ"><option value="">グループなし</option>${S.groups.map(g => `<option value="${g.id}"${a.group === g.id ? ' selected' : ''}>${esc(g.name)}</option>`).join('')}</select></label></div>
+    <div class="meta m3"><label><span>内部名(physical name)</span><input data-af="phys" value="${esc(a.phys || '')}" placeholder="例: applied_on" aria-label="${esc(a.name)} の内部名"></label>
+      <label><span>データ型</span><select data-af="dtype" aria-label="${esc(a.name)} のデータ型">${['', ...DTYPES].map(t => `<option value="${t}"${(a.dtype || '') === t ? ' selected' : ''}>${t || '未設定'}</option>`).join('')}</select></label>
+      <label><span>状態</span><select data-af="status" aria-label="${esc(a.name)} の状態"><option value="active">active(使う)</option><option value="deprecated"${a.status === 'deprecated' ? ' selected' : ''}>deprecated(使わない)</option></select></label></div>
+    <label class="mdesc"><span>意味・定義</span><textarea data-af="desc" rows="2" placeholder="例: 申込フォームを送信した日。契約日とは別" aria-label="${esc(a.name)} の意味・定義">${esc(a.desc || '')}</textarea></label>
     ${vals.length ? `<div class="vals">${vals.slice(0, 24).map(v => `<span>${esc(v)}</span>`).join('')}${vals.length > 24 ? `<span>ほか ${vals.length - 24}</span>` : ''}</div>` : ''}</div>`;
   const syn = synOf(a.id), chip = d => `<span class="sc2${d.rel === '=' ? '' : ' ap'}" title="${esc(REL[d.rel] + (d.note ? '・' + d.note : ''))}">${esc(d.from)}<span class="r">${d.rel}</span>${d.value != null ? `<span class="s">${esc(d.value)}</span>` : ''}${d.scope === 'all' ? '' : '<span class="s">このシートだけ</span>'}<button data-dd="${d.id}" aria-label="「${esc(d.from)}」のつなぎを外す">×</button></span>`;
   const cs = syn.filter(d => d.kind === 'col'), vs = syn.filter(d => d.kind === 'val');
-  $('libSyn').innerHTML = `<div class="synl"><h3>つながっている列の呼び名 <span class="muted">${cs.length}</span></h3>${cs.length ? `<div class="chs">${cs.map(chip).join('')}</div>` : '<p class="hint">まだありません。上でつなぐか、Import で列を承認すると増えます。</p>'}</div>`
+  $('libSyn').innerHTML = `<div class="synl"><h3>呼び名(Alias・読み替え) <span class="muted">${cs.length}</span></h3>${cs.length ? `<div class="chs">${cs.map(chip).join('')}</div>` : '<p class="hint">まだありません。上でつなぐか、Import で列を承認すると増えます。</p>'}</div>`
     + (vs.length ? `<div class="synl"><h3>値の呼び名 <span class="muted">${vs.length}</span></h3><div class="chs">${vs.map(chip).join('')}</div></div>` : '');
   bindDd($('libSyn'));
+  renderRel(a);
+  $('libHead').querySelectorAll('[data-af]').forEach(x => x.onchange = () => { const k = x.dataset.af, v = x.value.trim(), was = a[k] || (k === 'status' ? 'active' : '');
+    if (was === v) return; if (v && !(k === 'status' && v === 'active')) a[k] = v; else delete a[k];
+    log(`カラム「${a.name}」の${{ phys: '内部名', dtype: 'データ型', status: '状態', desc: '意味・定義' }[k]}を${v ? '「' + v + '」にした' : '消した'}`, []); redo(); });
   $('libHead').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const x = ax(b.dataset.fav); x.fav = !x.fav; save(); renderAxes(); renderGather(); });
   $('libHead').querySelectorAll('[data-asub]').forEach(x => x.onchange = () => { const v = x.value.trim(); if ((a.sub || '') === v) return;
     if (v) a.sub = v; else delete a.sub; log(`カラム「${a.name}」のサブタイトルを${v ? '付けた' : '消した'}`, [v || '(なし)']); redo(); });
   $('libHead').querySelectorAll('[data-agrp]').forEach(x => x.onchange = () => { const g = S.groups.find(g => g.id === x.value);
     if (g) a.group = g.id; else delete a.group; log(`カラム「${a.name}」を${g ? 'グループ「' + g.name + '」に入れた' : 'グループから出した'}`, []); redo(); });
+}
+const DTYPES = ['文字列', '数値', '金額', '日付', '年月', 'ID・コード', '真偽', '住所', '電話番号'];
+// カラム同士の関係。Alias(同じカラムの別名)は上の呼び名、ここは登録済みの別カラムとの関係
+const LINK = { equiv: ['Equivalent', '意味は同じだが別のカラム'], related: ['Related', '関連はあるが意味は同じではない'], ref: ['参照', 'このカラムが相手を参照する'] };
+function renderRel(a) {
+  const ls = S.links.filter(l => l.a === a.id || l.b === a.id), other = l => ax(l.a === a.id ? l.b : l.a);
+  const tag = l => l.rel === 'ref' ? (l.a === a.id ? '参照先 →' : '参照元 ←') : LINK[l.rel][0];
+  const chip = l => { const o = other(l); return o ? `<span class="lk ${l.rel}" title="${esc(LINK[l.rel][1] + (l.note ? '・' + l.note : ''))}"><span class="r">${tag(l)}</span><button class="lkn" data-colgo="${o.id}">${esc(o.name)}</button>${l.note ? `<span class="s">${esc(l.note)}</span>` : ''}<button data-lkdel="${l.id}" aria-label="${esc(o.name)} との関係を外す">×</button></span>` : ''; };
+  const others = S.axes.filter(x => x.id !== a.id && visibleAxis(x));
+  $('libRel').innerHTML = `<div class="synl"><h3>カラム同士の関係 <span class="muted">${ls.length}</span></h3>
+    ${ls.length ? `<div class="chs">${ls.map(chip).join('')}</div>` : '<p class="hint">まだありません。物理的には別のカラムでも意味が同じなら Equivalent、近いが同じではないなら Related でつなぎます。</p>'}
+    <div class="lkf"><select id="lkRel" aria-label="関係">${Object.entries(LINK).map(([k, [n, t]]) => `<option value="${k}">${n}: ${t}</option>`).join('')}</select><select id="lkTo" aria-label="相手のカラム"><option value="">相手のカラム</option>${others.map(x => `<option value="${x.id}">${esc(x.name)}${x.sub ? '(' + esc(x.sub) + ')' : ''}</option>`).join('')}</select><input id="lkNote" placeholder="メモ(違いなど)" aria-label="関係のメモ"><button class="small primary" id="lkAdd">つなぐ</button></div></div>`;
+  const log = t => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: t, lines: [], sources: [], results: [] });
+  $('lkAdd').onclick = () => { const rel = $('lkRel').value, to = $('lkTo').value, nt = $('lkNote').value.trim(); if (!to) { note('相手のカラムを選んでください'); return; }
+    if (S.links.some(l => l.rel === rel && ((l.a === a.id && l.b === to) || (rel !== 'ref' && l.a === to && l.b === a.id)))) { note('同じ関係はもうあります'); return; }
+    S.links.push({ id: 'lk' + Date.now().toString(36), a: a.id, b: to, rel, ...(nt ? { note: nt } : {}), at: today() }); log(`カラム「${a.name}」と「${ax(to).name}」を ${LINK[rel][0]} でつないだ`); save(); renderAxes(); };
+  $('libRel').querySelectorAll('[data-lkdel]').forEach(b => b.onclick = () => { const l = S.links.find(x => x.id === b.dataset.lkdel), o = other(l); S.links = S.links.filter(x => x !== l); log(`カラム「${a.name}」と「${o ? o.name : '?'}」の ${LINK[l.rel][0]} を外した`); save(); renderAxes(); });
+  // 使用箇所(逆引き): このカラムを持つ種類(Library)と、所属するシート(表)
+  const defs = S.defs.filter(d => defCols(d).some(c => c.axis === a.id));
+  const shs = S.sheets.filter(x => instCols('sheet', x).some(c => c.axis === a.id));
+  $('libUse').innerHTML = `<div class="synl"><h3>使用箇所 <span class="muted">${defs.length + shs.length}</span></h3>
+    ${defs.length ? `<div class="chs">${defs.map(d => `<button class="colc" data-defgo="${d.id}" title="Library で開く"><span class="kd">${KINDS[d.kind]}</span>${esc(d.name)}<i>${instOf(d).filter(x => instCols(d.kind, x).some(c => c.axis === a.id)).length}件</i></button>`).join('')}</div>` : '<p class="hint">まだどの Cube・Box・Sheet・Card にも使われていません。</p>'}
+    ${shs.length ? `<div class="uses">${shs.map(x => `<button class="lkn" data-shgo="${x.id}">▤ ${esc(x.name)}</button><span class="muted">${esc(instPath(x))}${x.origin ? '・元: ' + esc(x.origin.short) : ''}</span>`).join('')}</div>` : ''}</div>`;
+  [$('libRel'), $('libUse')].forEach(r => r.querySelectorAll('[data-colgo]').forEach(b => b.onclick = () => colGo(b.dataset.colgo)));
+  $('libUse').querySelectorAll('[data-defgo]').forEach(b => b.onclick = () => defGo(b.dataset.defgo));
+  $('libUse').querySelectorAll('[data-shgo]').forEach(b => b.onclick = () => lookSheet(b.dataset.shgo));
 }
 // カラムを登録する
 function addColumn() {
@@ -839,6 +915,105 @@ function addColumn() {
   S.axes.push({ id, name, kind, values: kind === 'measure' ? [name] : [], fav: false, scope: 'all', ...(sub ? { sub } : {}), ...(group ? { group } : {}) });
   S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: `カラム「${name}」を登録した`, lines: [`種類: ${kind === 'measure' ? '数値' : '分類'}${sub ? '・' + sub : ''}`], sources: [], results: [] });
   libSel = id; $('libNewForm').reset(); $('libNewForm').hidden = true; save(); renderAll(); note(`カラム「${name}」を登録しました`);
+}
+
+// ---------- Library: 情報の単位(Cube・Box・Sheet・Card)のカタログ ----------
+// 2026-10-06 ユーザー指定: Library は「どんな種類があるか」を先に見せ、種類を開いてから実体を探す。カラムの意味・関係は Column Registry(画面 id は dict)
+const KINDS = { cube: 'Cube', box: 'Box', sheet: 'Sheet', card: 'Card' };
+const instOf = d => d.kind === 'sheet' ? S.sheets.filter(x => x.def === d.id) : d.kind === 'card' ? S.cards.filter(x => x.def === d.id) : S.boxes.filter(x => x.kind === d.kind && x.def === d.id);
+// 列の名前から登録カラムを探す(名前が同じか、呼び名でつないだもの)
+const colAxis = name => { if (!name) return null; const a = S.axes.find(x => x.name === name); if (a) return a.id; const d = S.dict.find(x => x.kind === 'col' && x.from === name && ax(x.axis)); return d ? d.axis : null; };
+// 実体のカラムと値
+function instCols(kind, x) {
+  if (kind === 'sheet') return x.cols.map((c, i) => ({ label: c, axis: (x.bind && x.bind[i] && x.bind[i].axis !== 'item' && x.bind[i].axis) || colAxis(c), value: null }));
+  if (kind === 'card') return x.fields.filter(([k]) => k).map(([k, v]) => ({ label: k, axis: colAxis(k), value: v }));
+  return [...Object.entries(x.own || {}).map(([a, v]) => ({ label: ax(a) ? ax(a).name : a, axis: ax(a) ? a : null, value: v })),
+    ...(kind === 'cube' ? (x.axes || []).filter(ax).map(a => ({ label: ax(a).name, axis: a, value: null })) : []),
+    ...Object.entries(x.info || {}).map(([k, v]) => ({ label: k, axis: colAxis(k), value: v }))];
+}
+// 種類のカラム = 実体のカラムを合わせたもの(同じ登録カラムは1つにまとめる)
+function defCols(d) {
+  const m = new Map();
+  instOf(d).forEach(x => instCols(d.kind, x).forEach(c => { const k = c.axis ? 'a:' + c.axis : 'l:' + c.label; const e = m.get(k); if (e) e.n++; else m.set(k, { label: c.axis ? ax(c.axis).name : c.label, axis: c.axis, n: 1 }); }));
+  return [...m.values()];
+}
+// 種類を決める鍵と名前(箱・キューブは単位、シートは列の組み合わせ、カードは単位か項目の組み合わせ)
+function defKey(kind, x) {
+  if (kind === 'box') return ['lv:' + levelOf(x), levelOf(x)];
+  if (kind === 'cube') { const L = levelOf(x); if (L !== 'キューブ') return ['lv:' + L, L]; return ['ax:' + (x.axes || []).join(','), (x.axes || []).filter(ax).map(a => ax(a).name).join('×') || 'キューブ']; }
+  if (kind === 'sheet') return ['cols:' + [...x.cols].sort().join('\u0001'), x.name.replace(/[\s_\-]*(\d{4}[-\/.年]?\d{1,2}月?|\d+)$/, '') || x.name];
+  if (x.unit) return ['lv:' + x.unit, /情報$/.test(x.unit) ? x.unit : x.unit + '情報'];
+  const ks = x.fields.map(f => f[0]).filter(Boolean);
+  return ['keys:' + [...ks].sort().join('\u0001'), ks.length ? ks.slice(0, 2).join('・') + 'のカード' : 'カード'];
+}
+// 種類のない実体に種類を付ける。自分で名前や説明を変えていない種類は、実体がなくなれば片付ける
+function assignDefs() {
+  const before = JSON.stringify(S.defs.map(d => d.id)); let changed = false;
+  const each = (kind, list) => list.forEach(x => { if (x.def && S.defs.some(d => d.id === x.def && d.kind === kind)) return;
+    const [key, name] = defKey(kind, x); let d = S.defs.find(d => d.kind === kind && d.key === key);
+    if (!d) { d = { id: 'df' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind, key, name, at: today() }; S.defs.push(d); }
+    x.def = d.id; changed = true; });
+  each('cube', S.boxes.filter(b => b.kind === 'cube')); each('box', S.boxes.filter(b => b.kind === 'box')); each('sheet', S.sheets); each('card', S.cards);
+  S.defs = S.defs.filter(d => d.kept || instOf(d).length);
+  if (changed || before !== JSON.stringify(S.defs.map(d => d.id))) save();
+}
+let lbKind = 'all', lbDef = null, lbQ = '', lbIQ = '', lbCol = '', lbVal = '';
+const instPath = x => { const p = x.cube || x.parent; return p && box(p) ? pathOf(p).map(b => b.name).join(' › ') : 'いちばん上'; };
+const instHit = (kind, x, q) => { if (!q) return true; q = q.toLowerCase(); return [x.name, ...instCols(kind, x).map(c => c.value == null ? '' : String(c.value))].some(t => String(t).toLowerCase().includes(q)); };
+const openInst = (kind, id) => kind === 'sheet' ? lookSheet(id) : kind === 'card' ? lookCard(id) : lookUnit(id);
+function colGo(id) { libSel = id; libQ = ''; $('libQ').value = ''; go('dict'); renderAxes(); }
+function defGo(id) { const d = S.defs.find(x => x.id === id); if (!d) return; lbDef = id; lbKind = d.kind; lbIQ = ''; lbCol = ''; lbVal = ''; go('library'); renderLibrary(); }
+function renderLibrary() {
+  assignDefs();
+  const el = $('libCat'), d = S.defs.find(x => x.id === lbDef);
+  if (!d) { lbDef = null; return renderCatalog(el); }
+  const all = instOf(d), cs = defCols(d);
+  if (lbCol && !cs.some(c => c.label === lbCol)) lbCol = '';
+  const list = all.filter(x => instHit(d.kind, x, lbIQ) && (!lbCol || instCols(d.kind, x).some(c => (c.axis ? ax(c.axis).name : c.label) === lbCol && (!lbVal || String(c.value ?? '').toLowerCase().includes(lbVal.toLowerCase())))));
+  const shown = list.slice(0, 200);
+  const row = x => { const vs = instCols(d.kind, x).filter(c => c.value != null && c.value !== '').slice(0, 3);
+    return `<div class="ir"><span class="nm"><b>${esc(x.name)}</b><small>${esc(instPath(x))}</small></span><span class="vs">${d.kind === 'sheet' ? `${x.cols.length}列 × ${x.rows.length}行${x.origin ? '・' + esc(x.origin.short) : ''}` : vs.map(c => `<span><i>${esc(c.label)}</i>${esc(c.value)}</span>`).join('')}</span><button class="small" data-iopen="${x.id}">開く</button></div>`; };
+  el.innerHTML = `<nav class="lbcrumb" aria-label="Library の場所"><button data-lbtop>Library</button><span>›</span><button data-lbkind="${d.kind}">${KINDS[d.kind]}</button><span>›</span><b>${esc(d.name)}</b></nav>
+    <div class="dfhead"><span class="kd">${KINDS[d.kind]}</span><input class="dfname" data-defname value="${esc(d.name)}" aria-label="種類の名前"><span class="muted">${all.length}件</span></div>
+    <input class="dfdesc" data-defdesc value="${esc(d.desc || '')}" placeholder="この種類の説明(例: 取引先の法人の基本情報)" aria-label="種類の説明">
+    <div class="dfcols"><h3>この種類のカラム <span class="muted">${cs.length}</span></h3><div class="chs">${cs.map(c => c.axis
+      ? `<button class="colc" data-colgo="${c.axis}" title="Column Registry で開く">${esc(c.label)}<i>${c.n}</i></button>`
+      : `<button class="colc un" data-colnew="${esc(c.label)}" title="Column Registry に未登録。押すと登録する">${esc(c.label)}<i>未登録</i></button>`).join('') || '<span class="muted">まだありません</span>'}</div></div>
+    <div class="ifind"><input id="lbIQ" type="search" value="${esc(lbIQ)}" placeholder="この中で探す(名前・値)" aria-label="この種類の中で探す"><select id="lbCol" aria-label="カラムで絞る"><option value="">カラムで絞る</option>${cs.map(c => `<option${c.label === lbCol ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select><input id="lbVal" value="${esc(lbVal)}" placeholder="値" aria-label="カラムの値"${lbCol ? '' : ' disabled'}></div>
+    <div class="ilist" id="lbList">${shown.map(row).join('') || '<p class="muted">見つかりません</p>'}${list.length > shown.length ? `<p class="muted">ほか ${list.length - shown.length}件。上で絞り込んでください</p>` : ''}</div>`;
+  bindLib(el, d);
+}
+function renderCatalog(el) {
+  const q = lbQ.trim().toLowerCase(), cnt = k => S.defs.filter(d => d.kind === k).length;
+  const ks = lbKind === 'all' ? Object.keys(KINDS) : [lbKind];
+  const card = (d, hits) => { const cs = defCols(d), n = instOf(d).length;
+    return `<button class="dfc" data-def="${d.id}"><span class="dft"><span class="kd">${KINDS[d.kind]}</span><span class="n">${n}件</span></span><b>${esc(d.name)}</b>${d.desc ? `<span class="ds">${esc(d.desc)}</span>` : ''}<small>${cs.length ? esc(cs.slice(0, 4).map(c => c.label).join('・')) + (cs.length > 4 ? ` ほか${cs.length - 4}` : '') : 'カラムなし'}</small>${hits ? `<em>中身が一致 ${hits}件</em>` : ''}</button>`; };
+  const body = ks.map(k => {
+    const ds = S.defs.filter(d => d.kind === k).map(d => { if (!q) return [d, 0];
+      const own = [d.name, d.desc || '', ...defCols(d).map(c => c.label)].some(t => t.toLowerCase().includes(q));
+      const hits = instOf(d).filter(x => instHit(k, x, q)).length; return own || hits ? [d, own ? 0 : hits] : null; }).filter(Boolean);
+    if (q && !ds.length) return '';
+    return `<div class="lbk"><h2>${KINDS[k]} <span class="muted">種類 ${ds.length}</span></h2>${ds.length ? `<div class="dgrid">${ds.map(([d, h]) => card(d, h)).join('')}</div>` : `<p class="muted">まだありません。Compose で${{ cube: 'キューブ', box: '箱', sheet: 'シート', card: 'カード' }[k]}を作ると、その種類がここに並びます。</p>`}</div>`; }).join('');
+  el.innerHTML = `<div class="lbbar"><input id="lbQ" type="search" value="${esc(lbQ)}" placeholder="種類・カラム・中身で探す" aria-label="種類を探す"></div>
+    <div class="seg" role="tablist">${[['all', 'すべて', S.defs.length], ...Object.entries(KINDS).map(([k, l]) => [k, l, cnt(k)])].map(([k, l, n]) => `<button role="tab" data-lbk="${k}" class="${lbKind === k ? 'on' : ''}" aria-selected="${lbKind === k}">${l} <span class="muted">${n}</span></button>`).join('')}</div>
+    ${body || '<p class="muted">見つかりません</p>'}`;
+  bindLib(el, null);
+}
+function bindLib(el, d) {
+  const keepFocus = (id, set) => { const x = el.querySelector('#' + id); if (!x) return; x.oninput = () => { set(x.value); renderLibrary(); const y = $(id); y.focus(); y.setSelectionRange(y.value.length, y.value.length); }; };
+  keepFocus('lbQ', v => lbQ = v); keepFocus('lbIQ', v => lbIQ = v); keepFocus('lbVal', v => lbVal = v);
+  const sc = el.querySelector('#lbCol'); if (sc) sc.onchange = () => { lbCol = sc.value; if (!lbCol) lbVal = ''; renderLibrary(); };
+  el.querySelectorAll('[data-lbk]').forEach(b => b.onclick = () => { lbKind = b.dataset.lbk; renderLibrary(); });
+  el.querySelectorAll('[data-def]').forEach(b => b.onclick = () => { lbDef = b.dataset.def; lbIQ = lbQ; lbCol = ''; lbVal = ''; renderLibrary(); });
+  el.querySelectorAll('[data-lbtop]').forEach(b => b.onclick = () => { lbDef = null; lbKind = 'all'; renderLibrary(); });
+  el.querySelectorAll('[data-lbkind]').forEach(b => b.onclick = () => { lbDef = null; lbKind = b.dataset.lbkind; renderLibrary(); });
+  el.querySelectorAll('[data-colgo]').forEach(b => b.onclick = () => colGo(b.dataset.colgo));
+  el.querySelectorAll('[data-colnew]').forEach(b => b.onclick = () => { go('dict'); $('libNewForm').hidden = false; $('lnName').value = b.dataset.colnew; $('lnName').focus(); });
+  el.querySelectorAll('[data-iopen]').forEach(b => b.onclick = () => openInst(d.kind, b.dataset.iopen));
+  if (!d) return;
+  const log = t => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: t, lines: [], sources: [], results: [] });
+  el.querySelector('[data-defname]').onchange = e => { const v = e.target.value.trim(); if (!v || v === d.name) { e.target.value = d.name; return; } log(`${KINDS[d.kind]} の種類「${d.name}」を「${v}」に変えた`); d.name = v; d.kept = true; save(); renderLibrary(); };
+  el.querySelector('[data-defdesc]').onchange = e => { const v = e.target.value.trim(); if (v) d.desc = v; else delete d.desc; d.kept = true; save(); };
 }
 
 // ---------- シートを入れる:軸の候補を全部出し、最後に承認 ----------
@@ -2743,7 +2918,7 @@ $('navToggle').onclick = () => navC(!document.querySelector('.shell').classList.
 try { if (localStorage.getItem('axis-boxes-v2:navc')) navC(true); } catch (e) {}
 
 // ---------- つなぐ ----------
-function renderAll() { renderPinBar(); renderInputs(); renderCreate(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderCard(); renderHist(); renderSaving(); }
+function renderAll() { renderLibrary(); renderPinBar(); renderInputs(); renderCreate(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderCard(); renderHist(); renderSaving(); }
 $('read').onclick = readSheet;
 $('pAct').onchange = renderTarget;
 $('approve').onclick = approve;
@@ -2758,7 +2933,7 @@ document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (
 
 // ---------- ダッシュボードの画面切り替え ----------
 // 左のメニュー(と data-go を持つボタン)で画面を1つだけ見せる。開いていた画面は次に開いたときも同じ(ブラウザに覚える)
-const VIEWS = { home: 'ホーム', world: 'World', create: 'Compose › Create', import: 'Compose › Import', gather: 'Compose › Remix', saving: 'Saving', dict: 'Library', history: '履歴', settings: '設定' };
+const VIEWS = { home: 'ホーム', world: 'World', create: 'Compose › Create', import: 'Compose › Import', gather: 'Compose › Remix', saving: 'Saving', library: 'Library', dict: 'Column Registry', history: '履歴', settings: '設定' };
 function go(v) {
   if (!VIEWS[v]) v = 'home';
   document.querySelectorAll('.view').forEach(e => e.hidden = e.dataset.view !== v);
