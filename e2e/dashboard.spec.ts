@@ -811,3 +811,39 @@ test("見本なし: Sheet を入れるために作った Cube が World に出�
   await page.waitForTimeout(500);
   expect(errors).toEqual([]);
 });
+
+// 同じ単位のBoxの中に、同じ単位のBoxを入れても World が止まらずに描ける(前は大きさの計算が終わらず何も映らなかった)
+test("見本なし: 同じ単位のBoxを入れ子にしても World に出る", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => { if (m.text().includes("視点を戻しました")) errors.push(m.text()); });
+  await page.goto("/");
+  const rowsToBoxes = async (name: string, data: string) => {
+    await page.locator('.nv[data-go="import"]').click();
+    await page.locator("#newName").fill(name);
+    await page.locator("#newData").fill(data);
+    await page.locator("#pasteRead").click();
+    await page.locator("#pickCards [data-pact]").selectOption("box");
+    await page.locator("#pickGo").click();
+    await page.locator("#uUnit").fill("法人");
+    await page.locator("#uMake").click();
+    await expect(page.locator("#unitSec")).toBeHidden();
+  };
+  await rowsToBoxes("法人一覧", "法人名\n法人A\n法人B");
+  await page.locator('.nv[data-go="import"]').click();
+  await page.locator("#newName").fill("支店");
+  await page.locator("#newData").fill("法人名\n法人A 支店");
+  await page.locator("#pasteRead").click();
+  await page.locator("#pickCards [data-pact]").selectOption("box");
+  const opt = await page.locator('#pickCards [data-pdest] option', { hasText: "法人A" }).first().getAttribute("value");
+  await page.locator("#pickCards [data-pdest]").selectOption(opt!);
+  await page.locator("#pickGo").click();
+  await page.locator("#uUnit").fill("法人");
+  await page.locator("#uMake").click();
+  await expect(page.locator("#unitSec")).toBeHidden();
+  await page.locator('.nv[data-go="world"]').click();
+  await page.waitForTimeout(800);
+  await expect(page.locator("#gizmo text").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
