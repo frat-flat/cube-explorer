@@ -47,7 +47,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 .nv.on{background:var(--bg);color:var(--accent);font-weight:700}
 .nv .ic{width:18px;text-align:center;font-size:15px}
 .nv .lb{flex:1;white-space:nowrap}
-.nv .lb small{display:block;font-size:10.5px;font-weight:400;color:var(--muted);margin-top:-1px}
+.nv .lb small{display:block;white-space:normal;line-height:1.3;font-size:10.5px;font-weight:400;color:var(--muted);margin-top:-1px}
 .ngh{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:12px 10px 2px;font-weight:700}
 .nv.sub{padding-left:16px}
 .shell.navc .ngh{display:none}
@@ -283,6 +283,20 @@ tfoot td{font-weight:700}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 32px));background:var(--ink);color:var(--panel);border-radius:10px;padding:10px 12px 10px 16px;font-size:13px;box-shadow:0 6px 24px rgb(0 0 0/.25)}
 .toast button{flex:none;border:0;background:var(--accent);color:#fff;font-weight:700;border-radius:6px;padding:5px 14px}
 .toast .tx{min-width:0}
+.seg.sm button{padding:4px 12px;font-size:12.5px}
+.ncols{display:grid;gap:6px}.ncols>span small{margin-left:6px}
+.nc{display:flex;flex-wrap:wrap;gap:6px}
+.nch{display:inline-flex;align-items:baseline;gap:6px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer;max-width:240px;background:var(--panel)}
+.nch input{margin:0;align-self:center;accent-color:var(--accent)}
+.nch b{font-size:12.5px;white-space:nowrap}.nch small{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.nch.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.nch i{font-style:normal;font-size:11px;font-weight:700;color:#fff;background:var(--accent);border-radius:99px;min-width:18px;text-align:center;align-self:center}
+.pill.card{color:var(--ok)}
+.drawer.card{width:min(440px,100vw)}
+.cardv{display:grid;gap:12px;border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel);box-shadow:0 2px 10px rgb(0 0 0/.06)}
+.cardv .ch{display:grid;gap:2px}.cardv .ch b{font-size:17px}
+.cardv dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:13px}.cardv dt{color:var(--muted)}.cardv dd{margin:0;overflow-wrap:anywhere}
+.cardv .memo{margin:0;white-space:pre-wrap;font-size:13px;border-left:3px solid var(--line);padding-left:10px}
 .mkdone{display:grid;gap:4px;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.mkdone h3{font-size:12px;color:var(--muted);margin:0 0 2px}
 .mkdone .it{display:flex;align-items:center;gap:8px;font-size:13px}.mkdone .it .kd{flex:none}.mkdone .it b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mkdone .it button{margin-left:auto;flex:none}
 /* Library */
@@ -398,7 +412,7 @@ tfoot td{font-weight:700}
   <span class="cloud" id="cloud" hidden></span>
   <a class="out" id="logout" href="/auth/signout" hidden>ログアウト</a>
 </header>
-<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><span class="ngh" aria-hidden="true">Compose</span><button class="nv sub" data-go="create"><span class="ic" aria-hidden="true">＋</span><span class="lb">Create<small>キューブ・箱・シート</small></span><span class="nb" id="nb-create" hidden></span></button><button class="nv sub" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">Import<small>シート</small></span><span class="nb" id="nb-import" hidden></span></button><button class="nv sub" data-go="gather"><span class="ic" aria-hidden="true">⇄</span><span class="lb">Remix<small>シート</small></span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="saving"><span class="ic" aria-hidden="true">▤</span><span class="lb">Saving</span><span class="nb" id="nb-saving" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">Library<small>カラム・同義</small></span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
+<nav class="side" aria-label="画面"><button class="nv" data-go="home"><span class="ic" aria-hidden="true">⌂</span><span class="lb">ホーム</span><span class="nb" id="nb-home" hidden></span></button><button class="nv" data-go="world"><span class="ic" aria-hidden="true">◈</span><span class="lb">World</span><span class="nb" id="nb-world" hidden></span></button><span class="ngh" aria-hidden="true">Compose</span><button class="nv sub" data-go="create"><span class="ic" aria-hidden="true">＋</span><span class="lb">Create<small>キューブ・箱・シート・カード</small></span><span class="nb" id="nb-create" hidden></span></button><button class="nv sub" data-go="import"><span class="ic" aria-hidden="true">⇪</span><span class="lb">Import<small>シート</small></span><span class="nb" id="nb-import" hidden></span></button><button class="nv sub" data-go="gather"><span class="ic" aria-hidden="true">⇄</span><span class="lb">Remix<small>シート</small></span><span class="nb" id="nb-gather" hidden></span></button><button class="nv" data-go="saving"><span class="ic" aria-hidden="true">▤</span><span class="lb">Saving</span><span class="nb" id="nb-saving" hidden></span></button><button class="nv" data-go="dict"><span class="ic" aria-hidden="true">≡</span><span class="lb">Library<small>カラム・同義</small></span><span class="nb" id="nb-dict" hidden></span></button><button class="nv" data-go="history"><span class="ic" aria-hidden="true">↺</span><span class="lb">履歴</span><span class="nb" id="nb-history" hidden></span></button><button class="nv" data-go="settings"><span class="ic" aria-hidden="true">⚙</span><span class="lb">設定</span><span class="nb" id="nb-settings" hidden></span></button></nav>
 <div class="content">
 <div class="view" data-view="home">
   <div class="vhead"><h1>ホーム</h1><p class="lead">箱(法人など、入れ物)とキューブ(3軸が決まった店舗など)を区別し、シートの列を Library に照らして登録します。軸がそろっていれば、箱やキューブをまたいで1枚のシートにまとめられます。</p></div>
@@ -425,9 +439,9 @@ tfoot td{font-weight:700}
     </section>
 </div>
 <div class="view" data-view="create" hidden>
-  <div class="vhead"><h1>Create <small class="vs">キューブ・箱・シート</small></h1><p class="lead">何もないところから、キューブ・箱・シートを1つずつ作ります。スプシや貼り付けから作るときは Import へ。</p></div>
+  <div class="vhead"><h1>Create <small class="vs">キューブ・箱・シート・カード</small></h1><p class="lead">キューブ・箱・シート・カードを作ります。箱とカードは、入っているシートの各行からまとめて作ることもできます。</p></div>
   <section class="mk">
-    <div class="seg" role="tablist" aria-label="作るもの"><button role="tab" data-mk="cube">キューブ</button><button role="tab" data-mk="box">箱</button><button role="tab" data-mk="sheet">シート</button></div>
+    <div class="seg" role="tablist" aria-label="作るもの"><button role="tab" data-mk="cube">キューブ</button><button role="tab" data-mk="box">箱</button><button role="tab" data-mk="sheet">シート</button><button role="tab" data-mk="card">カード</button></div>
     <div id="mkForm"></div>
   </section>
 </div>
@@ -465,7 +479,7 @@ tfoot td{font-weight:700}
   <section id="bookSec" hidden><h2>スプシの読み取り結果(シートごとに、何にするかと入れる先を選ぶ)</h2><div id="book"></div></section>
   <section id="matchSec" hidden><h2>読み取った列と軸の候補(最後に承認)</h2><div id="matches"></div>
     <div class="row"><button class="primary" id="approve">この内容で承認して入れる</button><button id="cancel">やめる</button><span class="muted" id="queueInfo"></span></div></section>
-  <section id="unitSec" hidden><h2>シートの行から箱・キューブを作る</h2><div id="unitForm"></div></section>
+  <section id="unitSec" hidden><h2>シートの各行から箱・キューブ・カードを作る</h2><div id="unitForm"></div></section>
 </div>
 <div class="view" data-view="saving" hidden>
   <div class="vhead"><h1>Saving</h1><p class="lead">読み取ったけれど、まだ箱・キューブに反映していないシート・列・行の置き場です。箱・キューブに反映するときは、必ず元のスプシから最新を読み直してから入れます。</p></div>
@@ -515,6 +529,7 @@ tfoot td{font-weight:700}
 </div>
 </div>
 <div id="note" class="toast" role="status" aria-live="polite" hidden></div>
+<section id="cardSec" class="drawer card" hidden aria-label="カードを開く"><h2><span id="cardTitle">カード</span><span class="sp"></span><button class="small" id="cardClose">閉じる</button></h2><div id="cardBody"></div></section>
 <section id="viewSec" class="drawer" hidden aria-label="シートを開く"><h2><span id="viewTitle">シート</span><span class="sp"></span><button class="small" id="viewClose">閉じる</button></h2>
     <div class="trail" id="viewInfo"></div><div class="fbar" id="fbar">セルを押すと中身(関数があれば関数)が出ます。ダブルクリックで直せます</div>
     <div class="tablewrap"><table class="grid" id="viewGrid"></table></div><div class="row" id="viewActs"></div></section>
@@ -657,7 +672,7 @@ function upgradeSample2() {
 }
 // 読み込んだ中身を画面で使える形にそろえる(はじめと、Supabase から読んだとき)
 function adopt(x) {
-  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || []; S.groups = S.groups || [];
+  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || []; S.groups = S.groups || []; S.cards = S.cards || [];
   S.saving.forEach(e => { if (!e.L) e.L = { raw: [e.cols, ...e.rows], hr: 0, gr: -1, merges: [] }; });
   upgradeSample();
   numberUnits();
@@ -733,22 +748,25 @@ let used = new Set();   // まとめに使ったシート
 function renderTree() {
   const el = $('tree'); let h = '';
   const kids = p => S.boxes.filter(b => b.parent === p);
+  const cardsIn = (p, d) => S.cards.filter(c => (c.parent || null) === p).forEach(c => h += `<div class="node ind${d}" data-card="${c.id}"><span class="pill card">カード</span><b>${esc(c.name)}</b><span class="ax">${c.fields.length}項目</span></div>`);
   const walk = (p, d) => kids(p).forEach(b => {
     const isUsed = S.sheets.some(s => used.has(s.id) && pathOf(s.cube).includes(b));
     h += `<div class="node ind${d}${isUsed ? ' used' : ''}${selUnits().includes(b) ? ' sel' : ''}" data-unit="${b.id}"><span class="unit">${esc(levelOf(b))}単位・${unitOf(b)}</span><span class="pill ${b.kind}">${b.kind === 'box' ? '箱' : 'キューブ'}</span><b>${esc(b.name)}</b>${b.kind === 'cube' ? `<span class="ax">${b.axes.map(a => esc(ax(a).name)).join('×')}</span>` : `<span class="ax">${Object.entries(b.own).map(([a, v]) => esc(ax(a).name + '=' + v)).join('')}</span>`}<button class="small pin${b.pin ? ' on' : ''}" data-pin="${b.id}" title="画面を回しても向きを変えない">${b.pin ? '固定中 ' + (b.kind === 'box' ? '中は' : '') + faceOf(b.pin.face).name : '固定'}</button></div>`;
+    cardsIn(b.id, d + 1);
     S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addbox="${b.id}">＋ 箱を足す</button></div>`;
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(caTxt())})</button></div>`;
   });
-  walk(null, 0);
-  if (!S.boxes.length) h = '<p class="muted">まだ箱もキューブもありません。「シートを入れる」でスプシを読み取り、シートごとに「1行ずつ箱にする」などを選ぶとここに並びます。</p>';
+  walk(null, 0); cardsIn(null, 0);
+  if (!S.boxes.length && !S.cards.length) h = '<p class="muted">まだ箱もキューブもありません。「シートを入れる」でスプシを読み取り、シートごとに「1行ずつ箱にする」などを選ぶとここに並びます。</p>';
   el.innerHTML = h;
   el.querySelectorAll('[data-pin]').forEach(n => n.onclick = e => { e.stopPropagation(); togglePin(n.dataset.pin); });
   el.querySelectorAll('[data-unit]').forEach(n => n.onclick = () => select(n.dataset.unit));
   el.querySelectorAll('[data-addcube]').forEach(n => n.onclick = () => addCube(n.dataset.addcube));
   el.querySelectorAll('[data-addbox]').forEach(n => n.onclick = () => addBox(n.dataset.addbox));
   el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollTop = 0; });
+  el.querySelectorAll('[data-card]').forEach(n => n.onclick = () => lookCard(n.dataset.card));
 }
 // 軸のグループとサブタイトル。名前は短く、どの列のことかの細かい指定はサブタイトルに書く
 const grpOf = a => S.groups.find(g => g.id === a.group) || null;
@@ -893,7 +911,9 @@ function mkLayout(raw, merges) {
   raw = raw.map(r => r.map(v => String(v ?? '').trim()));
   // 上の10行のうち、文字(数字でない)のマスがいちばん多い行を列名の行とみなす(同じなら上の行)
   let hr = 0, best = -1;
-  raw.slice(0, 10).forEach((r, i) => { const n = r.filter(v => v && !isNumTxt(v)).length; if (n > best) { best = n; hr = i; } });
+  // A・C・AJ・H列 のような列の記号だけの行(スプシで目印に置いた行)は列名にしない
+  const letters = r => { const vs = r.filter(Boolean); return vs.length >= 2 && vs.filter(v => /^[A-Z]{1,3}列?$/.test(v)).length >= vs.length * .6; };
+  raw.slice(0, 10).forEach((r, i) => { const n = letters(r) ? 0 : r.filter(v => v && !isNumTxt(v)).length; if (n > best) { best = n; hr = i; } });
   // そのすぐ上の行が結合セルか、A列以外に値があり、列名の行より少なければグループ名の行とみなす(A1 だけの表題は除く)
   const up = hr > 0 ? raw[hr - 1] : [], upN = up.filter(Boolean).length, merged = (merges || []).some(m => m.r0 <= hr - 1 && hr - 1 < m.r1);
   const gr = hr > 0 && upN && upN < best && (merged || up.some((v, i) => v && i > 0)) ? hr - 1 : -1;
@@ -991,21 +1011,26 @@ const unitName = (u, r) => { const vs = u.nameCols.map(i => r[i]).filter(Boolean
 function renderUnits() {
   const sec = $('unitSec'); sec.hidden = !unitSrc; if (!unitSrc) return;
   const u = unitSrc, names = u.rows.map(r => unitName(u, r)).filter(Boolean), uniq = [...new Set(names)];
-  const parents = S.boxes.filter(b => b.kind === 'box');
-  $('unitForm').innerHTML = `<p class="muted">元: ${esc(u.name)}(${u.rows.length} 行)。1行を1つの箱(またはキューブ)にします。行のほかの列は、その箱の情報として持ちます。</p>
-    <div class="row"><span class="muted">作るもの</span><label><input type="radio" name="uKind" value="box"${u.kind === 'box' ? ' checked' : ''}> 箱</label><label><input type="radio" name="uKind" value="cube"${u.kind === 'cube' ? ' checked' : ''}> キューブ(${curPref('cubeAxes') ? '3軸: ' : ''}${esc(caTxt())})</label></div>
+  const parents = S.boxes.filter(b => b.kind === 'box' || (u.kind === 'card' && b.kind === 'cube'));
+  // 名前に使える列: 値が入っている列だけ、列名と1行目の値を並べる。選んだ順に番号を出し、その順でつなぐ
+  const sample = i => (u.rows.find(r => r[i]) || [])[i] || '', usable = u.cols.map((c, i) => i).filter(i => u.rows.some(r => r[i]));
+  const ex = m => esc(u.rows.slice(0, 1).map(r => unitName({ ...u, nameMode: m }, r))[0] || '');
+  const kindTxt = { box: '箱', cube: 'キューブ', card: 'カード' };
+  $('unitForm').innerHTML = `<p class="muted">元: ${esc(u.name)}(${u.rows.length} 行)。1行を1つの${kindTxt[u.kind]}にします。行のほかの列は、その${kindTxt[u.kind]}の情報として持ちます。</p>
+    <div class="row"><span class="muted">作るもの</span><label><input type="radio" name="uKind" value="box"${u.kind === 'box' ? ' checked' : ''}> 箱</label><label><input type="radio" name="uKind" value="cube"${u.kind === 'cube' ? ' checked' : ''}> キューブ(${curPref('cubeAxes') ? '3軸: ' : ''}${esc(caTxt())})</label><label><input type="radio" name="uKind" value="card"${u.kind === 'card' ? ' checked' : ''}> カード</label></div>
     ${u.L ? headUi(u.L, 'u') : ''}
-    <div class="row"><span class="muted">名前に使う列</span>${u.cols.map((c, i) => `<label><input type="checkbox" data-ncol="${i}"${u.nameCols.includes(i) ? ' checked' : ''}> ${colL(i)} ${esc(c)}</label>`).join('')}</div>
-    <div class="row"><span class="muted">複数の列を選んだとき</span><select id="uMode" aria-label="複数の列の使い方"><option value="join"${u.nameMode !== 'first' ? ' selected' : ''}>組み合わせる(例: 0001 法人C 山田)</option><option value="first"${u.nameMode === 'first' ? ' selected' : ''}>どれか1つ(左から最初に値がある列)</option></select></div>
+    <div class="ncols"><span class="muted">名前に使う列<small>(選んだ順につなぎます。値が空の列は出していません)</small></span><div class="nc">${usable.map(i => { const k = u.nameCols.indexOf(i);
+      return `<label class="nch${k >= 0 ? ' on' : ''}"><input type="checkbox" data-ncol="${i}"${k >= 0 ? ' checked' : ''}>${k >= 0 ? `<i>${k + 1}</i>` : ''}<b>${esc(u.cols[i] || colL(i) + '列')}</b><small>${esc(sample(i))}</small></label>`; }).join('')}</div></div>
+    ${u.nameCols.length > 1 ? `<div class="row"><span class="muted">2つ以上の列から名前を作るとき</span><select id="uMode" aria-label="2つ以上の列から名前を作るとき"><option value="join"${u.nameMode !== 'first' ? ' selected' : ''}>つなげる(例: ${ex('join')})</option><option value="first"${u.nameMode === 'first' ? ' selected' : ''}>どれか1つ: 選んだ順で最初に値がある列(例: ${ex('first')})</option></select></div>` : ''}
     <div class="row"><span class="muted">単位の名前</span><input type="text" id="uUnit" value="${esc(u.unit)}" placeholder="例: お客様" aria-label="単位の名前"></div>
-    <div class="row"><span class="muted">入れる先</span><select id="uParent" aria-label="入れる先"><option value="">いちばん上</option>${parents.map(b => `<option value="${b.id}"${u.parent === b.id ? ' selected' : ''}>箱 ${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('')}</select></div>
+    <div class="row"><span class="muted">入れる先</span><select id="uParent" aria-label="入れる先"><option value="">いちばん上</option>${parents.map(b => `<option value="${b.id}"${u.parent === b.id ? ' selected' : ''}>${b.kind === 'box' ? '箱' : 'キューブ'} ${esc(pathOf(b.id).map(x => x.name).join(' › '))}</option>`).join('')}</select></div>
     ${queue.length ? `<p class="muted">${queueTxt()}</p>` : ''}
     <p class="muted" id="uPreview">${uniq.length} 個できます${names.length > uniq.length ? `(同じ名前の ${names.length - uniq.length} 行は1つにまとめます)` : ''}。例: ${esc(uniq.slice(0, 4).join(' / ') || 'なし')}</p>
     <div class="row"><button class="primary" id="uMake"${uniq.length && u.unit.trim() ? '' : ' disabled'}>この内容で作る</button><button id="uCancel">やめる</button><span class="muted" id="uHint"${u.unit.trim() ? ' hidden' : ''}>単位の名前を入れてください</span></div>`;
-  $('uMode').onchange = e => { u.nameMode = e.target.value; renderUnits(); };
+  if ($('uMode')) $('uMode').onchange = e => { u.nameMode = e.target.value; renderUnits(); };
   if (u.L) bindHead($('unitForm'), u.L, () => { ushape(u); headToStash(u.stash, u.L); renderUnits(); });
   $('unitForm').querySelectorAll('input[name=uKind]').forEach(x => x.onchange = () => { u.kind = x.value; renderUnits(); });
-  $('unitForm').querySelectorAll('[data-ncol]').forEach(x => x.onchange = () => { u.nameCols = [...$('unitForm').querySelectorAll('[data-ncol]:checked')].map(y => +y.dataset.ncol); renderUnits(); });
+  $('unitForm').querySelectorAll('[data-ncol]').forEach(x => x.onchange = () => { const i = +x.dataset.ncol; u.nameCols = x.checked ? [...u.nameCols.filter(k => k !== i), i] : u.nameCols.filter(k => k !== i); renderUnits(); });
   // 打つたびに作り直すと入力中の欄やボタンが消えるので、ボタンと案内だけ切り替える
   $('uUnit').oninput = e => { u.unit = e.target.value; $('uMake').disabled = !(uniq.length && u.unit.trim()); $('uHint').hidden = !!u.unit.trim(); };
   $('uParent').onchange = e => { u.parent = e.target.value; };
@@ -1025,19 +1050,20 @@ async function makeUnits() {
     if (u0.cols.join('\u0001') !== oldCols) { renderUnits(); note('元のスプシの列が変わっていたので、最新の列で選び直してください(まだ反映していません)'); return; }
     fresh = JSON.stringify(u0.rows) !== oldRows ? `反映の前に最新を読み直し、行が変わっていたので最新(${u0.rows.length} 行)で作った` : `反映の前に最新を読み直した(変わりなし、${u0.rows.length} 行)`;
   }
-  const u = u0, unit = u.unit.trim(), parent = u.parent || null, made = [], madeIds = [], seen = new Set(S.boxes.filter(b => b.parent === parent).map(b => b.kind + '\u0001' + b.name));
+  const u = u0, unit = u.unit.trim(), parent = u.parent || null, made = [], madeIds = [], seen = new Set([...S.boxes.filter(b => b.parent === parent).map(b => b.kind + '\u0001' + b.name), ...S.cards.filter(c => c.parent === parent).map(c => 'card\u0001' + c.name)]);
   u.rows.forEach((r, ri) => {
     const name = unitName(u, r), k = u.kind + '\u0001' + name; if (!name || seen.has(k)) return; seen.add(k);
     const info = Object.fromEntries(u.cols.map((c, i) => [c, r[i]]));
+    if (u.kind === 'card') { const c = { id: 'cd' + Date.now().toString(36) + ri, name, parent, unit, fields: u.cols.map((c, i) => [c, r[i] || '']).filter(([, v]) => v), memo: '', at: today(), from: { sheet: u.name, row: ri + 2 } }; S.cards.push(c); made.push(name); madeIds.push(c.id); return; }
     const b = { id: (u.kind === 'box' ? 'u' : 'k') + Date.now().toString(36) + ri, kind: u.kind, name, own: {}, levelName: unit, parent, info, from: { sheet: u.name, row: ri + 2 } };
     if (u.kind === 'cube') b.axes = [...curPref('cubeAxes')];
     S.boxes.push(b); made.push(name); madeIds.push(b.id);
   });
-  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${u.name} の行から${u.kind === 'box' ? '箱' : 'キューブ'}を ${made.length} 個作った(単位: ${unit})`,
-    lines: [...(fresh ? [fresh] : []), `名前に使った列: ${u.nameCols.map(i => colL(i) + ' ' + u.cols[i]).join('・')}${u.nameCols.length > 1 ? (u.nameMode === 'first' ? '(どれか1つ: 左から最初に値がある列)' : '(組み合わせ)') : ''}`, ...(u.L ? [`列名の行: ${u.L.hr + 1}行目${u.L.gr >= 0 ? `・グループ名の行: ${u.L.gr + 1}行目` : ''}`] : []), `入れた先: ${parent ? box(parent).name : 'いちばん上'}`, `作ったもの: ${made.slice(0, 10).join(' / ')}${made.length > 10 ? ' ほか' : ''}`,
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${u.name} の行から${{ box: '箱', cube: 'キューブ', card: 'カード' }[u.kind]}を ${made.length} 個作った(単位: ${unit})`,
+    lines: [...(fresh ? [fresh] : []), `名前に使った列: ${u.nameCols.map(i => colL(i) + ' ' + u.cols[i]).join('・')}${u.nameCols.length > 1 ? (u.nameMode === 'first' ? '(どれか1つ: 選んだ順で最初に値がある列)' : '(つなげる)') : ''}`, ...(u.L ? [`列名の行: ${u.L.hr + 1}行目${u.L.gr >= 0 ? `・グループ名の行: ${u.L.gr + 1}行目` : ''}`] : []), `入れた先: ${parent ? box(parent).name : 'いちばん上'}`, `作ったもの: ${made.slice(0, 10).join(' / ')}${made.length > 10 ? ' ほか' : ''}`,
       ...markDone(u.stash ? [{ id: u.stash, off: 0 }] : [], u.cols.map(() => true), u.rows.map((r, i) => unitName(u, r) ? i : -1).filter(i => i >= 0))], sources: [{ book: u.name, tab: '', range: 'A2:' + colL(u.cols.length - 1) + (u.rows.length + 1) }], results: [] });
   nextStep(); renderUnits(); numberUnits(); save(); renderAll(); paint();
-  if (madeIds.length) madeAdd(u.kind, madeIds[0], made.length > 1 ? `${made[0]} ほか ${made.length - 1} 個(${unit})` : made[0], () => madeIds.length > 1 && parent ? lookUnit(parent) : lookUnit(madeIds[0]));
+  if (madeIds.length) madeAdd(u.kind, madeIds[0], made.length > 1 ? `${made[0]} ほか ${made.length - 1} 個(${unit})` : made[0], () => u.kind === 'card' ? lookCard(madeIds[0]) : madeIds.length > 1 && parent ? lookUnit(parent) : lookUnit(madeIds[0]));
   else note('作れるものがありませんでした(名前が空か、同じ名前がすでにあります)');
 }
 const pickCols = (cols, rows) => cols.map((c, i) => { const cs = candidates(c, rows.map(r => r[i])); return { cands: cs, pick: cs.length && cs[0].score >= .55 ? 0 : 'new', rel: null, note: '', isNum: rows.every(r => shapeOf(r[i]) === '数値') }; });
@@ -1202,10 +1228,24 @@ function note(t, look) {
   clearTimeout(noteT); noteT = setTimeout(() => { el.hidden = true; }, look ? 10000 : 6000);
 }
 const lookUnit = id => { if (!box(id)) return; go('world'); requestAnimationFrame(() => select(id)); };
-const lookSheet = id => { if (!S.sheets.some(x => x.id === id)) return; viewId = id; viewCell = null; renderView(); };
+const lookSheet = id => { if (!S.sheets.some(x => x.id === id)) return; cardId = null; renderCard(); viewId = id; viewCell = null; renderView(); };
+// カード(情報の札): 項目と値、メモ。箱やキューブの中に置ける
+let cardId = null;
+const lookCard = id => { if (!S.cards.some(c => c.id === id)) return; viewId = null; renderView(); cardId = id; renderCard(); };
+function renderCard() {
+  const c = cardId && S.cards.find(x => x.id === cardId); $('cardSec').hidden = !c; if (!c) return;
+  $('cardTitle').textContent = 'カード';
+  $('cardBody').innerHTML = `<div class="cardv"><div class="ch"><b>${esc(c.name)}</b><span class="muted">${c.parent && box(c.parent) ? esc(pathOf(c.parent).map(x => x.name).join(' › ')) : 'いちばん上'}</span></div>
+    ${c.fields.length ? `<dl>${c.fields.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '<p class="muted">項目はまだありません</p>'}
+    ${c.memo ? `<p class="memo">${esc(c.memo)}</p>` : ''}
+    <p class="muted">${c.from ? `元: ${esc(c.from.sheet)} の ${c.from.row} 行目・` : ''}${esc(c.at || '')}</p></div>
+    <div class="row"><button class="small" id="cardDel">このカードを消す</button></div>`;
+  $('cardDel').onclick = () => { if (!confirm(`カード「${c.name}」を消しますか?`)) return; S.cards = S.cards.filter(x => x !== c);
+    S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `カード ${c.name} を消した`, lines: c.fields.map(([k, v]) => `${k}: ${v}`), sources: [], results: [] }); cardId = null; save(); renderAll(); renderCard(); };
+}
 // Compose で作ったもの(この画面を開いている間の分)。Create の下に並べ、いつでも「見る」
 const madeLog = [];
-function madeAdd(kind, id, name, look) { madeLog.unshift({ kind, id, name, look }); madeLog.splice(8); note(`${{ cube: 'キューブ', box: '箱', sheet: 'シート', remix: 'まとめ' }[kind]}「${name}」を作りました`, look); renderCreate(); }
+function madeAdd(kind, id, name, look) { madeLog.unshift({ kind, id, name, look }); madeLog.splice(8); note(`${{ cube: 'キューブ', box: '箱', sheet: 'シート', remix: 'まとめ', card: 'カード' }[kind]}「${name}」を作りました`, look); renderCreate(); }
 
 
 
@@ -1242,30 +1282,49 @@ function addBox(boxId) {
   numberUnits(); save(); renderAll(); paint();
 }
 // ---------- Compose › Create: キューブ・箱・シートを1つずつ作る ----------
-let mkKind = 'cube';
+let mkKind = 'cube', mkRows = false;
 function renderCreate() {
   document.querySelectorAll('[data-mk]').forEach(b => { b.classList.toggle('on', b.dataset.mk === mkKind); b.setAttribute('aria-selected', b.dataset.mk === mkKind); });
   const boxes = S.boxes.filter(b => b.kind === 'box'), cubes = S.boxes.filter(b => b.kind === 'cube'), ca = curPref('cubeAxes') || [];
   const inBox = `<option value="">いちばん上</option>` + boxes.map(b => `<option value="${b.id}">箱 ${pathTxt(b.id)}</option>`).join('');
+  const inAny = inBox + cubes.map(b => `<option value="${b.id}">キューブ ${pathTxt(b.id)}</option>`).join('');
+  // 各行から作る: キューブに入っているシートと、Saving に置いてあるシート
+  const srcs = [...S.sheets.map(x => [`sh:${x.id}`, `${where(x)}(${x.rows.length} 行)`]), ...S.saving.map(e => [`sv:${e.id}`, `Saving: ${e.name}(${e.rows.length} 行)`])];
+  const rowsUi = k => `<div class="seg sm" role="radiogroup" aria-label="作り方"><button type="button" data-rows="0" class="${mkRows ? '' : 'on'}">1つ作る</button><button type="button" data-rows="1" class="${mkRows ? 'on' : ''}">シートの各行から作る</button></div>`
+    + (mkRows ? (srcs.length ? `<label><span><b>シート</b>1行を1つの${k}にします。名前に使う列は次で選びます</span><select id="mkSrc" aria-label="元のシート">${srcs.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('')}</select></label>` : '<p class="muted">まだシートがありません。Import でシートを読み取ると選べます。</p>') : '');
   const axOpt = cur => `<option value="">選んでください</option>` + S.axes.filter(a => a.scope === 'all').map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
   const f = {
     cube: `<label><span><b>名前</b></span><input id="mkName" placeholder="例: S-01 楽天店" aria-label="キューブの名前"></label>
       <label><span><b>入れる先</b></span><select id="mkIn" aria-label="入れる先">${inBox}</select></label>
       <div class="fm-ax"><label><span><b>3軸</b>X × Y × Z${ca.length ? '(設定の3軸を入れてあります)' : ''}</span></label><div class="ax3">${[0, 1, 2].map(i => `<select data-mka="${i}" aria-label="${'XYZ'[i]}軸">${axOpt(ca[i])}</select>`).join('')}</div></div>`,
-    box: `<label><span><b>名前</b></span><input id="mkName" placeholder="例: 法人A" aria-label="箱の名前"></label>
+    box: rowsUi('箱') + (mkRows ? '' : `<label><span><b>名前</b></span><input id="mkName" placeholder="例: 法人A" aria-label="箱の名前"></label>
       <label><span><b>単位</b>同じ段の箱をまとめて呼ぶ名前(任意)</span><input id="mkUnit" placeholder="例: 法人" aria-label="単位の名前"></label>
-      <label><span><b>入れる先</b></span><select id="mkIn" aria-label="入れる先">${inBox}</select></label>`,
+      <label><span><b>入れる先</b></span><select id="mkIn" aria-label="入れる先">${inBox}</select></label>`),
+    card: rowsUi('カード') + (mkRows ? '' : `<label><span><b>名前</b></span><input id="mkName" placeholder="例: 法人A の契約条件" aria-label="カードの名前"></label>
+      <label><span><b>入れる先</b>箱やキューブの中に置けます</span><select id="mkIn" aria-label="入れる先">${inAny}</select></label>
+      <label><span><b>項目</b>1行に「項目: 値」</span><textarea id="mkFields" rows="4" placeholder="担当: 山田
+電話: 03-0000-0000
+契約開始: 2026-10-01" aria-label="項目と値"></textarea></label>
+      <label><span><b>メモ</b>(任意)</span><textarea id="mkMemo" rows="2" aria-label="メモ"></textarea></label>`),
     sheet: cubes.length ? `<label><span><b>名前</b></span><input id="mkName" placeholder="例: 楽天の売上" aria-label="シートの名前"></label>
       <label><span><b>入れる先</b></span><select id="mkIn" aria-label="入れる先">${cubes.map(b => `<option value="${b.id}">キューブ ${pathTxt(b.id)}</option>`).join('')}</select></label>
       <label><span><b>列</b>カンマか改行で区切る</span><textarea id="mkCols" rows="3" placeholder="年月, モール, 売上金額" aria-label="列の名前"></textarea></label><div class="colchips" id="mkChips"></div>` : `<p class="muted">シートはキューブの中に作ります。先にキューブを作ってください。</p>`
   }[mkKind];
-  const btn = { cube: 'キューブを作る', box: '箱を作る', sheet: '作って列を軸に照らす' }[mkKind];
-  const done = madeLog.length ? `<div class="mkdone"><h3>さっき作ったもの</h3>${madeLog.map((m, k) => `<div class="it"><span class="kd">${{ cube: 'キューブ', box: '箱', sheet: 'シート', remix: 'まとめ' }[m.kind]}</span><b>${esc(m.name)}</b><button class="small" data-look="${k}">見る</button></div>`).join('')}</div>` : '';
-  $('mkForm').innerHTML = `<div class="fm">${f}${mkKind !== 'sheet' || cubes.length ? `<div class="act"><button class="primary" id="mkGo">${btn}</button>${mkKind === 'sheet' ? '<span class="muted">列ごとの軸は、次に Import の画面で承認します</span>' : ''}</div>` : ''}</div>${done}`;
+  const btn = mkRows && (mkKind === 'box' || mkKind === 'card') ? '次へ(名前に使う列を選ぶ)' : { cube: 'キューブを作る', box: '箱を作る', sheet: '作って列を軸に照らす', card: 'カードを作る' }[mkKind];
+  const canGo = mkKind === 'sheet' ? cubes.length : !(mkRows && (mkKind === 'box' || mkKind === 'card')) || srcs.length;
+  const done = madeLog.length ? `<div class="mkdone"><h3>さっき作ったもの</h3>${madeLog.map((m, k) => `<div class="it"><span class="kd">${{ cube: 'キューブ', box: '箱', sheet: 'シート', remix: 'まとめ', card: 'カード' }[m.kind]}</span><b>${esc(m.name)}</b><button class="small" data-look="${k}">見る</button></div>`).join('')}</div>` : '';
+  $('mkForm').innerHTML = `<div class="fm">${f}${canGo ? `<div class="act"><button class="primary" id="mkGo">${btn}</button>${mkKind === 'sheet' ? '<span class="muted">列ごとの軸は、次に Import の画面で承認します</span>' : ''}</div>` : ''}</div>${done}`;
   $('mkForm').querySelectorAll('[data-look]').forEach(b => b.onclick = () => madeLog[+b.dataset.look].look());
   const cols = () => ($('mkCols') ? $('mkCols').value.split(/[,、\n\t]/).map(x => x.trim()).filter(Boolean) : []);
   if ($('mkCols')) $('mkCols').oninput = () => { $('mkChips').innerHTML = cols().map(c => `<span>${esc(c)}</span>`).join(''); };
+  $('mkForm').querySelectorAll('[data-rows]').forEach(b => b.onclick = () => { mkRows = b.dataset.rows === '1'; renderCreate(); });
   if ($('mkGo')) $('mkGo').onclick = () => {
+    if (mkRows && (mkKind === 'box' || mkKind === 'card')) {   // 各行から: 行から作る画面(名前に使う列・単位・入れる先)へ
+      const [t, id] = $('mkSrc').value.split(':');
+      if (t === 'sh') { const x = sheetById(id); openUnits({ name: x.name, cols: [...x.cols], rows: x.rows.map(r => [...r]), kind: mkKind }); }
+      else { const e = S.saving.find(y => y.id === id); openUnits({ name: e.name, L: copyL(e.L), stash: e.id, src: stashSrc(e), kind: mkKind }); }
+      return;
+    }
     const name = $('mkName').value.trim(), at = $('mkIn').value || null, hist = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: t, lines: l, sources: [], results: [] });
     if (!name) { note('名前を入れてください'); $('mkName').focus(); return; }
     let made;
@@ -1279,6 +1338,11 @@ function renderCreate() {
       const unit = $('mkUnit').value.trim();
       S.boxes.push({ id: 'u' + Date.now().toString(36), kind: 'box', name, own: {}, ...(unit ? { levelName: unit } : {}), parent: at });
       hist(`${at ? box(at).name + ' に' : 'いちばん上に'}箱 ${name} を作った`, unit ? [`単位: ${unit}`] : []); made = ['box', S.boxes[S.boxes.length - 1].id];
+    } else if (mkKind === 'card') {
+      const fields = $('mkFields').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^(.+?)\s*[:：]\s*(.*)$/); return m ? [m[1], m[2]] : ['', l]; });
+      const c = { id: 'cd' + Date.now().toString(36), name, parent: at, fields, memo: $('mkMemo').value.trim(), at: today() };
+      S.cards.push(c); hist(`${at ? box(at).name + ' に' : 'いちばん上に'}カード ${name} を作った`, fields.map(([k, v]) => k ? `${k}: ${v}` : v));
+      save(); renderAll(); madeAdd('card', c.id, name, () => lookCard(c.id)); return;
     } else {
       const cs = cols(); if (!cs.length) { note('列の名前を1つ以上入れてください'); return; }
       pending = newPending({ name, cube: at, tag: {}, L: mkLayout([cs]), origin: { text: 'Create で作ったシート', short: 'Create', minutes: [`Create で列 ${cs.join(' / ')} のシートを作った`], sources: [] } });
@@ -1553,7 +1617,9 @@ function renderView() {
   // 分ける・まとめる(元がどれかは履歴に残す)
   const mi = sh.bind.findIndex(b => b && b.axis === 'month' && b.value == null), ms = mi >= 0 ? [...new Set(sh.rows.map(r => r[mi]))] : [];
   const sib = S.sheets.filter(x => x !== sh && x.cube === sh.cube && x.cols.join('|') === sh.cols.join('|') && JSON.stringify(x.tag) === JSON.stringify(sh.tag));
-  $('viewActs').innerHTML = (ms.length > 1 ? `<button id="vSplit">月ごとに${ms.length}枚に分ける</button>` : '') + (sib.length ? `<button id="vMerge">同じ列の${sib.length}枚とまとめる</button>` : '') + '<span class="muted">分けたり、まとめたりした元は履歴に残ります</span>';
+  $('viewActs').innerHTML = (ms.length > 1 ? `<button id="vSplit">月ごとに${ms.length}枚に分ける</button>` : '') + (sib.length ? `<button id="vMerge">同じ列の${sib.length}枚とまとめる</button>` : '') + `<button id="vRows">各行を箱にする</button><button id="vCards">各行をカードにする</button>` + '<span class="muted">分けたり、まとめたりした元は履歴に残ります</span>';
+  $('vRows').onclick = () => { viewId = null; renderView(); openUnits({ name: sh.name, cols: [...sh.cols], rows: sh.rows.map(r => [...r]), kind: 'box' }); };
+  $('vCards').onclick = () => { viewId = null; renderView(); openUnits({ name: sh.name, cols: [...sh.cols], rows: sh.rows.map(r => [...r]), kind: 'card' }); };
   if ($('vSplit')) $('vSplit').onclick = () => splitSheet(sh, mi, ms);
   if ($('vMerge')) $('vMerge').onclick = () => mergeSheets([sh, ...sib]);
 }
@@ -2660,7 +2726,7 @@ $('navToggle').onclick = () => navC(!document.querySelector('.shell').classList.
 try { if (localStorage.getItem('axis-boxes-v2:navc')) navC(true); } catch (e) {}
 
 // ---------- つなぐ ----------
-function renderAll() { renderPinBar(); renderInputs(); renderCreate(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderHist(); renderSaving(); }
+function renderAll() { renderPinBar(); renderInputs(); renderCreate(); renderPrefs(); renderAxes(); renderDict(); renderGather(); renderSaved(); renderMatches(); renderBook(); renderView(); renderCard(); renderHist(); renderSaving(); }
 $('read').onclick = readSheet;
 $('pAct').onchange = renderTarget;
 $('approve').onclick = approve;
@@ -2670,6 +2736,7 @@ $('bookRead').onclick = readBook;
 // アプリの中で開いたときだけ(読み取りの口に答えがある)ログアウトを出す
 fetch('/api/sheets/read', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(j => { if (j) $('logout').hidden = false; if (j && j.serviceAccount) $('saMail').textContent = '(' + j.serviceAccount + ')'; }).catch(() => {});
 $('viewClose').onclick = () => { viewId = null; renderView(); };
+$('cardClose').onclick = () => { cardId = null; renderCard(); };
 document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; if (viewId) $('viewClose').click(); else if (entered) leaveUnit(); });
 
 // ---------- ダッシュボードの画面切り替え ----------
