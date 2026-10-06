@@ -103,6 +103,9 @@ textarea{width:100%;min-height:80px;font-family:var(--mono);font-size:12px}
 .axis .nm{font-weight:700}
 .axis .al{grid-column:2/4;color:var(--muted);font-size:12px}
 .axis.mine{border-style:dashed;border-color:var(--mine)}
+.axis .ed{grid-column:2/4;display:flex;gap:4px;flex-wrap:wrap}.axis .ed input{flex:1 1 180px;min-width:0;font-size:12px}.axis .ed select{font-size:12px}
+.agrp{border:1px solid var(--line);border-radius:8px;padding:6px;display:grid;gap:4px;background:color-mix(in srgb,var(--accent) 4%,var(--panel))}
+.ghd{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.ghd b{margin-right:auto}
 /* 立体 */
 #stage{position:relative;height:clamp(420px,calc(100vh - 210px),1200px);border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
 #pinBar{position:absolute;right:8px;top:8px;max-width:calc(100% - 16px);font-size:12px;color:var(--muted);pointer-events:none}
@@ -396,8 +399,9 @@ tfoot td{font-weight:700}
 <div class="view" data-view="dict" hidden>
   <div class="vhead"><h1>軸の辞書</h1><p class="lead">軸と、呼び名・値の言い換えを管理します。</p></div>
   <div class="two">
-  <section><h2>軸の辞書<span class="sp"></span><label class="muted"><input type="checkbox" id="showMine" checked> マイリストも見る</label></h2><div id="axes" class="tree"></div>
-    <p class="muted">★ はお気に入り。点線はマイリスト(自分だけの一時的な軸で、全体のシートには反映しない)。</p></section>
+  <section><h2>軸の辞書<span class="sp"></span><label class="muted"><input type="checkbox" id="showMine" checked> マイリストも見る</label></h2>
+    <div class="row"><input id="axGrpName" placeholder="グループの名前(例: 申込の情報)" aria-label="グループの名前"><button id="axGrpAdd" class="small">グループを作る</button></div><div id="axes" class="tree"></div>
+    <p class="muted">★ はお気に入り。点線はマイリスト(自分だけの一時的な軸で、全体のシートには反映しない)。軸の名前は短くし、どの列のことかの細かい指定はサブタイトルに書けます。</p></section>
   <section><h2>登録辞書(呼び名と値の言い換え)</h2><div class="dict" id="dict"></div>
     <details><summary class="muted">言い換えを足す</summary><div class="form">
       <select id="dKind" aria-label="種類"><option value="col">列の呼び名</option><option value="val">値の呼び名</option></select>
@@ -417,8 +421,8 @@ tfoot td{font-weight:700}
 </div>
 <div class="view" data-view="settings" hidden>
   <div class="vhead"><h1>設定</h1></div>
-  <section><h2>設定(初期値と自分の設定を分けて持つ)</h2><div id="prefs"></div>
-    <p class="muted">初期値はシステムで固定し、誰も書き換えません。変えた内容は「自分の設定」として初期値とは別に持ち、いつでも初期値に戻せます。変えた記録は履歴に残ります。</p></section>
+  <section><h2>設定</h2><div id="prefs"></div>
+    <p class="muted">はじめは何も決めていません(未設定)。選んだ内容は「自分の設定」として持ち、いつでも外せます。変えた記録は履歴に残ります。</p></section>
 </div>
 </div>
 <section id="viewSec" class="drawer" hidden aria-label="シートを開く"><h2><span id="viewTitle">シート</span><span class="sp"></span><button class="small" id="viewClose">閉じる</button></h2>
@@ -563,7 +567,7 @@ function upgradeSample2() {
 }
 // 読み込んだ中身を画面で使える形にそろえる(はじめと、Supabase から読んだとき)
 function adopt(x) {
-  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || [];
+  S = x; S.prefs = S.prefs || {}; S.saving = S.saving || []; S.groups = S.groups || [];
   S.saving.forEach(e => { if (!e.L) e.L = { raw: [e.cols, ...e.rows], hr: 0, gr: -1, merges: [] }; });
   upgradeSample();
   numberUnits();
@@ -589,8 +593,11 @@ const box = id => S.boxes.find(b => b.id === id);
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 let showMine = true;
-// システムの初期値。画面からは変えられない(秩序のもと)。自分の設定は S.prefs に別で持つ
-const SYSTEM = Object.freeze({ shade: 'view', cubeAxes: Object.freeze(['month', 'mall', 'item']), world: 'none', center: 'origin' });
+// システムの初期値。濃淡の基準と新しいキューブの3軸は、自分で選ぶまで何も決めない(null)。自分の設定は S.prefs に別で持つ
+const SYSTEM = Object.freeze({ shade: null, cubeAxes: null, world: 'none', center: 'origin' });
+const caTxt = () => { const ca = curPref('cubeAxes'); return ca ? ca.map(a => ax(a) ? ax(a).name : '?').join('×') : '3軸は設定で選ぶ'; };
+// 3軸をまだ選んでいないときは設定の画面へ案内する
+const needAxes = () => { if (curPref('cubeAxes')) return false; note('新しいキューブの3軸がまだ決まっていません。設定で選んでください'); go('settings'); return true; };
 const SHADES = { view: '表示中の最大値で割る', global: 'その科目の全期間の最大値で割る(絞っても色が変わらない)', row: '行ごとの最大値で割る', share: '行の合計に占める割合' };
 const curPref = k => (S.prefs && S.prefs[k] != null ? S.prefs[k] : SYSTEM[k]);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -642,7 +649,7 @@ function renderTree() {
     S.sheets.filter(s => s.cube === b.id).forEach(s => h += `<div class="node ind${d + 1}${used.has(s.id) ? ' used' : ''}" data-sh="${s.id}" title="${esc(s.origin ? '元: ' + s.origin.text : '')}">▤ ${esc(s.name)} <span class="ax">${s.cols.length}列×${s.rows.length}行${s.origin ? '・' + esc(s.origin.short) : ''}</span></div>`);
     walk(b.id, d + 1);
     if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addbox="${b.id}">＋ 箱を足す</button></div>`;
-    if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(curPref('cubeAxes').map(a => ax(a) ? ax(a).name : '?').join('×'))})</button></div>`;
+    if (b.kind === 'box') h += `<div class="node ind${d + 1}"><button class="small" data-addcube="${b.id}">＋ キューブを足す(${esc(caTxt())})</button></div>`;
   });
   walk(null, 0);
   if (!S.boxes.length) h = '<p class="muted">まだ箱もキューブもありません。「シートを入れる」でスプシを読み取り、シートごとに「1行ずつ箱にする」などを選ぶとここに並びます。</p>';
@@ -653,16 +660,36 @@ function renderTree() {
   el.querySelectorAll('[data-addbox]').forEach(n => n.onclick = () => addBox(n.dataset.addbox));
   el.querySelectorAll('[data-sh]').forEach(n => n.onclick = () => { viewId = n.dataset.sh; viewCell = null; renderView(); $('viewSec').scrollTop = 0; });
 }
+// 軸のグループとサブタイトル。名前は短く、どの列のことかの細かい指定はサブタイトルに書く
+const grpOf = a => S.groups.find(g => g.id === a.group) || null;
+const axHint = id => { const a = ax(id); if (!a) return ''; const g = grpOf(a), t = [g && g.name, a.sub].filter(Boolean).join(' › '); return t ? ` <span class="muted">(${esc(t)})</span>` : ''; };
 function renderAxes() {
   const fsAll = facts();
   const list = [...S.axes].filter(visibleAxis).sort((a, b) => (b.fav - a.fav));
-  $('axes').innerHTML = list.map(a => {
+  const gOpts = cur => `<option value="">グループなし</option>` + S.groups.map(g => `<option value="${g.id}"${cur === g.id ? ' selected' : ''}>${esc(g.name)}</option>`).join('');
+  const card = a => {
     const vals = a.kind === 'measure' ? a.values : valuesOf(a.id, fsAll);
     const nm = d => d.from + (d.rel === '=' ? '' : '(' + d.rel + ')');
     const als = a.kind === 'measure' ? a.values.map(v => { const l = colNames(a.id, v); return l.length ? v + '←' + l.map(nm).join('/') : ''; }).filter(Boolean).join('、') : colNames(a.id).map(nm).join('、');
     return `<div class="axis${a.scope === 'mine' ? ' mine' : ''}"><button class="star${a.fav ? ' on' : ''}" data-fav="${a.id}" aria-label="お気に入り">${a.fav ? '\u2605\uFE0E' : '\u2606'}</button><span class="nm">${esc(a.name)} ${a.scope === 'mine' ? '<span class="pill mine">マイリスト</span>' : ''}</span><span class="muted">${a.kind === 'measure' ? '値の列' : vals.length + '個の値'}</span>
-      <span class="al">${als ? '呼び名: ' + esc(als) : '言い換えなし'}${a.kind === 'measure' ? ' / ' + esc(vals.join('・')) : ''}</span></div>`;
-  }).join('');
+      <span class="al">${als ? '呼び名: ' + esc(als) : '言い換えなし'}${a.kind === 'measure' ? ' / ' + esc(vals.join('・')) : ''}</span>
+      <span class="ed"><input data-asub="${a.id}" value="${esc(a.sub || '')}" placeholder="サブタイトル(例: 申込フォームの店舗コード)" aria-label="${esc(a.name)} のサブタイトル"><select data-agrp="${a.id}" aria-label="${esc(a.name)} のグループ">${gOpts(a.group)}</select></span></div>`;
+  };
+  const free = list.filter(a => !grpOf(a));
+  $('axes').innerHTML = S.groups.map(g => { const in_ = list.filter(a => a.group === g.id);
+    return `<div class="agrp"><div class="ghd"><b>${esc(g.name)}</b><span class="muted">${in_.length}個の軸</span><button class="small" data-gren="${g.id}">名前を変える</button><button class="x small" data-gdel="${g.id}" aria-label="グループ ${esc(g.name)} を消す">×</button></div>${in_.map(card).join('') || '<p class="muted">まだ軸がありません。軸の「グループなし」から選んで入れます。</p>'}</div>`; }).join('')
+    + (S.groups.length && free.length ? '<div class="ghd"><b>グループなし</b></div>' : '') + free.map(card).join('');
+  const log = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: t, lines: l, sources: [], results: [] });
+  const redo = () => { save(); renderAll(); };
+  $('axes').querySelectorAll('[data-asub]').forEach(x => x.onchange = () => { const a = ax(x.dataset.asub), v = x.value.trim(); if ((a.sub || '') === v) return;
+    if (v) a.sub = v; else delete a.sub; log(`軸「${a.name}」のサブタイトルを${v ? '付けた' : '消した'}`, [v || '(なし)']); redo(); });
+  $('axes').querySelectorAll('[data-agrp]').forEach(x => x.onchange = () => { const a = ax(x.dataset.agrp), g = S.groups.find(g => g.id === x.value);
+    if (g) a.group = g.id; else delete a.group; log(`軸「${a.name}」を${g ? 'グループ「' + g.name + '」に入れた' : 'グループから出した'}`, []); redo(); });
+  $('axes').querySelectorAll('[data-gren]').forEach(b => b.onclick = () => { const g = S.groups.find(g => g.id === b.dataset.gren), v = (prompt('グループの新しい名前', g.name) || '').trim();
+    if (!v || v === g.name) return; if (S.groups.some(o => o !== g && o.name === v)) { note('同じ名前のグループがあります'); return; } log(`グループ「${g.name}」を「${v}」に変えた`, []); g.name = v; redo(); });
+  $('axes').querySelectorAll('[data-gdel]').forEach(b => b.onclick = () => { const g = S.groups.find(g => g.id === b.dataset.gdel), n = S.axes.filter(a => a.group === g.id).length;
+    if (!confirm(`グループ「${g.name}」を消しますか?${n ? `中の ${n} 個の軸は消えず、グループなしに戻ります。` : ''}`)) return;
+    S.axes.forEach(a => { if (a.group === g.id) delete a.group; }); S.groups = S.groups.filter(o => o !== g); log(`グループ「${g.name}」を消した`, n ? [`中の ${n} 個の軸はグループなしに戻した`] : []); redo(); });
   $('axes').querySelectorAll('[data-fav]').forEach(b => b.onclick = () => { const a = ax(b.dataset.fav); a.fav = !a.fav; save(); renderAxes(); renderGather(); });
 }
 
@@ -852,7 +879,7 @@ function renderUnits() {
   const u = unitSrc, names = u.rows.map(r => unitName(u, r)).filter(Boolean), uniq = [...new Set(names)];
   const parents = S.boxes.filter(b => b.kind === 'box');
   $('unitForm').innerHTML = `<p class="muted">元: ${esc(u.name)}(${u.rows.length} 行)。1行を1つの箱(またはキューブ)にします。行のほかの列は、その箱の情報として持ちます。</p>
-    <div class="row"><span class="muted">作るもの</span><label><input type="radio" name="uKind" value="box"${u.kind === 'box' ? ' checked' : ''}> 箱</label><label><input type="radio" name="uKind" value="cube"${u.kind === 'cube' ? ' checked' : ''}> キューブ(3軸: ${esc(curPref('cubeAxes').map(a => ax(a).name).join('×'))})</label></div>
+    <div class="row"><span class="muted">作るもの</span><label><input type="radio" name="uKind" value="box"${u.kind === 'box' ? ' checked' : ''}> 箱</label><label><input type="radio" name="uKind" value="cube"${u.kind === 'cube' ? ' checked' : ''}> キューブ(${curPref('cubeAxes') ? '3軸: ' : ''}${esc(caTxt())})</label></div>
     ${u.L ? headUi(u.L, 'u') : ''}
     <div class="row"><span class="muted">名前に使う列</span>${u.cols.map((c, i) => `<label><input type="checkbox" data-ncol="${i}"${u.nameCols.includes(i) ? ' checked' : ''}> ${colL(i)} ${esc(c)}</label>`).join('')}</div>
     <div class="row"><span class="muted">複数の列を選んだとき</span><select id="uMode" aria-label="複数の列の使い方"><option value="join"${u.nameMode !== 'first' ? ' selected' : ''}>組み合わせる(例: 0001 法人C 山田)</option><option value="first"${u.nameMode === 'first' ? ' selected' : ''}>どれか1つ(左から最初に値がある列)</option></select></div>
@@ -872,6 +899,7 @@ function renderUnits() {
 }
 async function makeUnits() {
   const u0 = unitSrc; if (!u0) return;
+  if (u0.kind === 'cube' && needAxes()) return;
   let fresh = '';
   if (u0.src && u0.src.url) {
     $('uMake').disabled = true; note('反映の前に、元のスプシから最新を読み直しています…');
@@ -906,7 +934,7 @@ function renderMatches() {
     p.cols.map((c, i) => { const m = p.picks[i], ex = p.rows.slice(0, 3).map(r => r[i]).join(', ');
       const opt = (val, label, why, extra = '') => `<label class="cand"><input type="radio" name="m${i}" value="${val}"${String(m.pick) === String(val) ? ' checked' : ''}><span>${label}${extra}</span><span class="why">${why}</span></label>`;
       return `<div class="match"><div class="col">${esc(c)} <code>例: ${esc(ex)}</code> <span class="muted">候補 ${m.cands.length}件</span></div>` +
-        m.cands.map((cd, k) => opt(k, esc(cd.label), esc(cd.why), ` <span class="score"><span class="bar" style="width:${Math.round(cd.score * 40)}px"></span>${Math.round(cd.score * 100)}%</span>`)).join('') +
+        m.cands.map((cd, k) => opt(k, esc(cd.label) + axHint(cd.axis), esc(cd.why), ` <span class="score"><span class="bar" style="width:${Math.round(cd.score * 40)}px"></span>${Math.round(cd.score * 100)}%</span>`)).join('') +
         opt('new', `<span class="pill new">新しい軸</span> 「${esc(c)}」を${m.isNum ? '科目の新しい値' : '新しい軸'}として全体に登録`, '過去のどの軸とも別のものとして扱う') +
         opt('mine', `<span class="pill mine">マイリスト</span> 「${esc(c)}」を自分だけの一時的な軸にする`, '全体の軸の辞書やほかの人のまとめには反映しない') +
         opt('skip', '使わない', 'この列は読み込まない') +
@@ -1058,25 +1086,27 @@ function note(t) { $('note').textContent = t; clearTimeout(noteT); noteT = setTi
 
 // ---------- 設定(初期値と自分の設定) ----------
 function renderPrefs() {
-  const sh = curPref('shade'), ca = curPref('cubeAxes'), own = k => S.prefs[k] != null;
-  const axOpts = cur => S.axes.filter(a => a.scope === 'all').map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
-  $('prefs').innerHTML = `<div class="relrow"><b>濃淡の基準</b> <span class="pill ${own('shade') ? 'mine' : 'cube'}">${own('shade') ? '自分の設定' : '初期値'}</span></div>
-    <select id="pShade" aria-label="濃淡の基準">${Object.entries(SHADES).map(([k, t]) => `<option value="${k}"${sh === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-    <div class="muted">初期値: ${SHADES[SYSTEM.shade]} ${own('shade') ? '<button class="small" data-reset="shade">初期値に戻す</button>' : ''}</div>
-    <div class="relrow"><b>新しいキューブの3軸</b> <span class="pill ${own('cubeAxes') ? 'mine' : 'cube'}">${own('cubeAxes') ? '自分の設定' : '初期値'}</span></div>
+  const sh = curPref('shade'), ca = curPref('cubeAxes') || [], own = k => S.prefs[k] != null;
+  const pill = k => `<span class="pill ${own(k) ? 'mine' : 'cube'}">${own(k) ? '自分の設定' : '未設定'}</span>`;
+  const axOpts = cur => `<option value=""${cur ? '' : ' selected'}>選んでください</option>` + S.axes.filter(a => a.scope === 'all').map(a => `<option value="${a.id}"${cur === a.id ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+  $('prefs').innerHTML = `<div class="relrow"><b>濃淡の基準</b> ${pill('shade')}</div>
+    <select id="pShade" aria-label="濃淡の基準"><option value=""${sh ? '' : ' selected'}>選んでください(選ぶまで濃淡なし)</option>${Object.entries(SHADES).map(([k, t]) => `<option value="${k}"${sh === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
+    ${own('shade') ? '<div class="muted"><button class="small" data-reset="shade">設定を外す</button></div>' : ''}
+    <div class="relrow"><b>新しいキューブの3軸</b> ${pill('cubeAxes')}</div>
     <div class="row">${[0, 1, 2].map(i => `<select data-ca="${i}" aria-label="${'XYZ'[i]}軸">${axOpts(ca[i])}</select>`).join('×')}</div>
-    <div class="muted">初期値: ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')} ${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">初期値に戻す</button>' : ''}</div>
-    <div class="relrow"><b>World の世界</b> <span class="pill ${own('world') ? 'mine' : 'cube'}">${own('world') ? '自分の設定' : '初期値'}</span></div>
+    <div class="muted">${own('cubeAxes') ? '<button class="small" data-reset="cubeAxes">設定を外す</button>' : '3つとも選ぶまで、キューブは作れません。'}</div>
+    <div class="relrow"><b>World の世界</b> ${pill('world')}</div>
     <select id="pWorld" aria-label="World の世界">${Object.entries(WORLDS).filter(([k]) => !SPECIAL_ONLY.includes(k)).map(([k, t]) => `<option value="${k}"${curPref('world') === k ? ' selected' : ''}>${t}</option>`).join('')}</select>
-    <div class="muted">World の箱とキューブのまわりに映す世界(Blender で作った世界)。初期値: ${WORLDS[SYSTEM.world]} ${own('world') ? '<button class="small" data-reset="world">初期値に戻す</button>' : ''}</div>`;
+    <div class="muted">World の箱とキューブのまわりに映す世界(Blender で作った世界)。${own('world') ? '<button class="small" data-reset="world">設定を外す</button>' : ''}</div>`;
   const log = (t, l) => S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '設定', title: t, lines: l, sources: [], results: [] });
-  $('pShade').onchange = e => { const v = e.target.value; if (v === SYSTEM.shade) delete S.prefs.shade; else S.prefs.shade = v; log('濃淡の基準を変えた', [`${SHADES[v]}(初期値は ${SHADES[SYSTEM.shade]})`]); save(); renderAll(); };
+  $('pShade').onchange = e => { const v = SHADES[e.target.value] ? e.target.value : null; if (!v) delete S.prefs.shade; else S.prefs.shade = v; log('濃淡の基準を変えた', [v ? SHADES[v] : '設定なし(濃淡なし)']); save(); renderAll(); };
   $('prefs').querySelectorAll('[data-ca]').forEach(x => x.onchange = () => { const v = [...$('prefs').querySelectorAll('[data-ca]')].map(y => y.value);
-    if (new Set(v).size < 3) { note('3つの軸は別々のものを選んでください'); renderPrefs(); return; }
-    if (v.join() === SYSTEM.cubeAxes.join()) delete S.prefs.cubeAxes; else S.prefs.cubeAxes = v;
-    log('新しいキューブの3軸を変えた', [`${v.map(a => ax(a).name).join('×')}(初期値は ${SYSTEM.cubeAxes.map(a => ax(a).name).join('×')}。今あるキューブの軸は変えない)`]); save(); renderAll(); });
+    if (v.some(a => !a)) return;   // 3つとも選ぶまでは決めない(選びかけはそのまま残す)
+    if (new Set(v).size < 3) { note('3つの軸は別々のものを選んでください'); return; }
+    S.prefs.cubeAxes = v;
+    log('新しいキューブの3軸を決めた', [`${v.map(a => ax(a).name).join('×')}(今あるキューブの軸は変えない)`]); save(); renderAll(); });
   $('pWorld').onchange = e => { const v = WORLDS[e.target.value] ? e.target.value : SYSTEM.world; if (v === SYSTEM.world) delete S.prefs.world; else S.prefs.world = v; log('World の世界を変えた', [`${WORLDS[v]}(初期値は ${WORLDS[SYSTEM.world]})`]); save(); renderAll(); };
-  $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を初期値に戻した', [{ shade: '濃淡の基準', cubeAxes: '新しいキューブの3軸', world: 'World の世界' }[b.dataset.reset]]); save(); renderAll(); });
+  $('prefs').querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { delete S.prefs[b.dataset.reset]; log('設定を外した', [{ shade: '濃淡の基準', cubeAxes: '新しいキューブの3軸', world: 'World の世界' }[b.dataset.reset]]); save(); renderAll(); });
   setWorld(activeWorld());
 }
 // 箱の中に箱を足す(法人の中のグループなど)。単位は「グループ」
@@ -1087,14 +1117,16 @@ function addBox(boxId) {
   numberUnits(); save(); renderAll(); paint();
 }
 function addCube(boxId) {
+  if (needAxes()) return;
   const n = S.boxes.filter(b => b.kind === 'cube').length + 1, name = 'S-' + String(n).padStart(2, '0'), axes = [...curPref('cubeAxes')];
   S.boxes.push({ id: 'c' + Date.now().toString(36), kind: 'cube', name, own: { shop: name }, axes, parent: boxId });
-  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${box(boxId).name} にキューブ ${name} を足した`, lines: [`3軸: ${axes.map(a => ax(a).name).join('×')}(${S.prefs.cubeAxes ? '自分の設定' : '初期値'}から)`], sources: [], results: [] });
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '作成', title: `${box(boxId).name} にキューブ ${name} を足した`, lines: [`3軸: ${axes.map(a => ax(a).name).join('×')}(設定から)`], sources: [], results: [] });
   numberUnits(); save(); renderAll();
 }
 // まとめた表の濃淡。基準は設定で選ぶ
 function shadeOf(R, r, c, v) {
-  const mode = curPref('shade'), sumOf = (rr, cc) => (R.cell.get(rr + '\u0001' + cc) || []).reduce((a, f) => a + f.v, 0);
+  const mode = curPref('shade'); if (!mode) return 0;   // 基準を選ぶまで濃淡なし
+  const sumOf = (rr, cc) => (R.cell.get(rr + '\u0001' + cc) || []).reduce((a, f) => a + f.v, 0);
   let base = 0;
   if (mode === 'view') R.rows.forEach(rr => R.cols.forEach(cc => { base = Math.max(base, sumOf(rr, cc)); }));
   else if (mode === 'row') R.cols.forEach(cc => { base = Math.max(base, sumOf(r, cc)); });
@@ -2172,9 +2204,12 @@ function japanPins(items) {
   Promise.all([leaflet(), loadJP()]).then(([L]) => {
     if (!layoutMode() || wmode !== 'japan') return;
     if (!jm) {
-      jm = L.map('jmap', { doubleClickZoom: false, zoomSnap: .5, minZoom: 4, maxZoom: 18, maxBounds: [[15, 115], [52, 160]] }).fitBounds([[24, 123], [45.6, 146]]);
+      // いちばん縮めても地図の外(近隣の国を切った四角の外)が見えないよう、縮められる限度を枠の大きさから決める
+      const BOX = [[5, 95], [60, 180]], fitMin = () => { jm.invalidateSize(); jm.setMinZoom(Math.max(3, jm.getBoundsZoom(BOX, true))); };
+      jm = L.map('jmap', { doubleClickZoom: false, zoomSnap: .5, minZoom: 3, maxZoom: 18, maxBounds: BOX, maxBoundsViscosity: 1 });
+      fitMin(); jm.fitBounds([[24, 123], [45.6, 146]]);
       jm.attributionControl.setPrefix(false); jPins = L.layerGroup().addTo(jm); setJStyle(jStyle);
-      new ResizeObserver(() => jm.invalidateSize()).observe($('jmap'));
+      new ResizeObserver(fitMin).observe($('jmap'));
     }
     jm.invalidateSize(); jPins.clearLayers();
     const at = {};
@@ -2493,6 +2528,10 @@ $('faceSheet').onclick = () => {
 };
 $('cmdGo').onclick = () => { $('cmdMsg').textContent = runCmd($('cmd').value); };
 $('cmd').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) $('cmdGo').click(); };
+$('axGrpAdd').onclick = () => { const v = $('axGrpName').value.trim(); if (!v) { note('グループの名前を入れてください'); return; }
+  if (S.groups.some(g => g.name === v)) { note('同じ名前のグループがあります'); return; }
+  S.groups.push({ id: 'gr' + Date.now().toString(36), name: v }); $('axGrpName').value = '';
+  S.history.push({ id: 'h' + Date.now().toString(36), at: today(), kind: '辞書', title: `軸のグループ「${v}」を作った`, lines: ['軸の「グループなし」から選ぶと、このグループに入ります'], sources: [], results: [] }); save(); renderAll(); };
 $('addMonth').onclick = addMonth; $('addMonth').hidden = !DEMO;   // 見本の月を足す試しの道具なので、テストの時だけ
 $('showMine').onchange = e => { showMine = e.target.checked; renderAll(); };
 $('preset').onchange = pickSheet;

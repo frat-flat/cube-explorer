@@ -252,6 +252,12 @@ test("World の特別枠で日付と住所で並べ直す", async ({ page }) => 
   await expect(page.locator("#jmap .jlab", { hasText: "鳥取" })).toHaveCount(1);
   await expect(page.locator("#jmap .jlab", { hasText: "松江" })).toHaveCount(1);
   for (let i = 0; i < 2; i++) { await page.locator("#jmap .leaflet-control-zoom-out").click(); await page.waitForTimeout(600); }
+  // いちばん縮めても、近隣の国の陸が枠いっぱいにあり、地図が途中で切れない
+  for (let i = 0; i < 8 && !(await page.locator("#jmap .leaflet-control-zoom-out.leaflet-disabled").count()); i++) { await page.locator("#jmap .leaflet-control-zoom-out").click(); await page.waitForTimeout(500); }
+  await expect(page.locator("#jmap .leaflet-control-zoom-out")).toHaveClass(/leaflet-disabled/);
+  const [box, near] = await page.evaluate(() => [document.querySelector("#jmap")!.getBoundingClientRect().toJSON(), document.querySelector("#jmap .leaflet-jland-pane path")!.getBoundingClientRect().toJSON()]);
+  expect(near.left).toBeLessThanOrEqual(box.left + 1); expect(near.right).toBeGreaterThanOrEqual(box.right - 1);
+  expect(near.top).toBeLessThanOrEqual(box.top + 1); expect(near.bottom).toBeGreaterThanOrEqual(box.bottom - 1);
   await page.locator('#guide [data-js="photo"]').click();
   await expect(page.locator("#jmap .leaflet-tile").first()).toHaveAttribute("src", /seamlessphoto/);
   await page.locator("#jmap .leaflet-interactive").first().dblclick();
@@ -404,5 +410,45 @@ test("見本なし: はじめは空で、前の見本は消えて実データは
   await page.locator('.nv[data-go="home"]').click();
   await expect(page.locator("#tree")).toContainText("0001 実データ");
   await expect(page.locator("#tree")).not.toContainText("東京ネット販売");
+  expect(errors).toEqual([]);
+});
+
+// 見本なし: 設定ははじめ何も決めていない。軸の辞書でグループとサブタイトルを作れる
+test("見本なし: 設定は未設定から始まり、軸の辞書にグループとサブタイトルを付けられる", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator('.nv[data-go="settings"]').click();
+  await expect(page.locator("#pShade")).toHaveValue("");
+  for (const i of [0, 1, 2]) await expect(page.locator(`[data-ca="${i}"]`)).toHaveValue("");
+  await expect(page.locator("#prefs")).not.toContainText("初期値");
+  await expect(page.locator("#prefs .pill", { hasText: "未設定" })).toHaveCount(3);
+  // 3つとも選ぶと自分の設定になる
+  await page.locator('[data-ca="0"]').selectOption("month");
+  await page.locator('[data-ca="1"]').selectOption("mall");
+  await expect(page.locator('[data-ca="0"]')).toHaveValue("month");
+  await page.locator('[data-ca="2"]').selectOption("item");
+  await expect(page.locator("#prefs .pill", { hasText: "自分の設定" })).toHaveCount(1);
+  let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.prefs.cubeAxes).toEqual(["month", "mall", "item"]);
+  // 軸の辞書: グループを作り、軸を入れ、サブタイトルを付ける
+  await page.locator('.nv[data-go="dict"]').click();
+  await page.locator("#axGrpName").fill("売上の情報");
+  await page.locator("#axGrpAdd").click();
+  await page.locator('[data-agrp="month"]').selectOption({ label: "売上の情報" });
+  await page.locator('[data-asub="month"]').fill("売上シートの計上月(申込月ではない)");
+  await page.locator('[data-asub="month"]').press("Enter");
+  await page.locator('[data-asub="month"]').blur();
+  await expect(page.locator("#axes .agrp")).toContainText("月");
+  await expect(page.locator('#axes .agrp [data-asub="month"]')).toHaveValue("売上シートの計上月(申込月ではない)");
+  st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.groups.map((g: { name: string }) => g.name)).toEqual(["売上の情報"]);
+  expect(st.axes.find((a: { id: string }) => a.id === "month")).toMatchObject({ group: st.groups[0].id, sub: "売上シートの計上月(申込月ではない)" });
+  // グループを消しても軸は残る
+  page.once("dialog", (d) => d.accept());
+  await page.locator("[data-gdel]").click();
+  await expect(page.locator("#axes .agrp")).toHaveCount(0);
+  await expect(page.locator('[data-asub="month"]')).toHaveValue("売上シートの計上月(申込月ではない)");
   expect(errors).toEqual([]);
 });

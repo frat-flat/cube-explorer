@@ -91,7 +91,7 @@ if (k23.length) dots.push([r4(k23.reduce((a, d) => a + d[0] * d[2], 0) / s23), r
 dots.sort((a, b) => b[2] - a[2]);
 // 近隣の国(韓国・北朝鮮・中国・台湾・ロシアなど)の陸: 地図の範囲の四角で切り取った輪
 const topo = require("topojson-client"), wa = JSON.parse(readFileSync(require.resolve("world-atlas/countries-50m.json"), "utf8"));
-const BB = [110, 12, 168, 56];   // 経度・緯度の範囲
+const BB = [95, 5, 180, 60];   // 経度・緯度の範囲
 function clipRect(ring) {   // Sutherland–Hodgman で四角に切る
   let pts = ring;
   for (const [axis, v, keepGreater] of [[0, BB[0], 1], [0, BB[2], 0], [1, BB[1], 1], [1, BB[3], 0]]) {
@@ -109,7 +109,7 @@ for (const f of topo.feature(wa, wa.objects.countries).features) {
   const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
   for (const poly of polys) { const r = clipRect(poly[0]); if (r.length >= 4 && Math.abs(area(r)) > 0.01) near.push(r.map(([x, y]) => [r4(x), r4(y)])); }
 }
-const nearLab = [["韓国", 127.8, 36.3], ["北朝鮮", 126.9, 40.2], ["中国", 116.5, 34.5], ["台湾", 121, 23.7], ["ロシア", 135, 48.5], ["モンゴル", 112.5, 46.5], ["フィリピン", 121.5, 16.5]];
+const nearLab = [["韓国", 127.8, 36.3], ["北朝鮮", 126.9, 40.2], ["中国", 116.5, 34.5], ["台湾", 121, 23.7], ["ロシア", 135, 48.5], ["モンゴル", 112.5, 46.5], ["フィリピン", 121.5, 16.5], ["ベトナム", 105.8, 16.2]];
 const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」 / 人口: 総務省「住民基本台帳人口」令和4年1月1日 / 近隣の国: Natural Earth(world-atlas)", pref: prefOut, city: cityOut, border, land, near, nearLab, dots };
 writeFileSync(new URL("../../public/worlds/japan.json", import.meta.url), JSON.stringify(out));
 console.log("dots", dots.length, "23ku", k23.length, "prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "land rings", land.length, "near rings", near.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
