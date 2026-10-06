@@ -50,7 +50,7 @@ for (let o = 100, i = 0; o < shp.length; i++) {
   const pf = admAt(i).slice(0, 2);
   for (let k = 0; k < np; k++) {
     const ring = []; for (let j = parts[k]; j < (k + 1 < np ? parts[k + 1] : nv); j++) ring.push([shp.readDoubleLE(pts + 16 * j), shp.readDoubleLE(pts + 16 * j + 8)]);
-    for (let j = 0; j + 1 < ring.length; j++) { const a = key(ring[j]), c = key(ring[j + 1]), kk = a < c ? a + "|" + c : c + "|" + a; const e = E.get(kk) || { p: new Set(), a: ring[j], b: ring[j + 1] }; e.p.add(pf); E.set(kk, e); nE++; }
+    for (let j = 0; j + 1 < ring.length; j++) { const a = key(ring[j]), c = key(ring[j + 1]), kk = a < c ? a + "|" + c : c + "|" + a; const e = E.get(kk) || { p: new Set(), n: 0, a: ring[j], b: ring[j + 1] }; e.p.add(pf); e.n++; E.set(kk, e); nE++; }
   }
 }
 const segs = [...E.values()].filter((e) => e.p.size > 1);
@@ -70,6 +70,16 @@ function simplify(pts, tol) { if (pts.length < 3) return pts; const keep = new U
     for (let i = a + 1; i < b; i++) { const d = L > 1e-12 ? Math.abs(dy * pts[i][0] - dx * pts[i][1] + bx * ay - by * ax) / L : Math.hypot(pts[i][0] - ax, pts[i][1] - ay); if (d > md) { md = d; mi = i; } }
     if (md > tol) { keep[mi] = 1; st.push([a, mi], [mi, b]); } } return pts.filter((_, i) => keep[i]); }
 const border = lines.map((l) => simplify(l, 0.002).map(([x, y]) => [r4(x), r4(y)]));
+// 陸地(白地図に地理院タイルを使わず、海の上に白い陸を描く): どの市区町村とも共有しない辺(海岸線)をつないだ輪
+const coast = [...E.values()].filter((e) => e.n === 1), cadj = new Map();
+coast.forEach((s, i) => { for (const p of [s.a, s.b]) { const k = K(p); (cadj.get(k) || cadj.set(k, []).get(k)).push(i); } });
+const cused = new Uint8Array(coast.length), land = [];
+for (let i = 0; i < coast.length; i++) {
+  if (cused[i]) continue; cused[i] = 1; const ring = [coast[i].a, coast[i].b];
+  for (;;) { const end = ring[ring.length - 1], nx = (cadj.get(K(end)) || []).find((j) => !cused[j]); if (nx == null) break; cused[nx] = 1; const s = coast[nx]; ring.push(K(s.a) === K(end) ? s.b : s.a); }
+  if (Math.abs(area(ring)) < 0.0004) continue;   // ごく小さな島は省く
+  const h = ring.length >> 1, sm = [...simplify(ring.slice(0, h + 1), 0.003), ...simplify(ring.slice(h), 0.003).slice(1)]; if (sm.length >= 4) land.push(sm.map(([x, y]) => [r4(x), r4(y)]));
+}
 // 白地図のドット: 地図に形がある市区町村(政令市は市でまとめ、区は除く)ごとに [経度, 緯度, 人口, 名前, 出す縮尺]
 // 出す縮尺: 0=いつも、1=日本全体のときだけ(東京23区をまとめた点)、2=寄ったときだけ(23区の一つ一つ)
 const pop = JSON.parse(readFileSync(new URL("./population.json", import.meta.url), "utf8"));
@@ -78,6 +88,6 @@ const dots = munis.filter((m) => geo.has(m.code.slice(0, 5)) && pop[m.code]).map
 const k23 = dots.filter((d) => d[4] === 2), s23 = k23.reduce((a, d) => a + d[2], 0);
 if (k23.length) dots.push([r4(k23.reduce((a, d) => a + d[0] * d[2], 0) / s23), r4(k23.reduce((a, d) => a + d[1] * d[2], 0) / s23), s23, "東京23区", 1]);
 dots.sort((a, b) => b[2] - a[2]);
-const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」 / 人口: 総務省「住民基本台帳人口」令和4年1月1日", pref: prefOut, city: cityOut, border, dots };
+const out = { src: "位置: 国土地理院「地球地図日本」(jpn-atlas) / 市区町村名: 総務省「全国地方公共団体コード」 / 人口: 総務省「住民基本台帳人口」令和4年1月1日", pref: prefOut, city: cityOut, border, land, dots };
 writeFileSync(new URL("../../public/worlds/japan.json", import.meta.url), JSON.stringify(out));
-console.log("dots", dots.length, "23ku", k23.length, "prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);
+console.log("dots", dots.length, "23ku", k23.length, "prefectures", prefOut.length, "cities", cityOut.length, "border lines", border.length, "land rings", land.length, "missing", munis.filter((m) => !geo.has(m.code.slice(0, 5))).length);

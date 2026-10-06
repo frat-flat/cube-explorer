@@ -142,7 +142,7 @@ button.pin.on{border-color:var(--hl);color:var(--hl);font-weight:700}
 #miniMap[hidden]{display:none}#miniMap:hover{opacity:1}#miniMap svg{display:block;width:100%;height:auto}
 #jmap{position:absolute;inset:0;z-index:2;background:#dfe7ec;font:12px var(--sans)}
 #jmap .leaflet-tooltip{font-size:12px}
-#jmap .jlab{font-size:11px;color:#3a3f47;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;background:none;border:0}
+#jmap .jlab{font-size:12px;font-weight:600;color:#33373d;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;background:none;border:0}
 #guide .seg{display:inline-flex;gap:0;margin:2px 0 8px}
 #guide .seg button{border-radius:0;padding:3px 12px}
 #guide .seg button:first-child{border-radius:16px 0 0 16px}#guide .seg button:last-child{border-radius:0 16px 16px 0}
@@ -2097,8 +2097,9 @@ function geocode(addr) {
   return pf ? { lon: pf.lon, lat: pf.lat, where: pf.n } : null;
 }
 // 日本地図: 地理院タイル(淡色地図=白地図、全国最新写真=空撮)を Leaflet で重ね、住所の場所にピンを立てる。部品は日本地図を開いたときだけ読む
-const JTILES = { pale: ['白地図', 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', '淡色地図'], photo: ['空撮', 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', '全国最新写真(シームレス)'] };
-let jm = null, jTile = null, jPins = null, jBorder = null, jStyle = 'pale', LP = null, JPP = null;
+// 地図は地理院タイルを使わず、Google マップのような青い海と緑の陸に、県境(点線)と主要都市(白い丸と名前)だけを描く(2026-10-06 ユーザー指定: 道路や細かい地名は出さない)
+const JTILES = { pale: ['地図', null, ''], photo: ['空撮', 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', '全国最新写真(シームレス)'] };
+let jm = null, jTile = null, jLand = null, jPins = null, jBorder = null, jStyle = 'pale', LP = null, JPP = null;
 try { jStyle = JTILES[localStorage.getItem('axis-boxes-v2:jmap')] ? localStorage.getItem('axis-boxes-v2:jmap') : 'pale'; } catch (e) {}
 function leaflet() {
   return LP = LP || new Promise((ok, ng) => {
@@ -2111,31 +2112,35 @@ const loadJP = () => JPP = JPP || fetch('/worlds/japan.json').then(r => { if (!r
 function setJStyle(k) {
   if (!JTILES[k]) return; jStyle = k;
   try { localStorage.setItem('axis-boxes-v2:jmap', k); } catch (e) {}
-  if (jm) { if (jTile) jm.removeLayer(jTile); const [, url, name] = JTILES[k]; jTile = L.tileLayer(url, { maxZoom: 18, maxNativeZoom: 18, attribution: `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>(${name})` }).addTo(jm); jTile.bringToBack();
+  if (jm) { if (jTile) { jm.removeLayer(jTile); jTile = null; } if (jLand) { jm.removeLayer(jLand); jLand = null; }
+    const [, url, name] = JTILES[k];
+    jm.getContainer().style.background = url ? '#dfe3e8' : '#7fd3e6';
+    if (url) { jTile = L.tileLayer(url, { maxZoom: 18, maxNativeZoom: 18, attribution: `<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>(${name})` }).addTo(jm); jTile.bringToBack(); }
+    else if (JP && JP.land) { if (!jm.getPane('jland')) jm.createPane('jland').style.zIndex = 250; jLand = L.polygon(JP.land.map(r => r.map(([lon, lat]) => [lat, lon])), { color: '#8cc9a0', weight: .8, fillColor: '#b8e6c6', fillOpacity: 1, interactive: false, pane: 'jland', attribution: '国土地理院「地球地図日本」' }).addTo(jm); }
     // 県境の線を重ねる(空撮は黄色、白地図は灰色)
     if (jBorder) { jm.removeLayer(jBorder); jBorder = null; }
-    if (JP && JP.border) jBorder = L.polyline(JP.border.map(l => l.map(([lon, lat]) => [lat, lon])), k === 'photo' ? { color: '#ffe066', weight: 1.6, opacity: .9, interactive: false } : { color: '#7d8590', weight: 1.3, opacity: .85, interactive: false }).addTo(jm);
+    if (JP && JP.border) jBorder = L.polyline(JP.border.map(l => l.map(([lon, lat]) => [lat, lon])), k === 'photo' ? { color: '#ffe066', weight: 1.6, opacity: .9, interactive: false } : { color: '#7f8aa3', weight: 1.1, opacity: .9, dashArray: '4 3', interactive: false }).addTo(jm);
     jDotsDraw();
   }
   document.querySelectorAll('[data-js]').forEach(b => b.classList.toggle('on', b.dataset.js === k));
 }
-// 白地図の市区町村ドット(人口に合わせた大きさ)。日本全体では主要都市(50万人以上、東京は23区で1つ)だけ、寄るほど小さな町まで出す
+// 白地図の都市部: 同じ大きさの小さな点と名前。日本全体では主要都市(50万人以上、東京は23区で1つ)だけ、寄るほど小さな町まで出す
+// (人口に合わせて丸の大きさを変えるのは 2026-10-06 にやめた: 何の大きさか分かりにくいため)
 let jDots = null, jDotR = null;
 function jDotsDraw() {
   if (!jm || !JP || !JP.dots) return;
   if (!jDots) { jm.createPane('jdots').style.zIndex = 390; jm.getPane('jdots').style.pointerEvents = 'none'; jDotR = L.canvas({ pane: 'jdots' }); jDots = L.layerGroup().addTo(jm); jm.on('zoomend moveend', jDotsDraw); }
   jDots.clearLayers(); if (jStyle !== 'pale') return;
   const z = jm.getZoom(), b = jm.getBounds().pad(.3), wide = z < 6.5, mid = z < 8.5;
-  const min = wide ? 5e5 : mid ? 1e5 : z < 9.5 ? 2e4 : 0, lab = wide ? 1e6 : mid ? 4e5 : z < 10 ? 1e5 : z < 11 ? 2e4 : 0, grow = wide ? 1 : mid ? 1.15 : 1.35;
-  const placed = [];   // 名前は大きい市から置き、先に置いた名前と重なるものは出さない
+  // Google マップのように、名前を出せる都市にだけ白い丸を置く(ほかの町の点は出さない)
+  const lab = wide ? 5e5 : mid ? 2e5 : z < 10 ? 5e4 : z < 11 ? 2e4 : 0;
+  const placed = [];   // 名前は大きい市から置き、先に置いた丸や名前と重なるものは出さない
   for (const [lon, lat, p, n, t] of JP.dots) {
-    if (p < min || (t === 1 && !mid) || (t === 2 && mid) || !b.contains([lat, lon])) continue;
-    const r = Math.max(2, Math.sqrt(p) / 150 * grow);
-    L.circleMarker([lat, lon], { pane: 'jdots', renderer: jDotR, radius: r, color: '#ffffff', weight: 1, fillColor: '#d9622b', fillOpacity: .5, interactive: false }).addTo(jDots);
-    if (p < lab) continue;
-    const q = jm.latLngToContainerPoint([lat, lon]), x0 = q.x + r + 3, x1 = x0 + n.length * 11, y0 = q.y - 8;
-    if (placed.some(o => x0 < o[1] && x1 > o[0] && Math.abs(y0 - o[2]) < 13)) continue; placed.push([x0, x1, y0]);
-    L.marker([lat, lon], { pane: 'jdots', interactive: false, keyboard: false, icon: L.divIcon({ className: 'jlab', html: esc(n), iconSize: null, iconAnchor: [-r - 3, 8] }) }).addTo(jDots);
+    if (p < lab || (t === 1 && !mid) || (t === 2 && mid) || !b.contains([lat, lon])) continue;
+    const name = n.replace(/23区$/, '').replace(/(.)市$/, '$1'), q = jm.latLngToContainerPoint([lat, lon]), x0 = q.x - 4, x1 = q.x + 7 + name.length * 12, y0 = q.y - 8;
+    if (placed.some(o => x0 < o[1] && x1 > o[0] && Math.abs(y0 - o[2]) < 16)) continue; placed.push([x0, x1, y0]);
+    L.circleMarker([lat, lon], { pane: 'jdots', renderer: jDotR, radius: 3, color: '#4a4f57', weight: 1.2, fillColor: '#ffffff', fillOpacity: 1, interactive: false }).addTo(jDots);
+    L.marker([lat, lon], { pane: 'jdots', interactive: false, keyboard: false, icon: L.divIcon({ className: 'jlab', html: esc(name), iconSize: null, iconAnchor: [-6, 8] }) }).addTo(jDots);
   }
 }
 function japanPins(items) {
