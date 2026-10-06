@@ -302,6 +302,12 @@ test("読み取ったシートごとに、何にするかと入れる先を選�
   await page.locator("#bookUrl").fill("https://docs.google.com/spreadsheets/d/y/edit");
   await page.locator("#bookRead").click();
   await expect(page.locator("#bookSec")).toBeVisible();
+  // カードは名前・大きさ・選ぶ所だけ。列などの中身は「詳しく」を開いたときだけ。貼り付け欄は折り返さない
+  await expect(page.locator('[data-tab="0"] .sz')).toHaveText("3行 × 2列");
+  await expect(page.locator('[data-more="0"] .dt')).toBeHidden();
+  await page.locator('[data-more="0"] summary').click();
+  await expect(page.locator('[data-more="0"] .cols')).toContainText("売上金額");
+  await expect(page.locator("#newData")).toHaveAttribute("wrap", "off");
   // 売上はシートとしてキューブ S-02 へ、顧客は1行ずつ箱にして代理店「東京ネット販売」の中へ、メモはまだ使わない
   await page.locator('[data-dest="0"]').selectOption("c2");
   await page.locator('[data-act="1"]').selectOption("box");
