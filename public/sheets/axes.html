@@ -286,12 +286,28 @@ tfoot td{font-weight:700}
 .stash .cols{display:flex;flex-wrap:wrap;gap:4px}
 .stash .cols span{font-size:11.5px;border:1px solid var(--line);border-radius:99px;padding:0 7px}
 .stash .cols span.left{border-color:var(--mine);color:var(--mine)}
-.tab{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;font-size:13px}
-.tab .d{grid-column:2;color:var(--muted);font-size:12.5px}
-.tabd{grid-template-columns:minmax(0,1fr)}
-.tabd .d,.tabd .row{grid-column:1}
-.tabd select{max-width:100%}
+.tabs{gap:10px}
+.bkhd{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap;margin:0 0 10px}.bkhd>b{font-size:15px;margin-right:4px}
+.st{font-size:12px;color:var(--muted)}.st b{font-size:15px;color:var(--ink);margin-right:3px;font-variant-numeric:tabular-nums}
+.tab{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;font-size:13px;background:var(--panel)}
+.tab.tabd{border-left:3px solid var(--accent)}.tab.off{border-left-color:var(--line)}.tab.off .tn{color:var(--muted)}
+.th{display:flex;align-items:center;gap:8px;min-width:0}.th .tn{font-size:14.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kd{font-size:11px;border-radius:4px;padding:1px 6px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);white-space:nowrap}.kd.calc{background:var(--okSoft);color:var(--ok)}
+.sz{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}.sz small{font-weight:400;color:var(--muted);margin:0 1px}
+.tc{display:flex;gap:8px 16px;flex-wrap:wrap}.tc label{display:flex;flex-direction:column;gap:3px;flex:1 1 220px;min-width:0}.tc label>span{font-size:11.5px;color:var(--muted)}.tc select{width:100%}
+.tab .hint{margin:0;font-size:12px;color:var(--muted)}
+.tab details{border-top:1px solid var(--line);padding-top:8px}
+.tab summary{list-style:none;display:flex;gap:6px;align-items:center;cursor:pointer;flex-wrap:wrap}.tab summary::-webkit-details-marker{display:none}
+.tab summary .ch{font-size:11.5px;border:1px solid var(--line);border-radius:99px;padding:1px 8px;color:var(--muted)}
+.tab summary .lk{margin-left:auto;font-size:12px;color:var(--accent)}.tab summary .lk::after{content:' ▾'}.tab details[open] summary .lk::after{content:' ▴'}
+.tab .dt{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.tab .dl{display:grid;grid-template-columns:7em minmax(0,1fr);gap:8px;font-size:12.5px}.tab .dl>span{color:var(--muted)}
+.tab .cols{display:flex;flex-wrap:wrap;gap:4px}.tab .cols span{font-size:11.5px;border:1px solid var(--line);border-radius:4px;padding:0 6px}
+.tab .fx{display:flex;gap:8px;align-items:baseline;min-width:0}.tab .fx b{flex:none;font-size:12px}
+.tab .fx code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;color:var(--muted)}
+@media (max-width:640px){.tab .dl{grid-template-columns:minmax(0,1fr);gap:3px}}
 .tab code,.gas code{font-family:var(--mono);font-size:12px}
+#newData{white-space:pre;overflow-x:auto;overflow-wrap:normal;font-family:var(--mono);font-size:12px;tab-size:12}
 .ai{border:1px solid var(--accent);border-radius:8px;padding:8px 10px;font-size:13px;display:flex;flex-direction:column;gap:4px}
 .ai b.h{color:var(--accent)}
 .gas{border:1px dashed var(--line);border-radius:8px;padding:6px 8px;font-size:13px}
@@ -383,7 +399,7 @@ tfoot td{font-weight:700}
     <div class="row"><span class="muted">入れる先</span><select id="target" aria-label="入れる先"></select></div>
     <div class="row" id="tagRow"><span class="muted">このシート全体の値</span><select id="tagAxis" aria-label="シート全体の軸"></select><input type="text" id="tagVal" size="9" aria-label="シート全体の値"></div>
     <input type="text" id="newName" placeholder="シート名" aria-label="シート名">
-    <textarea id="newData" aria-label="シートの中身(1行目が列名、カンマかタブ区切り)"></textarea>
+    <textarea id="newData" wrap="off" aria-label="シートの中身(1行目が列名、カンマかタブ区切り)"></textarea>
     <div class="row"><button class="primary" id="read">読み取って次へ</button></div>
   </section>
   </div>
@@ -1197,17 +1213,25 @@ const cellsTxt = t => (t.size.rows * t.size.cols).toLocaleString();
 function renderBook() {
   const sec = $('bookSec'); sec.hidden = !book; if (!book) return;
   const data = book.tabs.filter(t => t.kind === 'data'), tot = data.reduce((a, t) => a + t.size.rows * t.size.cols, 0);
-  let h = `<p class="muted">「${esc(book.name)}」: タブ ${book.tabs.length} 枚・関数 ${book.tabs.reduce((a, t) => a + Object.keys(t.formulas).length, 0)} 種類・条件付き書式 ${book.tabs.reduce((a, t) => a + t.cf.length, 0)} 件・入力規則 ${book.tabs.reduce((a, t) => a + t.dv.length, 0)} 件・${book.real ? 'GAS は読めません' : 'GAS ' + book.gas.length + ' 個'}</p><div class="tabs">`;
-  h += book.tabs.map((t, i) => (t.kind === 'data'
-    ? `<div class="tab tabd" data-tab="${i}"><b>${esc(t.name)} <span class="muted">データのタブ</span></b>
-    <div class="row"><span class="muted">何にする</span><select data-act="${i}" aria-label="${esc(t.name)} を何にする">${Object.entries(ACTS).map(([k, v]) => `<option value="${k}"${t.act === k ? ' selected' : ''}${k === 'sheet' && !firstCube() ? ' disabled' : ''}>${v}${k === 'sheet' && !firstCube() ? '(キューブがまだありません)' : ''}</option>`).join('')}</select>
-    ${t.act === 'none' ? '' : `<span class="muted">入れる先</span><select data-dest="${i}" aria-label="${esc(t.name)} の入れる先">${destOpts(t.act, t.dest)}</select>`}</div>
-    ${t.act === 'box' || t.act === 'cube' ? `<span class="d">1行を1つの${t.act === 'box' ? '箱' : 'キューブ'}にします。名前に使う列と単位の名前は、このあとの画面で選びます</span>` : ''}`
-    : `<label class="tab"><input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''}><b>${esc(t.name)} <span class="muted">${t.kind === 'calc' ? '計算のタブ' : 'その他'}</span></b>`) + `
-    <span class="d">実物: 約${t.size.rows.toLocaleString()}行×${t.size.cols}列(${cellsTxt(t)}セル)・列: ${esc(t.cols.join(' / ') || 'なし')}${book.real ? `・読んだ行 ${t.rows.length}${t.truncated ? '(先頭だけ)' : ''}` : ''}</span>
-    ${Object.entries(t.formulas).map(([c, f]) => `<span class="d">関数 ${c}列: <code>${esc(f.f.replace('{r}', '2'))}</code> … ${esc(f.text)}${t.q ? ' → 「まとめる」の条件として再現' : ' → 同じ計算をシートに持つ'}</span>`).join('')}
-    ${t.cf.map(c => `<span class="d">条件付き書式: ${esc(c.text)} → 同じ表示ルールを再現</span>`).join('')}
-    ${t.dv.map(c => `<span class="d">入力規則: ${esc(c.text)} → 登録辞書の値と照らす</span>`).join('')}${t.kind === 'data' ? '</div>' : '</label>'}`).join('');
+  // 1枚ごとのカード: 名前と大きさ、何にするか・入れる先、関数などは数だけ。中身は「詳しく」を開いたときだけ
+  const sum = (f) => book.tabs.reduce((a, t) => a + f(t), 0), stat = (n, l) => n ? `<span class="st"><b>${n.toLocaleString()}</b>${l}</span>` : '';
+  let h = `<div class="bkhd"><b>${esc(book.name)}</b>${stat(book.tabs.length, 'タブ')}${stat(sum(t => Object.keys(t.formulas).length), '関数')}${stat(sum(t => t.cf.length), '条件付き書式')}${stat(sum(t => t.dv.length), '入力規則')}${book.real ? '' : stat(book.gas.length, 'GAS')}</div><div class="tabs">`;
+  const kindTxt = { data: 'データ', calc: '計算' };
+  h += book.tabs.map((t, i) => {
+    const fs = Object.entries(t.formulas), nf = fs.length, chips = [nf && `関数 ${nf}`, t.cf.length && `条件付き書式 ${t.cf.length}`, t.dv.length && `入力規則 ${t.dv.length}`].filter(Boolean);
+    const head = `<div class="th">${t.kind === 'data' ? '' : `<input type="checkbox" data-use="${i}"${t.use ? ' checked' : ''} aria-label="${esc(t.name)} を使う">`}<b class="tn">${esc(t.name)}</b><span class="kd ${t.kind}">${kindTxt[t.kind] || 'その他'}</span><span class="sz">${t.size.rows.toLocaleString()}<small>行</small> × ${t.size.cols}<small>列</small></span></div>`;
+    const ctl = t.kind === 'data' ? `<div class="tc"><label><span>何にする</span><select data-act="${i}" aria-label="${esc(t.name)} を何にする">${Object.entries(ACTS).map(([k, v]) => `<option value="${k}"${t.act === k ? ' selected' : ''}${k === 'sheet' && !firstCube() ? ' disabled' : ''}>${v}${k === 'sheet' && !firstCube() ? '(キューブがまだありません)' : ''}</option>`).join('')}</select></label>
+      ${t.act === 'none' ? '' : `<label><span>入れる先</span><select data-dest="${i}" aria-label="${esc(t.name)} の入れる先">${destOpts(t.act, t.dest)}</select></label>`}</div>
+      ${t.act === 'box' || t.act === 'cube' ? `<p class="hint">1行を1つの${t.act === 'box' ? '箱' : 'キューブ'}にします。名前に使う列と単位の名前は次の画面で選びます。</p>` : ''}` : '';
+    const more = `<details data-more="${i}"${t.open ? ' open' : ''}><summary>${chips.map(c => `<span class="ch">${c}</span>`).join('')}<span class="lk">${t.open ? '閉じる' : '詳しく'}</span></summary><div class="dt">
+      <div class="dl"><span>列</span><div class="cols">${t.cols.length ? t.cols.map(c => `<span>${esc(c)}</span>`).join('') : '<em>なし</em>'}</div></div>
+      ${book.real ? `<div class="dl"><span>読んだ行</span><div>${t.rows.length.toLocaleString()} 行${t.truncated ? '(先頭だけ)' : ''}・${cellsTxt(t)} セル</div></div>` : ''}
+      ${nf ? `<div class="dl"><span>関数</span><div>${fs.map(([c, f]) => `<div class="fx"><b>${esc(c)}列</b><code title="${esc(f.f.replace('{r}', '2'))}">${esc(f.f.replace('{r}', '2'))}</code></div>`).join('')}<p class="hint">${t.q ? '「まとめる」の条件として再現します' : '同じ計算をシートに持ちます'}</p></div></div>` : ''}
+      ${t.cf.length ? `<div class="dl"><span>条件付き書式</span><div>${t.cf.map(c => `<div class="fx"><code title="${esc(c.text)}">${esc(c.text)}</code></div>`).join('')}<p class="hint">同じ表示ルールを再現します</p></div></div>` : ''}
+      ${t.dv.length ? `<div class="dl"><span>入力規則</span><div>${t.dv.map(c => `<div class="fx"><code title="${esc(c.text)}">${esc(c.text)}</code></div>`).join('')}<p class="hint">登録辞書の値と照らします</p></div></div>` : ''}
+    </div></details>`;
+    return `<div class="tab${t.kind === 'data' ? ' tabd' : ''}${t.kind === 'data' && t.act === 'none' ? ' off' : ''}" data-tab="${i}">${head}${ctl}${more}</div>`;
+  }).join('');
   h += '</div>';
   const asSheet = data.filter(t => t.act === 'sheet');
   h += book.gas.map(g => `<div class="gas"><b>GAS <code>${esc(g.fn)}</code></b> <span class="muted">(${esc(g.trig)})</span><br>AIの読み取り: ${esc(g.text)}<br>置き換え案: ${esc(g.plan)} <span class="muted">(GAS 自体は自動では動かしません)</span></div>`).join('');
@@ -1219,9 +1243,10 @@ function renderBook() {
     <span>${esc(asSheet.map(t => t.name).join('・'))} は列が同じで、月ごとにタブを分けています。1タブ約4万行、${data.length}タブで約${Math.round(tot / 10000)}万セルあり、スプシの上限(1ファイル1,000万セル)や読み込みの重さを避けるために分けたと推定します。このシステムではタブを分ける必要がないので、1枚にまとめ、タブ名の年月を「月」の列にすることを提案します。</span>
     <label><input type="radio" name="merge" value="1"${book.merge ? ' checked' : ''}> 1枚にまとめる(おすすめ)</label>
     <label><input type="radio" name="merge" value="0"${!book.merge ? ' checked' : ''}> 分けたまま、タブごとにシートにする</label></div>`;
-  h += `<div class="row"><button class="primary" id="bookGo">この内容で進める(このあと1枚ずつ確かめて反映)</button><button id="bookCancel">やめる</button></div>`;
+  h += `<div class="row" style="margin-top:12px"><button class="primary" id="bookGo">この内容で進める(このあと1枚ずつ確かめて反映)</button><button id="bookCancel">やめる</button></div>`;
   $('book').innerHTML = h;
   $('book').querySelectorAll('[data-use]').forEach(c => c.onchange = () => { book.tabs[+c.dataset.use].use = c.checked; });
+  $('book').querySelectorAll('[data-more]').forEach(d => d.ontoggle = () => { book.tabs[+d.dataset.more].open = d.open; d.querySelector('.lk').textContent = d.open ? '閉じる' : '詳しく'; });
   $('book').querySelectorAll('input[name=merge]').forEach(r => r.onchange = () => { book.merge = r.value === '1'; });
   $('book').querySelectorAll('[data-act]').forEach(x => x.onchange = () => { const t = book.tabs[+x.dataset.act], was = t.act; t.act = x.value; t.use = t.act !== 'none';
     if ((was === 'sheet') !== (t.act === 'sheet')) t.dest = t.act === 'sheet' ? firstCube() : ''; renderBook(); });
