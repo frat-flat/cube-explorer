@@ -13,7 +13,9 @@ test("入口でダッシュボードが開き、画面を切り替えられる",
   await expect(page).toHaveTitle("軸の辞書と箱");
   await expect(page.locator("#crumb")).toHaveText("ホーム");
   await page.locator('.nv[data-go="import"]').click();
-  await expect(page.locator("#crumb")).toHaveText("シートを入れる");
+  await expect(page.locator("#crumb")).toHaveText("Compose › Import");
+  await expect(page.locator(".side .ngh")).toHaveText("Compose");
+  await expect(page.locator('.nv[data-go="gather"]')).toContainText("Remix");
   await expect(page.locator("#bookRead")).toBeVisible();
 });
 
@@ -420,7 +422,7 @@ test("見本なし: はじめは空で、前の見本は消えて実データは
 });
 
 // 見本なし: 設定ははじめ何も決めていない。軸の辞書でグループとサブタイトルを作れる
-test("見本なし: 設定は未設定から始まり、軸の辞書にグループとサブタイトルを付けられる", async ({ page }) => {
+test("見本なし: 設定は未設定から始まり、Library でカラムの登録・グループ・サブタイトル・同義を扱える", async ({ page }) => {
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -438,23 +440,83 @@ test("見本なし: 設定は未設定から始まり、軸の辞書にグルー
   await expect(page.locator("#prefs .pill", { hasText: "自分の設定" })).toHaveCount(1);
   let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   expect(st.prefs.cubeAxes).toEqual(["month", "mall", "item"]);
-  // 軸の辞書: グループを作り、軸を入れ、サブタイトルを付ける
+  // Library: グループを作り、カラムを入れ、サブタイトルを付ける
   await page.locator('.nv[data-go="dict"]').click();
+  await expect(page.locator("#crumb")).toHaveText("Library");
   await page.locator("#axGrpName").fill("売上の情報");
   await page.locator("#axGrpAdd").click();
+  await page.locator('[data-lib="month"]').click();
   await page.locator('[data-agrp="month"]').selectOption({ label: "売上の情報" });
   await page.locator('[data-asub="month"]').fill("売上シートの計上月(申込月ではない)");
-  await page.locator('[data-asub="month"]').press("Enter");
   await page.locator('[data-asub="month"]').blur();
   await expect(page.locator("#axes .agrp")).toContainText("月");
-  await expect(page.locator('#axes .agrp [data-asub="month"]')).toHaveValue("売上シートの計上月(申込月ではない)");
+  await expect(page.locator('#axes .agrp [data-lib="month"] small')).toHaveText("売上シートの計上月(申込月ではない)");
   st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
   expect(st.groups.map((g: { name: string }) => g.name)).toEqual(["売上の情報"]);
   expect(st.axes.find((a: { id: string }) => a.id === "month")).toMatchObject({ group: st.groups[0].id, sub: "売上シートの計上月(申込月ではない)" });
-  // グループを消しても軸は残る
+  // グループを消してもカラムは残る
   page.once("dialog", (d) => d.accept());
   await page.locator("[data-gdel]").click();
   await expect(page.locator("#axes .agrp")).toHaveCount(0);
   await expect(page.locator('[data-asub="month"]')).toHaveValue("売上シートの計上月(申込月ではない)");
+  // カラムを登録し、同義をつなぐ・外す
+  await page.locator("#libNew").click();
+  await page.locator("#lnName").fill("申込日");
+  await page.locator("#lnSub").fill("申込フォームの申込日");
+  await page.locator("#lnGo").click();
+  await expect(page.locator("#libHead h2")).toHaveText("申込日");
+  await page.locator("#dFrom").fill("申込年月日");
+  await page.locator("#dAdd").click();
+  await expect(page.locator("#libSyn .sc2")).toHaveCount(1);
+  await expect(page.locator("#axes .li.on .cnt")).toHaveText("同義 1");
+  await page.locator("#libQ").fill("申込年月");
+  await expect(page.locator("#axes .li")).toHaveCount(1);
+  await page.locator("#libSyn [data-dd]").click();
+  await expect(page.locator("#libSyn .sc2")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+// 見本なし: Compose › Create でキューブ・箱・シートを1つずつ作る(シートは列を軸に照らして承認)
+test("見本なし: Create でキューブ・箱・シートを作る", async ({ page }) => {
+  await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator('.nv[data-go="create"]').click();
+  await expect(page.locator("#crumb")).toHaveText("Compose › Create");
+  // シートはキューブがないと作れない
+  await page.locator('[data-mk="sheet"]').click();
+  await expect(page.locator("#mkForm")).toContainText("先にキューブを作ってください");
+  // 箱
+  await page.locator('[data-mk="box"]').click();
+  await page.locator("#mkName").fill("法人A");
+  await page.locator("#mkUnit").fill("法人");
+  await page.locator("#mkGo").click();
+  // キューブ: 3軸を選ばないと作れない
+  await page.locator('[data-mk="cube"]').click();
+  await page.locator("#mkName").fill("S-01 楽天店");
+  await page.locator("#mkIn").selectOption({ label: "箱 法人A" });
+  await page.locator("#mkGo").click();
+  await expect(page.locator("#note")).toContainText("3軸を3つとも選んでください");
+  await page.locator('[data-mka="0"]').selectOption("month");
+  await page.locator('[data-mka="1"]').selectOption("mall");
+  await page.locator('[data-mka="2"]').selectOption("item");
+  await page.locator("#mkGo").click();
+  let st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  const a = st.boxes.find((b: { name: string }) => b.name === "法人A"), c = st.boxes.find((b: { name: string }) => b.name === "S-01 楽天店");
+  expect(a).toMatchObject({ kind: "box", levelName: "法人", parent: null });
+  expect(c).toMatchObject({ kind: "cube", axes: ["month", "mall", "item"], parent: a.id });
+  // シート: 列を入れると Import で軸を照らして承認する
+  await page.locator('[data-mk="sheet"]').click();
+  await page.locator("#mkName").fill("楽天の売上");
+  await page.locator("#mkCols").fill("年月, モール名, 売上金額");
+  await expect(page.locator("#mkChips span")).toHaveCount(3);
+  await page.locator("#mkGo").click();
+  await expect(page.locator("#crumb")).toHaveText("Compose › Import");
+  await expect(page.locator("#matchSec")).toBeVisible();
+  await expect(page.locator("#matches .match")).toHaveCount(3);
+  await page.locator("#approve").click();
+  st = await page.evaluate(() => JSON.parse(localStorage.getItem("axis-boxes-v2") || "{}"));
+  expect(st.sheets.map((x: { name: string; cube: string; rows: unknown[] }) => [x.name, x.cube, x.rows.length])).toEqual([["楽天の売上", c.id, 0]]);
   expect(errors).toEqual([]);
 });
