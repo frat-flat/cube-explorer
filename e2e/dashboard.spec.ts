@@ -845,5 +845,10 @@ test("見本なし: 同じ単位のBoxを入れ子にしても World に出る",
   await page.locator('.nv[data-go="world"]').click();
   await page.waitForTimeout(800);
   await expect(page.locator("#gizmo text").first()).toBeVisible();
+  // 引いたり寄ったりしても止まらない(遠いと中身は数だけ、近いと中身が出る)
+  await page.locator("#stage canvas").hover();
+  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 400);
+  for (let i = 0; i < 10; i++) await page.mouse.wheel(0, -400);
+  await page.waitForTimeout(300);
   expect(errors).toEqual([]);
 });

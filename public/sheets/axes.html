@@ -1833,7 +1833,7 @@ let sizeOfUnit = () => 10;
 const boxLocked = () => S.boxes.some(b => b.kind === 'box' && b.pin);
 scene.add(new THREE.AmbientLight(0xffffff, .85)); const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(4, 9, 6); scene.add(sun);
 let world = new THREE.Group(); scene.add(world);
-let hits = [], groups = [], sel = null, fitted = 0;
+let hits = [], groups = [], lods = [], tags = [], sel = null, fitted = 0;
 const ROLL = Math.PI / 2;
 // 固定: 固定したBox・Cubeは画面(カメラ)に対して同じ向きを保つ。同じ目を正面にそろえれば X軸どうしが横に並ぶ
 // 面はサイコロの目で呼ぶ: ①正面 ②上 ③右 ④左 ⑤下 ⑥背面(向かい合う目の和は7)。h=横の軸、v=縦の軸(Cubeの軸 0=X,1=Y,2=Z)
@@ -2083,7 +2083,7 @@ function contentsOf(b, mode = showOf(levelOf(b))) {
 }
 // 同じ単位のBoxは同じ大きさ(その段でいちばん大きいBoxに合わせる)
 function paint() {
-  scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = []; uprights = [];
+  scene.remove(world); world = new THREE.Group(); scene.add(world); hits = []; groups = []; lods = []; tags = []; uprights = [];
   if (layoutMode()) { paintLayout(); return; }
   if (calCubeMode()) { paintCal3D(); return; }
   const memo = {}, allFacts = facts();
@@ -2094,7 +2094,9 @@ function paint() {
     return { items, k, slot, size: k * slot + .3 };
   };
   // 同じ単位のBoxが入れ子になっていても止まらないよう、計算中は仮の大きさを置く。数にならなければ1マスの大きさ
-  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) { memo[L] = cubeSlot; const v = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); memo[L] = Number.isFinite(v) ? v : cubeSlot; } return memo[L]; };
+  // 同じ単位で同じ深さのBoxは同じ大きさ。同じ単位のBoxを入れ子にしたときは、中のBoxが外より小さくなるよう深さごとに分ける
+  const depthOf = b => { let d = 0, p = b.parent; const seen = new Set(); while (p && box(p) && !seen.has(p)) { seen.add(p); d++; p = box(p).parent; } return d; };
+  const sizeOf = b => { const L = levelOf(b), D = depthOf(b), key = L + '\u0001' + D; if (memo[key] == null) { memo[key] = cubeSlot; const v = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L && depthOf(x) === D).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); memo[key] = Number.isFinite(v) ? v : cubeSlot; } return memo[key]; };
   sizeOfUnit = sizeOf;
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
@@ -2110,7 +2112,7 @@ function paint() {
       if (frame) bg.add(edges(W, W, W, new THREE.Color(c1), false, .22));
     } else if (frame) {
       bg.add(edges(W, W, W, new THREE.Color(css('--box')), true));
-      const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
+      const lb = textSprite(unitOf(b) + ' ' + b.name + (b.pin ? '(固定・中は' + faceOf(b.pin.face).name + ')' : ''), css(b.pin ? '--hl' : '--box'), top ? .42 : .32); tags.push({ s: lb, g: bg, W, w0: lb.scale.x, h0: lb.scale.y }); lb.position.set(0, W / 2 + .35, 0); bg.add(lb);
     }
     if (showOf(levelOf(b)) === 'count' && ex) return;
     if (showOf(levelOf(b)) === 'count') {
@@ -2118,15 +2120,20 @@ function paint() {
       const t = textSprite([nb ? `Box ${nb}` : '', `Cube ${nc}`, `Sheet ${ns}`].filter(Boolean).join('・'), css('--muted'), .6); bg.add(t);
       return;
     }
-    if (!lay.items.length && !ex) { const NONE = { box: '中にBoxはありません', cube: '中にCubeはありません', sheet: '中にSheetはありません' }[showOf(levelOf(b))] || '空です'; bg.add(textSprite(NONE, css('--muted'), .5)); }
+    // 中身は inner に入れ、離れて小さく見えるときは中身の代わりに数だけ出す(拡大・縮小で見える細かさを変える)
+    const inner = new THREE.Group(); bg.add(inner);
+    if (lay.items.length && !ex) { const nb = childBoxes(b).length, nc = descCubes(b).length, ns = S.sheets.filter(x => x.cube === b.id || descCubes(b).some(c => c.id === x.cube)).length;
+      const sum = textSprite([nb ? `Box ${nb}` : '', nc ? `Cube ${nc}` : '', ns ? `Sheet ${ns}` : ''].filter(Boolean).join('・') || '空です', css('--muted'), Math.max(.5, W * .08)); sum.visible = false; bg.add(sum); tags.push({ s: sum, g: bg, W, w0: sum.scale.x, h0: sum.scale.y });
+      lods.push({ g: bg, inner, sum, W }); }
+    if (!lay.items.length && !ex) { const NONE = { box: '中にBoxはありません', cube: '中にCubeはありません', sheet: '中にSheetはありません' }[showOf(levelOf(b))] || '空です'; inner.add(textSprite(NONE, css('--muted'), .5)); }
     lay.items.forEach((it, k) => {
       const K = lay.k, h = (K - 1) / 2, ix = k % K, iy = Math.floor(k / K) % K, iz = Math.floor(k / (K * K)), p = [(ix - h) * lay.slot, (h - iy) * lay.slot, (h - iz) * lay.slot];
       if (it.sheets) it.sheets.forEach((sh, i) => {   // Boxにじかに入れたSheet(店舗をまたぐSheetなど)
         const m = new THREE.Mesh(new THREE.PlaneGeometry(cubeW * .78, cubeW * .6), ex ? exhibitMat(.85) : new THREE.MeshBasicMaterial({ map: sheetTex(sh, used.has(sh.id)), side: THREE.DoubleSide }));
-        m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); bg.add(m);
+        m.position.set(p[0], p[1], (it.sheets.length - 1) / 2 * .55 - i * .55); inner.add(m);
       });
-      else if (it.u.kind === 'box') drawBox(it.u, bg, p, false);
-      else drawCube(it.u, bg, p, showOf(levelOf(b)) === 'sheet');
+      else if (it.u.kind === 'box') drawBox(it.u, inner, p, false);
+      else drawCube(it.u, inner, p, showOf(levelOf(b)) === 'sheet');
     });
   };
   const drawCube = (c, bg, pos, showSheets) => {
@@ -2165,29 +2172,36 @@ function paint() {
   // いちばん上に置いたBoxとCube(Sheetを入れるために作ったCubeは、Boxに入れなければいちばん上にある)
   const tops = S.boxes.filter(b => !b.parent && (b.kind === 'box' || b.kind === 'cube')), gap = 1.2;
   const topW = b => b.kind === 'cube' ? cubeW : sizeOf(b);
-  const total = tops.reduce((a, b) => a + topW(b), 0) + gap * (tops.length - 1);
+  // いちばん上のものは、少なければ横1列。多いときは横長のマス目(左上から X+ → Y− の順)にして、全体を1画面に収める
+  const n = tops.length, cell = Math.max(1, ...tops.map(topW)) + gap, cols = n <= 6 ? Math.max(1, n) : Math.ceil(Math.sqrt(n * 2)), rows = Math.ceil(n / cols);
+  const total = n <= 6 ? tops.reduce((a, b) => a + topW(b), 0) + gap * (n - 1) : cols * cell - gap, high = rows * cell - gap;
   let x0 = -total / 2;
-  for (const b of tops) { const W = topW(b); if (b.kind === 'cube') drawCube(b, world, [x0 + W / 2, 0, 0], false); else drawBox(b, world, [x0 + W / 2, 0, 0], true); x0 += W + gap; }
+  tops.forEach((b, i) => { const W = topW(b), pos = n <= 6 ? [x0 + W / 2, 0, 0] : [(i % cols - (cols - 1) / 2) * cell, ((rows - 1) / 2 - Math.floor(i / cols)) * cell, 0]; x0 += W + gap;
+    if (b.kind === 'cube') drawCube(b, world, pos, false); else drawBox(b, world, pos, true); });
   // 全体の大きさが変わったときだけ、全体が入る距離に引く(ふだんのズームは触らない)
-  const span = Math.max(total, ...tops.map(topW));
+  const span = Math.max(total, high * 1.8, ...tops.map(topW));
   setHome();
-  extent = { span, bottom: -Math.max(1, ...tops.map(topW)) / 2 - .2 }; placeEnv(); renderWorldUi();
-  if (fitted !== span) { fitted = span; cam.dist = Math.min(envLimit, fitDist(span)); }
+  extent = { span, bottom: -Math.max(high, ...tops.map(topW), 1) / 2 - .2 }; placeEnv(); renderWorldUi();
+  // 選んだものが入っているBoxは、離れていても中を開いておく
+  const su = selUnits(); groups.filter(x => su.includes(x.u)).forEach(x => { for (let p = x.g.parent; p; p = p.parent) { const L = lods.find(l => l.inner === p); if (L) L.keep = true; } });
+  if (!env || entered) { persp.far = Math.max(200, maxDist() * 3); persp.updateProjectionMatrix(); }
+  if (fitted !== span) { fitted = span; cam.dist = Math.min(maxDist(), fitDist(span)); }
 }
 function resetCam() {
   console.warn('視点を戻しました', JSON.stringify({ cam, tgt, tgtGoal, homeC, span: extent && extent.span }));
   const ok = v => [v.x, v.y, v.z].every(Number.isFinite);
   if (!ok(homeC)) homeC.set(0, 0, 0);
   tgtGoal.copy(homeC); tgt.copy(homeC); cam.th = .45; cam.ph = .34;
-  cam.dist = Math.min(Number.isFinite(envLimit) ? envLimit : 120, fitDist(extent && Number.isFinite(extent.span) ? extent.span : 8)); fitted = 0;
+  cam.dist = Math.min(Number.isFinite(envLimit) ? maxDist() : 120, fitDist(extent && Number.isFinite(extent.span) ? extent.span : 8)); fitted = 0;
 }
+const shown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
 function resize() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); }
 let drag = null;
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 // 押した所のBox・Cube。Cubeを優先する
 function unitAt(e) {
   const r = renderer.domElement.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-  ray.setFromCamera(ndc, camera); const hs = ray.intersectObjects(hits).map(h => box(h.object.userData.unit));
+  ray.setFromCamera(ndc, camera); const hs = ray.intersectObjects(hits.filter(shown)).map(h => box(h.object.userData.unit));
   return hs.find(u => u.kind === 'cube') || hs[0] || null;
 }
 renderer.domElement.addEventListener('pointerdown', e => { const u = unitAt(e); drag = { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, u, rot: u && u.pin && u.kind === 'cube' ? u : null }; renderer.domElement.setPointerCapture(e.pointerId); });
@@ -2205,7 +2219,7 @@ renderer.domElement.addEventListener('pointerup', () => {
   drag = null;
 });
 renderer.domElement.addEventListener('dblclick', e => { const u = unitAt(e); if (u && (exhibit() || calCubeMode() || layoutMode())) { enterUnit(u); return; } if (u && u.pin && u.kind === 'cube') { u.pin = { ...pinTo(u.pin.face), byBox: u.pin.byBox }; save(); } });
-renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); cam.dist = Math.max(3, Math.min(maxDist(), cam.dist * (1 + e.deltaY * .001))); }, { passive: false });
 function loop() {
   // 固定するときは必ずどこかの面を正面にする。Boxは必ず正面(①の側)をこちらに向けて止め、ドラッグでは角度を変えない。
   // 遠近はそのままなので、Boxの奥行き(中の壁)とCubeの立体感は残る。Cubeは選んだ目を正面に向ける
@@ -2239,6 +2253,12 @@ function loop() {
     pinQ.setFromEuler(pinE.set(u.pin.pitch, u.pin.yaw, u.pin.roll || 0, 'ZXY'));
     parentG.getWorldQuaternion(invQ); g.quaternion.copy(invQ.invert()).multiply(camera.quaternion).multiply(pinQ);
   }
+  // 画面の上で小さく見えるBoxは中身を隠して数だけ出す。近づくと中身(その中のBox・Cube)が出てくる
+  if (lods.length) { const f = stage.clientHeight / (2 * Math.tan(persp.fov * Math.PI / 360)), wp = new THREE.Vector3();
+    for (const L of lods) { const px = L.W / Math.max(.1, camera.position.distanceTo(L.g.getWorldPosition(wp))) * f, open = px > 160 || !!L.keep; L.inner.visible = open; L.sum.visible = !open; } }
+  // Boxの名前と数は、離れても読める大きさ(14px)より小さくしない。Boxより横に長くなるほど離れたら隠す
+  if (tags.length) { const f = stage.clientHeight / (2 * Math.tan(persp.fov * Math.PI / 360)), wp = new THREE.Vector3();
+    for (const T of tags) { const d = Math.max(.1, camera.position.distanceTo(T.g.getWorldPosition(wp))), k = Math.max(1, 14 / (T.h0 / d * f)); T.s.scale.set(T.w0 * k, T.h0 * k, 1); T.s.material.opacity = T.w0 * k > T.W * 1.15 ? 0 : 1; } }
   keepUpright();
   if (env && !entered && !layoutMode()) occlude();
   stepLife();
@@ -2373,7 +2393,9 @@ function exhibitMat(op) {
   return new THREE.MeshStandardMaterial({ color: new THREE.Color(c0), roughness: .35, metalness: .15, emissive: new THREE.Color(glow ? c1 : '#000000'), emissiveIntensity: glow ? .45 : 0, transparent: op < 1, opacity: op, side: THREE.DoubleSide });
 }
 function bare() { scene.background = null; scene.fog = null; envLimit = 120; persp.far = 200; persp.updateProjectionMatrix(); renderer.outputEncoding = THREE.LinearEncoding; }
-function fitDist(span) { return Math.max(12, Math.min(120, span * 1.25 + 6)); }
+function fitDist(span) { return Math.max(12, span * 1.25 + 6); }
+// どこまで引けるか。いちばん上のBox・Cubeが全部入る距離より少し先まで(世界の中では、その世界の広さまで)
+const maxDist = () => env && !entered ? envLimit : Math.max(envLimit, fitDist(extent.span) * 1.6);
 function worldMsg(t) { $('worldMsg').textContent = t || ''; $('worldMsg').hidden = !t; }
 function setWorld(name) {
   if (!WORLDS[name]) name = 'none';
@@ -2439,7 +2461,7 @@ function enterUnit(u) {
 }
 function leaveUnit() {
   entered = null; focused = sel; tgtGoal.copy(homeC);
-  renderTree(); paint(); renderPinBar(); cam.dist = Math.min(envLimit, fitDist(extent.span));
+  renderTree(); paint(); renderPinBar(); cam.dist = Math.min(maxDist(), fitDist(extent.span));
 }
 function findUnit(q) {
   const t = q.trim().toLowerCase(); if (!t) return selUnits()[0] || null;
@@ -2732,7 +2754,7 @@ function axisScale(f, items, len) {
   const cats = [...new Set(vals.map(String))], c = (cats.length - 1) / 2;
   return { pos: u => has(val(u)) ? (cats.indexOf(String(val(u))) - c) * 3 : null, ticks: cats.map((t, i) => [(i - c) * 3, t]), half: Math.max(c, cats.length - 1 - c) * 3 };
 }
-function fitLayout() { if (fitted !== extent.span) { fitted = extent.span; cam.dist = Math.min(envLimit, fitDist(extent.span)); } }
+function fitLayout() { if (fitted !== extent.span) { fitted = extent.span; cam.dist = Math.min(maxDist(), fitDist(extent.span)); } }
 let layoutInfo = { f: null, n: 0, miss: 0 };
 function layoutPanel() {
   const fs = fieldsFor(wmode), tops = S.boxes.filter(b => !b.parent);
@@ -2951,7 +2973,7 @@ $('selUnit').onchange = e => { const id = e.target.value || null; sel = id; if (
 document.querySelectorAll('#gizmo [data-mv]').forEach(b => b.onclick = () => {
   const k = b.dataset.mv, step = Math.max(.6, cam.dist * .12);
   if (k === 'home') { tgtGoal.copy(homeC); fitted = 0; focused = sel = null; renderTree(); paint(); renderPinBar(); return; }
-  if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(envLimit, cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
+  if (k.startsWith('zoom')) { cam.dist = Math.max(3, Math.min(maxDist(), cam.dist * (k === 'zoom1' ? 1.25 : .8))); return; }
   tgtGoal[k[0]] += step * +k.slice(1);
 });
 $('unpinAll').onclick = () => { units().forEach(unpin); refreshPins(); };
