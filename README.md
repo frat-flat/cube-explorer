@@ -1,6 +1,6 @@
 # cube-explorer(4D Base)
 
-シートの列を軸の辞書に照らして登録し、箱(法人などの入れ物)とキューブ(3軸が決まった店舗など)をまたいで1枚のシートにまとめるためのアプリです。設計は [DESIGN.md](./DESIGN.md) を参照してください。
+シートの列を軸の辞書に照らして登録し、箱(法人などの入れ物)とキューブ(3軸が決まった店舗など)をまたいで1枚のシートにまとめるためのアプリです。仕様は [docs/4db/](./docs/4db/DECISIONS.md)、この環境の決まりは [docs/deployment/](./docs/deployment/ENVIRONMENT.md) を参照してください([DESIGN.md](./DESIGN.md) は旧設計と決定記録です)。
 
 入口(`/`)は 4D Base のダッシュボード(`public/sheets/axes.html`)です。データはブラウザに保存し、Supabase の設定があればログインした人ごとに Supabase にも保存します。
 
