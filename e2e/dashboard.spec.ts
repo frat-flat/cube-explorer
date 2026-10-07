@@ -830,7 +830,7 @@ test("見本なし: 同じ単位のBoxを入れ子にしても World に出る",
     await page.locator("#uMake").click();
     await expect(page.locator("#unitSec")).toBeHidden();
   };
-  await rowsToBoxes("法人一覧", "法人名\n法人A\n法人B");
+  await rowsToBoxes("法人一覧", "法人名\n法人A\n法人B\n" + Array.from({ length: 40 }, (_, i) => `取引先${i}`).join("\n"));
   await page.locator('.nv[data-go="import"]').click();
   await page.locator("#newName").fill("支店");
   await page.locator("#newData").fill("法人名\n法人A 支店");
@@ -845,6 +845,8 @@ test("見本なし: 同じ単位のBoxを入れ子にしても World に出る",
   await page.locator('.nv[data-go="world"]').click();
   await page.waitForTimeout(800);
   await expect(page.locator("#gizmo text").first()).toBeVisible();
+  // Box が多くても、画面が横にはみ出さない(固定の選択肢が長くなっていた)
+  expect(await page.locator(".content").evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
   // 引いたり寄ったりしても止まらない(遠いと中身は数だけ、近いと中身が出る)
   await page.locator("#stage canvas").hover();
   for (let i = 0; i < 10; i++) await page.mouse.wheel(0, 400);
