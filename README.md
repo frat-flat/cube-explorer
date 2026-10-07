@@ -1,8 +1,8 @@
-# cube-explorer(軸の辞書と箱)
+# cube-explorer(Axiom)
 
 シートの列を軸の辞書に照らして登録し、箱(法人などの入れ物)とキューブ(3軸が決まった店舗など)をまたいで1枚のシートにまとめるためのアプリです。設計は [DESIGN.md](./DESIGN.md) を参照してください。
 
-入口(`/`)は「軸の辞書と箱」のダッシュボード(`public/sheets/axes.html`)です。データはブラウザに保存し、Supabase の設定があればログインした人ごとに Supabase にも保存します。
+入口(`/`)は Axiom のダッシュボード(`public/sheets/axes.html`)です。データはブラウザに保存し、Supabase の設定があればログインした人ごとに Supabase にも保存します。
 
 ## 必要なもの
 
