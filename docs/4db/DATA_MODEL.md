@@ -1,6 +1,6 @@
 # 4D Base データモデル(Canonical Data Model)
 
-Status: 案(ユーザーの承認待ち)
+Status: 承認済み(2026-10-08 ユーザー承認。D-007)
 Date: 2026-10-08
 位置づけ: [DECISIONS.md](./DECISIONS.md) D-003 の「1. 芯の境界と Canonical Data Model」。表の定義は [0001_core.sql](../../src/fourdb/adapters/postgres/migrations/0001_core.sql)(元に戻すときは [0001_core.down.sql](../../src/fourdb/adapters/postgres/migrations/0001_core.down.sql))。
 
