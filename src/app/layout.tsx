@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Cube Explorer",
+  title: "4D Base",
+  icons: { icon: "/icon.svg" },
   description: "既存のRDBを立体的(多軸)に閲覧・探索する",
 };
 
