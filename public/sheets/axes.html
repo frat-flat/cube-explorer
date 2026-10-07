@@ -2094,7 +2094,9 @@ function paint() {
     return { items, k, slot, size: k * slot + .3 };
   };
   // 同じ単位のBoxが入れ子になっていても止まらないよう、計算中は仮の大きさを置く。数にならなければ1マスの大きさ
-  const sizeOf = b => { const L = levelOf(b); if (memo[L] == null) { memo[L] = cubeSlot; const v = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); memo[L] = Number.isFinite(v) ? v : cubeSlot; } return memo[L]; };
+  // 同じ単位で同じ深さのBoxは同じ大きさ。同じ単位のBoxを入れ子にしたときは、中のBoxが外より小さくなるよう深さごとに分ける
+  const depthOf = b => { let d = 0, p = b.parent; const seen = new Set(); while (p && box(p) && !seen.has(p)) { seen.add(p); d++; p = box(p).parent; } return d; };
+  const sizeOf = b => { const L = levelOf(b), D = depthOf(b), key = L + '\u0001' + D; if (memo[key] == null) { memo[key] = cubeSlot; const v = Math.max(...S.boxes.filter(x => x.kind === 'box' && levelOf(x) === L && depthOf(x) === D).flatMap(x => SHOW.map(([m]) => natural(x, m).size))); memo[key] = Number.isFinite(v) ? v : cubeSlot; } return memo[key]; };
   sizeOfUnit = sizeOf;
   const drawBox = (b, parent, pos, top) => {
     const W = sizeOf(b), lay = natural(b);
