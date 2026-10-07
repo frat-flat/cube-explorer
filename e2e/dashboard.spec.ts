@@ -15,12 +15,12 @@ const AXES = [
 const seedAxes = (page: import("@playwright/test").Page) =>
   page.addInitScript((a) => { if (!localStorage.getItem("axis-boxes-v2")) localStorage.setItem("axis-boxes-v2", JSON.stringify({ axes: a, boxes: [], sheets: [], saved: [], dict: [], history: [], nextMonth: 10, sampleV: 5 })); }, AXES);
 
-// 入口(/)でAxiom のダッシュボードが開き、メニューで画面を切り替えられる
+// 入口(/)で4D Base のダッシュボードが開き、メニューで画面を切り替えられる
 test("入口でダッシュボードが開き、画面を切り替えられる", async ({ page }) => {
   // three.js は CDN ではなく手元のものを使う(ネットにつながらない所でも動くように)
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   await page.goto("/");
-  await expect(page).toHaveTitle("Axiom");
+  await expect(page).toHaveTitle("4D Base");
   await expect(page.locator("#crumb")).toHaveText("ホーム");
   await page.locator('.nv[data-go="import"]').click();
   await expect(page.locator("#crumb")).toHaveText("Compose › Import");
