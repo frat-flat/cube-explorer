@@ -22,6 +22,8 @@ export type ReconcileResult = {
 type Col = { id: string; col_index: number; header: string; role: string; detail: { sums?: number[] | null } | null };
 
 const rowLabel = (key: string, index: number) => (key.startsWith("#") ? `${index + 1} 行目` : `${index + 1} 行目(${key})`);
+/** 合計の行の見出し(合計の行だと分かるように) */
+const aggregateRowLabel = (index: number) => `${index + 1} 行目(合計の行)`;
 
 /** つながった・重なった範囲をまとめる */
 function mergeRanges(list: [number, number][]): [number, number][] {
@@ -135,7 +137,7 @@ export async function reconcile(tx: Tx, sheetId: string): Promise<ReconcileResul
        group by rg.item`;
     for (const r of res) sums.set(r.item, Number(r.computed));
   }
-  const rows: ReconcileGroup[] = aggRows.map((ar) => ({ label: rowLabel(ar.row_key, ar.row_index), checked: 0, matched: 0, mismatches: [] }));
+  const rows: ReconcileGroup[] = aggRows.map((ar) => ({ label: aggregateRowLabel(ar.row_index), checked: 0, matched: 0, mismatches: [] }));
   const groupOf = new Map(aggRows.map((ar, i) => [Number(ar.id), rows[i]]));
   items.forEach((it, i) => {
     const g = groupOf.get(it.record)!;

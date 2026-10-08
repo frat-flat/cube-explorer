@@ -25,6 +25,8 @@ test.describe("スプシから 4D Base へ移す", () => {
     await page.getByLabel("スプシのリンク").fill(`https://docs.google.com/spreadsheets/d/${id}/edit`);
     await page.getByRole("button", { name: "読み取る" }).click();
     await expect(page.getByText("「店舗別売上(試験用)」を読み取りました")).toBeVisible();
+    // タブの一覧はスプシごとにまとまる(見出しにスプシの名前)
+    await expect(page.getByText("スプシ「店舗別売上(試験用)」").first()).toBeVisible();
 
     const row = page.getByRole("row").filter({ hasText: "2026年度" }).filter({ hasText: "7 行 × 13 列" }).first();
     await row.getByRole("button", { name: "取り込む" }).click();
@@ -47,6 +49,7 @@ test.describe("スプシから 4D Base へ移す", () => {
     await expect(page.getByRole("heading", { name: "反映しました" })).toBeVisible();
     await expect(page.getByText("スプシの合計 19 個のうち 19 個が、4D Base が元の値から計算した合計と一致しました")).toBeVisible();
     await expect(row.getByText("取り込み済み(移行中)")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "7 行目(合計の行)" })).toBeVisible();
 
     // 読み直し: 合計の列(Q1計)を数値の列にすると、合計の関数のセルは値にせず知らせる(二重に数えない)
     await row.getByRole("button", { name: "読み直す" }).click();

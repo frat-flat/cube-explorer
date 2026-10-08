@@ -1,7 +1,7 @@
 "use client";
 
 // スプシから 4D Base へ移す画面。リンクを読む → タブを選んで全行を読む(Saving)→ 候補を直して承認 → 反映 → 照合
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { SheetProposal } from "@/fourdb/core/import/analyze";
 import type { ApprovalSpec, ColumnApproval } from "@/fourdb/core/import/plan";
 import type { SourceCell } from "@/fourdb/core/import/types";
@@ -20,6 +20,17 @@ const ROLES: [Role, string][] = [
 ];
 const roleName = (r: Role) => ROLES.find(([k]) => k === r)?.[1] ?? r;
 const fmt = (n: number) => n.toLocaleString("ja-JP");
+
+/** タブの一覧をスプシごとにまとめる(並びは保つ。新しく読んだスプシが上) */
+function byBook(sheets: SheetSummary[]): { book: SheetSummary["book"]; tabs: SheetSummary[] }[] {
+  const out: { book: SheetSummary["book"]; tabs: SheetSummary[] }[] = [];
+  for (const x of sheets) {
+    const g = out.find((o) => o.book.id === x.book.id);
+    if (g) g.tabs.push(x);
+    else out.push({ book: x.book, tabs: [x] });
+  }
+  return out;
+}
 
 async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const res = await fetch(path, {
@@ -191,9 +202,16 @@ export function Migrate() {
             <table className={s.table}>
               <thead><tr><th>タブ</th><th className={s.num}>大きさ</th><th>状態</th><th className={s.num}>4D Base の行</th><th /></tr></thead>
               <tbody>
-                {sheets.map((x) => (
+                {byBook(sheets).map(({ book, tabs }) => (
+                  <Fragment key={book.id}>
+                    <tr className={s.bookRow}>
+                      <th colSpan={5}>
+                        スプシ「{book.title}」{book.url && <> <a href={book.url} target="_blank" rel="noopener noreferrer">元のスプシを開く</a></>}
+                      </th>
+                    </tr>
+                {tabs.map((x) => (
                   <tr key={x.id}>
-                    <td>{x.title}</td>
+                    <td className={s.tabCell}>{x.title}</td>
                     <td className={s.num}>{x.rowCount === null ? "—" : `${fmt(x.rowCount)} 行 × ${fmt(x.colCount ?? 0)} 列`}</td>
                     <td>{x.migrationStatus === "migrated" ? "移行完了" : x.lastRun ? ({ reading: "読み取り中", staged: "承認待ち", applying: "反映の途中", applied: "取り込み済み(移行中)", failed: "失敗", cancelled: "取りやめ" } as Record<string, string>)[x.lastRun.status] ?? x.lastRun.status : "まだ"}</td>
                     <td className={s.num}>{fmt(x.records)}</td>
@@ -205,6 +223,8 @@ export function Migrate() {
                       </div>
                     </td>
                   </tr>
+                ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

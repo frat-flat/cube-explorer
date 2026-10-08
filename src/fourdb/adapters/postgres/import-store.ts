@@ -21,6 +21,8 @@ export type SheetSummary = {
   migrationStatus: "migrating" | "migrated";
   records: number;
   lastRun: { id: string; status: string; rowsRead: number; startedAt: string } | null;
+  /** どのスプシのタブか(一覧をスプシごとにまとめる) */
+  book: { id: string; title: string; url: string | null };
 };
 
 type RunCursor = { next: number; total: number; cols: number; done: boolean; apply?: { next: number; done: boolean } };
@@ -48,8 +50,8 @@ export async function registerBook(tx: Tx, book: SourceBook): Promise<SheetSumma
     returning id`;
   for (const t of book.tabs) {
     await tx`
-      insert into fourdb.source_sheet (workspace_id, container_id, external_id, title, source_row_count, source_col_count)
-      values (fourdb.current_workspace_id(), ${container.id}, ${t.externalId}, ${t.title}, ${t.rowCount}, ${t.colCount})
+      insert into fourdb.source_sheet (workspace_id, container_id, external_id, title, source_row_count, source_col_count, created_at)
+      values (fourdb.current_workspace_id(), ${container.id}, ${t.externalId}, ${t.title}, ${t.rowCount}, ${t.colCount}, clock_timestamp())
       on conflict (container_id, external_id) where external_id is not null and deleted_at is null
       do update set title = excluded.title, source_row_count = excluded.source_row_count, source_col_count = excluded.source_col_count, updated_at = now()`;
   }
@@ -60,8 +62,9 @@ export async function listSheets(tx: Tx, containerId?: string): Promise<SheetSum
   const rows = await tx<{
     id: string; title: string; source_row_count: number | null; source_col_count: number | null; migration_status: "migrating" | "migrated";
     records: string; run_id: string | null; run_status: string | null; rows_read: number | null; started_at: Date | null; external_id: string | null; container_id: string;
+    book_title: string; book_url: string | null;
   }[]>`
-    select s.id, s.title, s.source_row_count, s.source_col_count, s.migration_status, s.external_id, s.container_id,
+    select s.id, s.title, s.source_row_count, s.source_col_count, s.migration_status, s.external_id, s.container_id, sc.title as book_title, sc.url as book_url,
            (select count(*) from fourdb.record r where r.sheet_id = s.id and r.system_to is null) as records,
            lr.id as run_id, lr.status as run_status, lr.rows_read, lr.started_at
       from fourdb.source_sheet s
@@ -77,6 +80,7 @@ export async function listSheets(tx: Tx, containerId?: string): Promise<SheetSum
     migrationStatus: r.migration_status,
     records: Number(r.records),
     lastRun: r.run_id ? { id: r.run_id, status: r.run_status!, rowsRead: r.rows_read ?? 0, startedAt: r.started_at!.toISOString() } : null,
+    book: { id: r.container_id, title: r.book_title, url: r.book_url },
   }));
 }
 

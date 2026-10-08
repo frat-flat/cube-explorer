@@ -145,6 +145,22 @@
   font-variant-numeric: tabular-nums;
 }
 
+.bookRow th {
+  position: static;
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.bookRow a {
+  font-weight: 400;
+  margin-left: 8px;
+  color: var(--accent);
+}
+
+.tabCell {
+  padding-left: 20px !important;
+}
+
 .headerRow td {
   font-weight: 700;
   background: var(--accent-soft);
