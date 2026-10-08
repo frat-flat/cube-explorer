@@ -25,7 +25,7 @@ export function isLocalDatabase(url: string): boolean {
 
 export function db(): Sql {
   const url = process.env.FOURDB_DATABASE_URL;
-  if (!url) throw new FourdbUnavailable("4D Base のデータベースがまだ設定されていません(FOURDB_DATABASE_URL)");
+  if (!url) throw new FourdbUnavailable("4DB のデータベースがまだ設定されていません(FOURDB_DATABASE_URL)");
   pool ??= postgres(url, {
     prepare: false,          // 接続をまとめる仕組み(pooler)越しでも動くように
     max: 5,
@@ -49,10 +49,10 @@ export async function assertSafeRole(sql: Sql): Promise<void> {
                     where n.nspname = 'fourdb' and c.relkind in ('r', 'p') and not (c.relrowsecurity and c.relforcerowsecurity)) as unforced
       from pg_roles r where r.rolname = current_user`;
   if (!r || r.rolsuper || r.rolbypassrls || r.owns) {
-    throw new FourdbUnavailable("4D Base のデータベースに、行ごとの権限を飛ばせる役割(superuser・BYPASSRLS・表の持ち主)でつながっています。実行用の役割でつないでください");
+    throw new FourdbUnavailable("4DB のデータベースに、行ごとの権限を飛ばせる役割(superuser・BYPASSRLS・表の持ち主)でつながっています。実行用の役割でつないでください");
   }
   if (r.unforced) {
-    throw new FourdbUnavailable("4D Base のデータベースに、行ごとの権限(RLS)が強制になっていない表があります。表の作り替え(migrations)を確かめてください");
+    throw new FourdbUnavailable("4DB のデータベースに、行ごとの権限(RLS)が強制になっていない表があります。表の作り替え(migrations)を確かめてください");
   }
 }
 let roleChecked: Promise<void> | null = null;
