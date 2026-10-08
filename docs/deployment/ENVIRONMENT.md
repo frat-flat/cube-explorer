@@ -8,6 +8,7 @@ Synapse などへ組み込むときは、その組み込み先の分をこの文
 | 日付 | 決定 |
 |---|---|
 | 2026-10-08 | 使うのは当面ユーザー本人だけ。データはログインした人ごとに持ち、共有はあとから足せる形にする |
+| 2026-10-08 | 4D Base の表(fourdb)は Neon に置く。ログイン(Neon Auth)と同じプロジェクト・同じデータベース(neondb)。このプロジェクトのデータは膨大にならないので、Neon の範囲に収まる見込み |
 | 2026-10-08 | 本番に入っているデータは試しに触っただけで、消えてもよい。旧 `cube_workspaces`(1人1件の JSON)から新しい形への移行手順は作らない。実際に消すときは改めて確認する |
 
 ## 構成(2026-10-08 時点)
@@ -20,6 +21,15 @@ Synapse などへ組み込むときは、その組み込み先の分をこの文
 | スプシの読み取り | Google のサービスアカウント | 閲覧のみ(`spreadsheets.readonly`)。読ませたいスプシをこのアカウントに共有する |
 
 環境変数(名前だけ): `NEON_AUTH_BASE_URL`・`NEON_AUTH_COOKIE_SECRET`・`ALLOWED_EMAILS`・`SUPABASE_URL`・`SUPABASE_SECRET_KEY`・`GOOGLE_SERVICE_ACCOUNT_JSON`。
+
+## 4D Base の芯の表(fourdb)を Neon に用意する
+
+```bash
+# .env.local に FOURDB_ADMIN_URL(Neon の画面の「Connect」で出る neondb_owner の接続先)を入れてから
+npm run fourdb:setup-remote
+```
+
+表を作り、実行用の役割 `fourdb_app`(パスワードはランダム)を作って、その接続先を `.env.local` の `FOURDB_DATABASE_URL` に書く(値は画面に出さない)。公開(Vercel)するときは、同じ値を Vercel の環境変数 `FOURDB_DATABASE_URL` に入れる。
 
 ## 4D Base の芯の表(fourdb)につなぐときの決まり
 
