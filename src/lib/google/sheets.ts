@@ -46,7 +46,7 @@ export function spreadsheetId(urlOrId: string): string | null {
 
 const b64url = (b: Buffer | string) => Buffer.from(b).toString("base64url");
 
-async function accessToken(sa: ServiceAccount): Promise<string> {
+export async function accessToken(sa: ServiceAccount): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claim = b64url(JSON.stringify({ iss: sa.client_email, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 }));
@@ -60,7 +60,7 @@ async function accessToken(sa: ServiceAccount): Promise<string> {
   return ((await res.json()) as { access_token: string }).access_token;
 }
 
-async function get(token: string, url: string, email: string) {
+export async function get(token: string, url: string, email: string) {
   const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
   if (res.status === 403) throw new SheetsError(`このスプシは共有されていません。スプシの「共有」で ${email} を閲覧者として追加してください`, 403, "not_shared");
   if (res.status === 404) throw new SheetsError("スプシが見つかりません。リンクを確かめてください", 404, "not_found");
