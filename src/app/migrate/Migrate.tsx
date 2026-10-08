@@ -149,7 +149,7 @@ export function Migrate() {
       let r = await api<{ done: boolean; next: number; total: number; counts: { rows: number; values: number; totals: number; closedValues: number } }>(
         `/api/4db/runs/${runId}/apply`, { method: "POST", body: { spec: resume ? null : spec } });
       while (!r.done) {
-        setProgress({ done: r.next, total: r.total, label: "4D Base に書いています" });
+        setProgress({ done: r.next, total: r.total, label: "4DB に書いています" });
         r = await api(`/api/4db/runs/${runId}/apply`, { method: "POST", body: {} });
       }
       setApplied(r.counts);
@@ -169,13 +169,13 @@ export function Migrate() {
   return (
     <main className={s.page}>
       <div className={s.top}>
-        <h1>スプシから 4D Base へ移す</h1>
+        <h1>スプシから 4DB へ移す</h1>
         <a href="/sheet">取り込んだデータを表で見る</a>
         <a href="/">ダッシュボードへ戻る</a>
       </div>
       <p className={s.lead}>
         スプシのタブを全行読み、合計の行・列と、関数で計算された値を見分けます。候補を確かめて直してから反映します。
-        反映したあと、スプシの合計と、4D Base が元の値から計算した合計が合っているかを照合します。元のスプシは書き換えません。
+        反映したあと、スプシの合計と、4DB が元の値から計算した合計が合っているかを照合します。元のスプシは書き換えません。
       </p>
       {error && <p className={s.error} role="alert">{error}</p>}
       {progress && (
@@ -201,7 +201,7 @@ export function Migrate() {
         ) : (
           <div className={s.tableWrap}>
             <table className={s.table}>
-              <thead><tr><th>タブ</th><th className={s.num}>大きさ</th><th>状態</th><th className={s.num}>4D Base の行</th><th /></tr></thead>
+              <thead><tr><th>タブ</th><th className={s.num}>大きさ</th><th>状態</th><th className={s.num}>4DB の行</th><th /></tr></thead>
               <tbody>
                 {byBook(sheets).map(({ book, tabs }) => (
                   <Fragment key={book.id}>
@@ -431,7 +431,7 @@ function Approval(props: {
           <h3>知らせ</h3>
           <ul className={s.list}>
             {pr.warnings.map((w) => <li key={w}>{w}</li>)}
-            {pr.calculatedCellCount > 0 && <li>関数で計算された値が {fmt(pr.calculatedCellCount)} 個あります(先頭の行の分)。元の値とは区別して入れ、4D Base では直せません。例: {pr.calculatedCells.slice(0, 3).map((c) => `${colLetter(c.col)}${c.row + 1} ${c.formula}`).join("、")}</li>}
+            {pr.calculatedCellCount > 0 && <li>関数で計算された値が {fmt(pr.calculatedCellCount)} 個あります(先頭の行の分)。元の値とは区別して入れ、4DB では直せません。例: {pr.calculatedCells.slice(0, 3).map((c) => `${colLetter(c.col)}${c.row + 1} ${c.formula}`).join("、")}</li>}
           </ul>
         </>
       )}
@@ -459,7 +459,7 @@ function Approval(props: {
               <ul className={s.list}>{check.problems.map((x) => <li key={`${x.row}:${x.col}`}>{colLetter(x.col)}{x.row + 1}: {x.message}</li>)}</ul>
             </>
           )}
-          {check.errors.length === 0 && <p className={s.ok}>問題はありません。「この内容で反映する」で 4D Base に書きます。</p>}
+          {check.errors.length === 0 && <p className={s.ok}>問題はありません。「この内容で反映する」で 4DB に書きます。</p>}
         </div>
       )}
     </section>
@@ -474,13 +474,13 @@ function Reconcile({ r }: { r: ReconcileResult }) {
     <section className={s.card}>
       <h2>照合: 「{r.sheet.title}」</h2>
       <p className={ok ? s.ok : s.error}>
-        スプシの合計 {fmt(r.summary.checked)} 個のうち {fmt(r.summary.matched)} 個が、4D Base が元の値から計算した合計と一致しました。
+        スプシの合計 {fmt(r.summary.checked)} 個のうち {fmt(r.summary.matched)} 個が、4DB が元の値から計算した合計と一致しました。
         {!ok && " 合わないものは下のとおりです(スプシの関数の範囲がずれている、値で上書きされている、などが考えられます)。"}
       </p>
       {all.length === 0 ? <p className={s.muted}>合計の行・列がない表です。</p> : (
         <div className={s.tableWrap}>
           <table className={s.table}>
-            <thead><tr><th>合計</th><th className={s.num}>照合した数</th><th className={s.num}>一致</th><th>合わないもの(スプシ / 4D Base)</th></tr></thead>
+            <thead><tr><th>合計</th><th className={s.num}>照合した数</th><th className={s.num}>一致</th><th>合わないもの(スプシ / 4DB)</th></tr></thead>
             <tbody>
               {all.map((g) => (
                 <tr key={g.label}>

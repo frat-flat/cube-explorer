@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createAuthClient } from "@neondatabase/auth/next";
+import { LoginLogo } from "./LoginLogo";
 import styles from "./login.module.css";
 
 const authClient = createAuthClient();
@@ -41,7 +42,8 @@ export function LoginForm({ deniedEmail }: { deniedEmail?: string }) {
   if (deniedEmail) {
     return (
       <main className={styles.wrap}>
-        <h1 className={styles.title}>Cube Explorer</h1>
+        <h1 className={styles.title}>4DB</h1>
+        <LoginLogo />
         <p className={styles.error}>
           {deniedEmail} には閲覧の許可がありません。管理者に追加を依頼してください。
         </p>
@@ -54,7 +56,8 @@ export function LoginForm({ deniedEmail }: { deniedEmail?: string }) {
 
   return (
     <main className={styles.wrap}>
-      <h1 className={styles.title}>Cube Explorer</h1>
+      <h1 className={styles.title}>4DB</h1>
+      <LoginLogo />
       {step === "email" ? (
         <form onSubmit={sendCode} className={styles.form}>
           <label htmlFor="email">メールアドレス</label>

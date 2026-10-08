@@ -38,7 +38,7 @@ export async function requireScope(request?: Request): Promise<Scope | Response>
   if (request && request.method !== "GET" && !sameOrigin(request)) return Response.json({ error: "この画面からの操作だけを受け付けます" }, { status: 403 });
   const principal = await currentPrincipal();
   if (!principal) return Response.json({ error: "ログインが必要です" }, { status: 401 });
-  if (!fourdbConfigured()) return Response.json({ error: "4D Base のデータベースがまだ設定されていません(FOURDB_DATABASE_URL)", code: "not_configured" }, { status: 503 });
+  if (!fourdbConfigured()) return Response.json({ error: "4DB のデータベースがまだ設定されていません(FOURDB_DATABASE_URL)", code: "not_configured" }, { status: 503 });
   if (principal === LOCAL_DEV && !isLocalDatabase(process.env.FOURDB_DATABASE_URL!)) {
     return Response.json({ error: "ログインなしの開発用の利用者は、手元のデータベースにしかつなげません" }, { status: 403 });
   }
@@ -82,7 +82,7 @@ export function failure(e: unknown): Response {
   if (typeof pg?.code === "string" && /^[0-9A-Z]{5}$/.test(pg.code)) {
     console.error("fourdb: データベースの決まりで止まった", { code: pg.code, constraint: pg.constraint_name ?? null });
     // P0001 = 4D Base の決まりのトリガー(文は 4D Base が書いたもの)。23 = 整合性(文はデータベースのもので、中の作りが見えるので決まった文にする)
-    if (pg.code === "P0001") return Response.json({ error: pg.message ?? "4D Base の決まりに合わないため止めました" }, { status: 409 });
+    if (pg.code === "P0001") return Response.json({ error: pg.message ?? "4DB の決まりに合わないため止めました" }, { status: 409 });
     if (pg.code.startsWith("23")) return Response.json({ error: "データの決まりに合わないため止めました。内容を確かめて、もう一度試してください" }, { status: 409 });
     return Response.json({ error: "データベースで処理できませんでした。少し時間をおいてもう一度試してください" }, { status: 500 });
   }

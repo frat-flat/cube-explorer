@@ -20,7 +20,7 @@ test("入口でダッシュボードが開き、画面を切り替えられる",
   // three.js は CDN ではなく手元のものを使う(ネットにつながらない所でも動くように)
   await page.route("**/three.min.js", (r) => r.fulfill({ path: "node_modules/three/build/three.min.js", contentType: "text/javascript" }));
   await page.goto("/");
-  await expect(page).toHaveTitle("4D Base");
+  await expect(page).toHaveTitle("4DB");
   await expect(page.locator("#crumb")).toHaveText("ホーム");
   await page.locator('.nv[data-go="import"]').click();
   await expect(page.locator("#crumb")).toHaveText("Compose › Import");

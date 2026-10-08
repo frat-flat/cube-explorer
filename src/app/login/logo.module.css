@@ -1,0 +1,73 @@
+/* ログイン画面のロゴ(LoginLogo.tsx)。線は pathLength=1 なので、stroke-dashoffset の 1 → 0 で描き終わる */
+.logo { width: min(300px, 100%); justify-self: center; }
+
+/* ログイン画面は黒地(login.module.css の .page)なので、絵は元のまま見せる */
+.art { display: block; width: 100%; height: auto; }
+
+.draw { stroke-dasharray: 1 2; animation: draw var(--t, 1s) cubic-bezier(.2, .7, .3, 1) var(--d, 0s) both; }
+.ribbon { animation-timing-function: cubic-bezier(.45, 0, .25, 1); }
+@keyframes draw {
+  from { stroke-dashoffset: 1.06; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 下書きの光の線: 描いたあと、絵がそろうころに消える */
+.pen { opacity: 0; animation-name: draw, fade; animation-duration: var(--t, 1s), .8s; animation-delay: var(--d, 0s), 2s; animation-timing-function: cubic-bezier(.2, .7, .3, 1), ease-in; animation-fill-mode: both; }
+.pen.ribbon { animation-timing-function: cubic-bezier(.45, 0, .25, 1), ease-in; }
+@keyframes fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 線の先の明るい点(描いている所) */
+.head { opacity: 0; stroke-dasharray: .02 2; animation-name: head, headFade; animation-duration: var(--t, 1s); animation-delay: var(--d, 0s); animation-fill-mode: both; }
+@keyframes head {
+  from { stroke-dashoffset: .02; }
+  to { stroke-dashoffset: -.98; }
+}
+@keyframes headFade {
+  0% { opacity: 0; }
+  10%, 85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 点がふくらんで出る */
+.pop { transform-box: fill-box; transform-origin: center; animation: pop .45s cubic-bezier(.3, 1.6, .5, 1) var(--d, 0s) both; }
+@keyframes pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+/* 中心の光(はじめに一度だけ光る) */
+.spark { opacity: 0; transform-box: fill-box; transform-origin: center; animation: spark .9s ease-out .05s both; }
+@keyframes spark {
+  from { opacity: 0; transform: scale(.2) rotate(-45deg); }
+  35% { opacity: 1; transform: scale(1.15) rotate(-10deg); }
+  to { opacity: 0; transform: scale(.9) rotate(0); }
+}
+
+/* 軸・点線・点の絵(mark-lines.png)は、全体の絵が広がり終わるころに消す(同じ線が2重にならないように) */
+.lines { opacity: 0; animation: fade .5s ease-in 2.6s both; }
+
+/* 絵の全体が中心から広がって、元の絵になる */
+.finale { transform-box: fill-box; transform-origin: center; animation: finale 1.1s cubic-bezier(.4, 0, .2, 1) 1.7s both; }
+@keyframes finale {
+  from { opacity: 0; transform: scale(.08); }
+  40% { opacity: 1; }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* 文字: 左から現れる */
+.word { animation: word 1s cubic-bezier(.2, .7, .2, 1) 2.4s both; }
+@keyframes word {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+.wipe { transform: translateX(120px); animation: wipe 1.1s cubic-bezier(.45, 0, .25, 1) 2.35s both; }
+@keyframes wipe {
+  from { transform: translateX(-1260px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .art * { animation: none !important; }
+}

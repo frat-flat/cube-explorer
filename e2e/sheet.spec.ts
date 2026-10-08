@@ -25,7 +25,7 @@ async function importFixture(page: Page) {
   await page.getByRole("button", { name: "全行で確かめる" }).click();
   await expect(page.getByText("問題はありません")).toBeVisible();
   await page.getByRole("button", { name: "この内容で反映する" }).click();
-  await expect(page.getByText("スプシの合計 19 個のうち 19 個が、4D Base が元の値から計算した合計と一致しました")).toBeVisible();
+  await expect(page.getByText("スプシの合計 19 個のうち 19 個が、4DB が元の値から計算した合計と一致しました")).toBeVisible();
 }
 
 /** 表の「Σ 総計」の行 */
