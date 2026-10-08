@@ -31,6 +31,7 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
  │       ├─ record(元の行)──────────────────── record_coord(行の軸の値)
  │       │   └─ value(セル = 行 × 列 の値。版つき)
  │       └─ import_run ── import_row(読み取ったけれど、まだ反映していない分 = Saving)
+ ├─ sheet_definition(表の定義: 名前・行・列・数値・絞り込み・小計など。版つき)
  ├─ history(履歴)
  └─ card_attribute(ビュー: Box の属性 = Card)
 ```
@@ -113,6 +114,19 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 - `import_run.cursor` に次に読む範囲を残し、途中で止まっても続きから読めます(D-006)。同じ表の取り込みは同時に1つだけです。
 - 反映したら `import_row` は消します(元のセルの中身には個人情報が含まれうるため、残し続けない)。
 
+### 3.13 集計(Projection Engine。D-009)
+- 表(Sheet)も、あとで作る Cube も、同じ1つの集計の仕組みを使います(② 21章「Sheet と Cube で別々の計算ロジックを作らない」)。指定の形(`ProjectionRequest`: 数値のカラム・集計のしかた・行・列・段・小計・絞り込み・対象のタブ)と、結果を表の形にする処理は芯(`src/fourdb/core/projection/`)、SQL はつなぎ(`src/fourdb/adapters/postgres/projection.ts`)にあります。
+- 合計・小計・総計は保存しません。そのつど元の値から計算し、軸の値ではなく「Σ の行・列」として返します(3.3)。
+- 計算の順: ① 値ごとに行・列の軸の値(いちばん細かい段 = 葉)を決める(行か列の片方しかないときは、ここで葉ごとにまとめる)→ ② 葉を見たい段の祖先に付け替えて、行 × 列(× 小計の段)ごとにまとめる → ③ その小さな結果から、行の合計・列の合計・小計・総計を出す(GROUPING SETS)。
+- 「段 L の祖先」を1回で引けるように、祖先の一覧に祖先の段を持たせています(`member_ancestor.ancestor_level`、[0004](../../src/fourdb/adapters/postgres/migrations/0004_member_ancestor_level.sql))。軸の値の段はあとから変えられないので、写しても食い違いません。
+- 大きすぎる表は出しません(② 25章)。行 5,000・列 400・セル 20 万を超えたら、中身を返さずに「段を上げるか、絞り込んでください」と知らせます。データベースの中の時間は、集計 50 秒・軸の値の検索 10 秒までです。絞り込みで選べる軸の値は合わせて 2,000 個まで、同じ軸の絞り込みは1つです。
+- 計算された値(`value.kind = calculated`)を含むセルは、印(ƒ)で見分けられるように、セルごとに「元の値だけ / 計算された値だけ / 両方」を返します(3.4)。
+
+### 3.14 表の定義(SheetDefinition。② 14章)
+- `sheet_definition`([0003](../../src/fourdb/adapters/postgres/migrations/0003_sheet_definition.sql))に、名前と定義(JSON: sources・rows・columns・measures・filters・subtotal_rules・grand_total_rules・sort_rules・format_rules)を残します。データは写さず、開くたびに元の値から計算し直します。
+- 名前は workspace の中で1つ(消したものは除く)。上書きすると版(`version`)が上がり、保存のたびに定義を `history` に残します。
+- 保存した定義を開くときも、届いた指定と同じ確かめ(形・ID・段・上限)を通します。
+
 ## 4. ② 技術設計の Entity との対応
 
 | ② の Entity | このモデル | いつ作るか |
@@ -126,8 +140,8 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 | Relation | `relation`(今はカラム同士・Box 同士) | 今回 |
 | History | `history`(値ごとの前後は `value` の版) | 今回 |
 | Snapshot | 読み取りの記録は `import_run`、値の前後は `value` の版 | 今回 |
-| Aggregation | 取り込みで見つけた合計は `record.kind`・`source_column.role`。表示の合計の定義は SheetDefinition の中 | D-003 の 3・4 |
-| SheetDefinition | 後で足す | D-003 の 4 |
+| Aggregation | 取り込みで見つけた合計は `record.kind`・`source_column.role`。表示の合計・小計は集計のたびに計算し(3.13)、その指定は SheetDefinition の中 | D-003 の 3・4(作った) |
+| SheetDefinition | `sheet_definition`(3.14) | D-003 の 4(作った) |
 | Selection・DrillContext | 後で足す | D-003 の 7 |
 | CubeDefinition・AxisConfiguration | 後で足す | D-003 の 8 |
 | ViewState | 後で足す | D-003 の 7・8 |
@@ -180,6 +194,19 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 | workspace を設定しないで値を読む | 0 件 |
 
 手元のパソコンでの値です。クラウドのデータベースでは遅くなる可能性があります(未確認)。全体をまとめる集計を画面で何度も使うようになったら、② 24章の Cache を使います。
+
+### 集計(Projection Engine、上と同じ架空のデータ。2026-10-08)
+画面と同じ集計の仕組み(`project()`)を、入れ物の実行用の役割で、行ごとの権限がかかった状態で測った(5回の真ん中の値)。パソコンはほかのアプリで CPU が 6 割ほど使われている状態。
+
+| 表 | 集計した値 | 時間 |
+|---|---|---|
+| 全法人(500)× 年、Σ 合計・総計つき | 28.8 万個 | 約 0.97 秒 |
+| 月(36)を年ごとに小計 | 28.8 万個 | 約 0.48 秒 |
+| 法人0001 で絞り込み、16 店舗 × 月 | 576 個 | 約 0.11 秒 |
+| 法人0001 で絞り込み、16 店舗(法人ごとに小計)× 四半期 | 576 個 | 約 0.11 秒 |
+| 全 8,000 店舗 × 月(大きすぎるので断る) | 28.8 万個 | 約 1.3 秒で「大きすぎます」 |
+
+手元のパソコンでの値です。Neon では未確認です。
 
 ### 別の立場での確認
 DB 担当とセキュリティ担当の AI が、この表の定義を確認しました。最初の案に対する指摘(workspace を消せない、軸の値の組に別の人の値を入れられる、値が別のタブの列を指せる、軸の値の段の矛盾で二重に数える、Box の輪、属性の期間の重なり、合計の行への書き込み、移行完了の表の物理削除、持ち主の接続で行ごとの権限が効かない など)は、すべてこの版で直し、上の 60 項目で確かめています。

@@ -170,6 +170,7 @@ export function Migrate() {
     <main className={s.page}>
       <div className={s.top}>
         <h1>スプシから 4D Base へ移す</h1>
+        <a href="/sheet">取り込んだデータを表で見る</a>
         <a href="/">ダッシュボードへ戻る</a>
       </div>
       <p className={s.lead}>

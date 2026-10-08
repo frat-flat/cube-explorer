@@ -22,7 +22,11 @@ test.describe("スプシから 4D Base へ移す", () => {
 
   test("リンクを読み、タブを取り込み、候補を確かめて反映し、照合が一致する。読み直して役割を直すと確かめの結果が変わる", async ({ page }) => {
     await page.goto(`${BASE}/migrate`);
-    await page.getByLabel("スプシのリンク").fill(`https://docs.google.com/spreadsheets/d/${id}/edit`);
+    // 開いた直後(開発用のサーバーが画面を作っている間)は入力が効かないことがあるので、ボタンが押せるまで入れ直す
+    await expect(async () => {
+      await page.getByLabel("スプシのリンク").fill(`https://docs.google.com/spreadsheets/d/${id}/edit`);
+      await expect(page.getByRole("button", { name: "読み取る" })).toBeEnabled({ timeout: 1000 });
+    }).toPass();
     await page.getByRole("button", { name: "読み取る" }).click();
     await expect(page.getByText("「店舗別売上(試験用)」を読み取りました")).toBeVisible();
     // タブの一覧はスプシごとにまとまる(見出しにスプシの名前)
