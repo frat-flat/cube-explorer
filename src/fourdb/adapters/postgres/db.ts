@@ -39,14 +39,20 @@ export function db(): Sql {
 /**
  * 接続した役割が、行ごとの権限(RLS)を飛ばせないことを確かめる。superuser・BYPASSRLS・fourdb の表の持ち主なら止める(fail-closed)。
  * workspace の絞り込みは RLS が最後の守りなので、飛ばせる役割では動かさない(DATA_MODEL.md 3.9)。
+ * fourdb の表のどれかで RLS が強制(FORCE)になっていなければ止める(表の作り替えが途中で止まった場合など)。
  */
 export async function assertSafeRole(sql: Sql): Promise<void> {
-  const [r] = await sql<{ rolsuper: boolean; rolbypassrls: boolean; owns: boolean }[]>`
+  const [r] = await sql<{ rolsuper: boolean; rolbypassrls: boolean; owns: boolean; unforced: boolean }[]>`
     select r.rolsuper, r.rolbypassrls,
-           exists (select 1 from pg_tables t where t.schemaname = 'fourdb' and t.tableowner = current_user) as owns
+           exists (select 1 from pg_tables t where t.schemaname = 'fourdb' and t.tableowner = current_user) as owns,
+           exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                    where n.nspname = 'fourdb' and c.relkind in ('r', 'p') and not (c.relrowsecurity and c.relforcerowsecurity)) as unforced
       from pg_roles r where r.rolname = current_user`;
   if (!r || r.rolsuper || r.rolbypassrls || r.owns) {
     throw new FourdbUnavailable("4D Base のデータベースに、行ごとの権限を飛ばせる役割(superuser・BYPASSRLS・表の持ち主)でつながっています。実行用の役割でつないでください");
+  }
+  if (r.unforced) {
+    throw new FourdbUnavailable("4D Base のデータベースに、行ごとの権限(RLS)が強制になっていない表があります。表の作り替え(migrations)を確かめてください");
   }
 }
 let roleChecked: Promise<void> | null = null;

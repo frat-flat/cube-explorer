@@ -149,9 +149,16 @@ describe.skipIf(!ADMIN)("取り込み(結合)", () => {
     await expect(withScope(bob, (tx) => reconcile(tx, sheetId))).rejects.toThrow(ImportError);
   });
 
-  it("行ごとの権限を飛ばせる役割(superuser)でつないだら止め、実行用の役割なら通す", async () => {
+  it("行ごとの権限を飛ばせる役割(superuser)でつないだら止め、実行用の役割なら通す。RLS の強制が外れた表があれば実行用の役割でも止める", async () => {
     await expect(assertSafeRole(admin)).rejects.toThrow("行ごとの権限を飛ばせる役割");
     const app = postgres(process.env.FOURDB_DATABASE_URL!, { max: 1, onnotice: () => {} });
+    await expect(assertSafeRole(app)).resolves.toBeUndefined();
+    await admin`alter table fourdb.box no force row level security`;
+    try {
+      await expect(assertSafeRole(app)).rejects.toThrow("強制になっていない表");
+    } finally {
+      await admin`alter table fourdb.box force row level security`;
+    }
     await expect(assertSafeRole(app)).resolves.toBeUndefined();
     await app.end();
   });
