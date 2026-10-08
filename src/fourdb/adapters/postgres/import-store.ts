@@ -65,9 +65,10 @@ export async function listSheets(tx: Tx, containerId?: string): Promise<SheetSum
            (select count(*) from fourdb.record r where r.sheet_id = s.id and r.system_to is null) as records,
            lr.id as run_id, lr.status as run_status, lr.rows_read, lr.started_at
       from fourdb.source_sheet s
+      join fourdb.source_container sc on sc.id = s.container_id
       left join lateral (select * from fourdb.import_run r where r.sheet_id = s.id order by r.started_at desc limit 1) lr on true
      where s.deleted_at is null ${containerId ? tx`and s.container_id = ${containerId}` : tx``}
-     order by s.container_id, s.created_at`;
+     order by sc.created_at desc, s.created_at`;   // 新しく読んだスプシを上に
   return rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -160,7 +161,7 @@ export async function loadRows(tx: Tx, runId: string, from: number, limit: numbe
 const PROPOSAL_ROWS = 500;
 
 /** 先頭の行から候補を作る(承認の画面に出す) */
-export async function proposal(tx: Tx, runId: string): Promise<{ sheet: { id: string; title: string }; run: { status: string; rowsRead: number }; proposal: SheetProposal; preview: { index: number; cells: SourceCell[] }[] }> {
+export async function proposal(tx: Tx, runId: string, layout?: { headerRow: number; groupRow: number | null }): Promise<{ sheet: { id: string; title: string }; run: { status: string; rowsRead: number }; proposal: SheetProposal; preview: { index: number; cells: SourceCell[] }[] }> {
   const run = await getRun(tx, runId);
   if (run.status === "reading") throw new ImportError("まだ読み取りの途中です", 409);
   const s = await sheetSource(tx, run.sheet_id);
@@ -172,7 +173,7 @@ export async function proposal(tx: Tx, runId: string): Promise<{ sheet: { id: st
   return {
     sheet: { id: s.id, title: s.title },
     run: { status: run.status, rowsRead: run.rows_read },
-    proposal: analyzeSheet({ title: s.title, rows: dense }),
+    proposal: analyzeSheet({ title: s.title, rows: dense, layout }),
     preview: rows.slice(0, 40),
   };
 }

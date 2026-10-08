@@ -67,38 +67,38 @@ export function validateSpec(spec: ApprovalSpec, width: number): string[] {
   for (let i = 0; i < width; i++) if (!seen.has(i)) errors.push(`列 ${i} の扱いが決まっていません`);
 
   const kindOf = new Map<string, string>();
-  const useDef = (name: string, kind: string, where: string) => {
+  const noteDef = (name: string, kind: string, where: string) => {
     if (!name.trim()) return errors.push(`${where}: カラムの名前が空です`);
     const k = kindOf.get(name);
     if (k && k !== kind) errors.push(`カラム「${name}」が ${k} と ${kind} の両方に使われています`);
     kindOf.set(name, kind);
   };
   const dims = new Map<string, string>();   // 軸 → どこで決めるか
-  const useDim = (name: string, where: string) => {
+  const noteDim = (name: string, where: string) => {
     if (!name.trim()) return errors.push(`${where}: 軸の名前が空です`);
     const w = dims.get(name);
     if (w && w !== where) errors.push(`軸「${name}」が ${w} と ${where} の2か所で決まっています(1か所にしてください)`);
     dims.set(name, where);
   };
   spec.sheetCoords.forEach((s) => {
-    useDim(s.dimension, "表全体");
+    noteDim(s.dimension, "表全体");
     if (!s.member.trim()) errors.push(`表全体の軸「${s.dimension}」の値が空です`);
   });
   for (const c of spec.columns) {
     const where = `列 ${c.index}`;
     if (c.role === "dimension") {
-      useDim(c.dimension, where);
-      useDef(c.definition, "dimension", where);
+      noteDim(c.dimension, where);
+      noteDef(c.definition, "dimension", where);
     } else if (c.role === "measure") {
-      useDef(c.definition, "measure", where);
+      noteDef(c.definition, "measure", where);
       if (c.month !== null) {
         if (!MONTH.test(c.month)) errors.push(`${where}: 月は YYYY-MM の形で入れてください(${c.month})`);
-        useDim(MONTH_DIMENSION, "列ごとの月");
+        noteDim(MONTH_DIMENSION, "列ごとの月");
       }
     } else if (c.role === "attribute") {
-      useDef(c.definition, "attribute", where);
+      noteDef(c.definition, "attribute", where);
     } else if (c.role === "aggregate") {
-      if (c.definition) useDef(c.definition, "measure", where);
+      if (c.definition) noteDef(c.definition, "measure", where);
       if (c.sums.some((i) => i < 0 || i >= width || i === c.index)) errors.push(`${where}: 合計の列が足す列の番号が正しくありません`);
     }
   }

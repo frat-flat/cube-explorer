@@ -1703,12 +1703,13 @@ function stash(x, keepHead) {
 }
 const tabLayout = t => mkLayout(t.grid || [t.cols, ...t.rows], t.merges);
 const stashBook = b => b.tabs.filter(t => t.kind === 'data').forEach(t => stash({ src: 'link', url: b.url, book: b.name, tab: t.name, month: t.month || '', name: b.name + ' › ' + t.name, L: tabLayout(t) }, true));
-// 元のスプシを読み直す(アプリの外では例のデータ)。読めなければ理由を投げる
+// 元のスプシを読み直す。読めなければ理由を投げる(例のデータに切り替えるのはテストの時だけ。本番で例のデータが入らないように)
 async function fetchBook(url) {
   let j = null;
   try { const r = await fetch('/api/sheets/read?url=' + encodeURIComponent(url), { credentials: 'same-origin' }); if ((r.headers.get('content-type') || '').includes('json')) j = await r.json(); } catch (e) {}
   if (j && j.book) { j.book.url = j.book.url || url; return j.book; }
   if (j && j.error) throw new Error(j.error);
+  if (!DEMO) throw new Error('元のスプシを読めませんでした。ネットワークとログインを確かめて、もう一度試してください');
   const b = mockBook(url); b.url = url; return b;
 }
 // 反映に使うタブを読み直し、Saving も最新にして、反映に使う列と行を返す(タブをまとめるときは先頭に「月」)
@@ -1769,7 +1770,8 @@ function renderSaving() {
 
 // ---------- Sheet(スプシを模した表) ----------
 let viewId = null, viewCell = null;
-const colL = i => String.fromCharCode(65 + i);
+// 列の記号(0 → A、25 → Z、26 → AA)。27 列目以降も正しく作る
+const colL = i => { let s = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
 function renderView() {
   const sec = $('viewSec'), sh = viewId && sheetById(viewId); sec.hidden = !sh; if (!sh) return;
   $('viewTitle').textContent = 'Sheet: ' + where(sh);

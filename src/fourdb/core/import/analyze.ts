@@ -81,11 +81,12 @@ export function rowLooksAggregate(cells: SourceCell[], row: number): string | nu
   return null;
 }
 
-export function analyzeSheet(input: { title: string; rows: SourceCell[][]; merges?: Merge[] }): SheetProposal {
+/** layout を渡すと、列名の行・グループ名の行をその指定で読む(画面で選び直したとき) */
+export function analyzeSheet(input: { title: string; rows: SourceCell[][]; merges?: Merge[]; layout?: Layout }): SheetProposal {
   const { title, rows } = input;
   const merges = input.merges ?? [];
   const grid = rows.map((r) => r.map((c) => c.v));
-  const layout = detectLayout(grid, merges);
+  const layout = input.layout ?? detectLayout(grid, merges);
   let width = Math.max(0, ...rows.map((r) => r.length));
   while (width > 0 && rows.every((r) => !filled(r[width - 1] ?? EMPTY_CELL))) width--;
   const headers = columnHeaders(grid, layout, width, merges);

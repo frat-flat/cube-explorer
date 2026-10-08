@@ -38,3 +38,29 @@ Synapse などへ組み込むときは、その組み込み先の分をこの文
 ## 手元での起動
 
 [README](../../README.md) のとおり `npm run dev`。手元の `.env.local` にはログイン(Neon Auth)の設定だけがあり、スプシのリンク読み取りと Supabase への保存は手元では動かない(2026-10-08 時点)。
+
+### 4D Base の新しい画面(/migrate)を手元で動かす
+
+本番のデータベースはまだない(置き場所と費用は未決)ので、手元の使い捨てデータベースで動かす。パソコンの PostgreSQL(18)の、すでに動いているもの(5432 番)は使わず、別のフォルダに別のものを立てる。
+
+```bash
+# 1. 使い捨てのデータベースを立てる(フォルダは .gitignore の外ならどこでもよい。パスワードなし・手元だけ)
+"C:/Program Files/PostgreSQL/18/bin/initdb.exe" -D <フォルダ> -U fourdb -A trust -E UTF8 --locale=C
+"C:/Program Files/PostgreSQL/18/bin/pg_ctl.exe" -D <フォルダ> -o "-p 55432 -c listen_addresses=localhost" -l <フォルダ>/pg.log start
+"C:/Program Files/PostgreSQL/18/bin/createdb.exe" -h localhost -p 55432 -U fourdb fourdb_dev
+# 2. fourdb の表を作り、実行用の役割 fourdb_app_local を作って権限を渡す
+FOURDB_ADMIN_URL=postgres://fourdb@localhost:55432/fourdb_dev FOURDB_APP_ROLE=fourdb_app_local npm run fourdb:migrate
+# 3. 起動(ログインなし。--fixture を付けると e2e/fixtures/sheets の試験用スプシを読む)→ http://localhost:3100/migrate
+node scripts/dev-fourdb.mjs --fixture
+```
+
+本物のスプシを読むときは、`--fixture` を付けず、`.env.local` に `GOOGLE_SERVICE_ACCOUNT_JSON` を入れる(鍵は秘密の値なので、利用者が自分で入れる)。
+
+### 試験
+
+```bash
+# 単体と、データベースを使う結合(使い捨てのデータベースの中を毎回作り直す。fourdb_it は空のデータベースを作っておく)
+FOURDB_TEST_ADMIN_URL=postgres://fourdb@localhost:55432/fourdb_it npx vitest run
+# 画面(上の 3 で起動しておく)
+E2E_4DB_URL=http://localhost:3100 npx playwright test e2e/migrate.spec.ts
+```

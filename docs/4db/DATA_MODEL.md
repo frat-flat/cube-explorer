@@ -58,7 +58,7 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 
 ### 3.3 合計は値にしない(② 30章-2)
 - 合計・小計の行は `record.kind = aggregate`、合計の列は `source_column.role = aggregate`(関数名つき)にします。データベースが、そこに値を入れることを拒否します。
-- スプシに書かれていた合計の数字と関数は残しておき、Cell Inspector で「スプシの合計」と「4D Base で計算した合計」を見比べられるようにします(D-003 の 5)。
+- スプシに書かれていた合計の数字と関数は、値とは別の表 `source_total`([0002_source_total.sql](../../src/fourdb/adapters/postgres/migrations/0002_source_total.sql)。合計の行・列のセルだけ入れられる)に残し、照合(D-003 の 2)と Cell Inspector(D-003 の 5)で「スプシの合計」と「4D Base で計算した合計」を見比べます。
 - 年合計・全店舗合計を「13番目の月」「4つ目の店舗」として軸の値にすることはありません。
 
 ### 3.4 計算された値は Raw と分ける(② 30章-3)
