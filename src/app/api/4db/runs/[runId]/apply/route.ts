@@ -10,7 +10,7 @@ export const maxDuration = 60;
 export async function POST(request: Request, { params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
   if (!isUuid(runId)) return notFound();
-  const scope = await requireScope();
+  const scope = await requireScope(request);
   if (scope instanceof Response) return scope;
   const raw = (await readJson(request))?.spec;
   const spec = raw === undefined || raw === null ? null : parseSpec(raw);

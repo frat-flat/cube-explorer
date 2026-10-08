@@ -1,12 +1,13 @@
-// 承認した内容を、分割して fourdb の表に書く。1回の呼び出しで APPLY_CHUNK 行ずつ。途中で止まっても続きから書ける。
+// 承認した内容を、分割して fourdb の表に書く。1回の呼び出しで applyChunk 行ずつ(列の数による)。途中で止まっても続きから書ける。
 // 最初の呼び出しで、全行の確かめ・意味(カラム・軸)と列の準備をし、承認の内容を取り込みに保存する(あとの呼び出しはそれを使う)。
 import { columnHeaders } from "@/fourdb/core/import/layout";
-import { MONTH_DIMENSION, planRows, type ApprovalSpec, type PlannedRow } from "@/fourdb/core/import/plan";
+import { MONTH_DIMENSION, planRows, validateSpec, type ApprovalSpec, type PlannedRow } from "@/fourdb/core/import/plan";
 import type { Scope, Tx } from "./db";
 import { withScope } from "./db";
-import { checkApply, ImportError, loadRows } from "./import-store";
+import { ImportError, keyFacts, loadRows, stagedKeys } from "./import-store";
 
-const APPLY_CHUNK = 2000;
+/** 1回に書く行の数。セルがおよそ 4 万個になるように、列の数に合わせる(20〜2000 行) */
+const applyChunk = (cols: number) => Math.min(2000, Math.max(20, Math.floor(40000 / Math.max(1, cols))));
 
 type ApplyState = {
   next: number;
@@ -265,14 +266,14 @@ async function writeRows(tx: Tx, sheetId: string, state: ApplyState, planned: Pl
 async function finish(tx: Tx, run: RunRow, state: ApplyState) {
   let closedRecords = 0;
   if (state.hadRecords) {
+    // 今回の行の鍵: データの行は鍵の列の値、鍵が空の行と合計の行は行番号(#n)。全行を JS に持ってこず SQL で作る
     await tx`create temp table seen_key (k text primary key) on commit drop`;
-    for (let from = 0; ; ) {
-      const rows = await loadRows(tx, run.id, from, 5000);
-      if (!rows.length) break;
-      const keys = planRows(state.spec, rows).rows.map((r) => r.rowKey);
-      await tx`insert into seen_key select unnest(${keys}::text[]) on conflict do nothing`;
-      from = rows[rows.length - 1].index + 1;
-    }
+    await tx`
+      insert into seen_key
+      select key from (${stagedKeys(tx, run.id, state.spec)}) x where not is_agg and key !~ ${String.raw`^\|*$`}
+      union
+      select '#' || (row_index + 1) from fourdb.import_row where run_id = ${run.id}
+      on conflict do nothing`;
     const gone = await tx<{ id: string }[]>`
       update fourdb.record set system_to = clock_timestamp()
        where sheet_id = ${run.sheet_id} and system_to is null and row_key not in (select k from seen_key)
@@ -305,14 +306,16 @@ export async function applyNext(scope: Scope, runId: string, spec: ApprovalSpec 
     if (run.status === "applied") return { done: true, next: run.cursor.total, total: run.cursor.total, counts: state?.counts ?? { rows: 0, values: 0, totals: 0, closedValues: 0 } };
     if (run.status === "staged") {
       if (!spec) throw new ImportError("承認の内容がありません");
-      const check = await checkApply(tx, runId, spec);
-      if (check.errors.length) throw new ImportError(check.errors.join("\n"));
+      // 全行の組み立ては画面の「全行で確かめる」で済ませている。ここでは内容の矛盾と、鍵の重なり(SQL)だけを確かめる
+      const errors = validateSpec(spec, spec.columns.length);
+      if (!errors.length && (await keyFacts(tx, runId, spec)).duplicateKeys.length) errors.push("行を見分ける列に、同じ値の行があります");
+      if (errors.length) throw new ImportError(errors.join("\n"));
       state = await setup(tx, run, spec);
       await tx`update fourdb.import_run set status = 'applying' where id = ${runId}`;
     } else if (run.status !== "applying" || !state) {
       throw new ImportError(`この取り込みは ${run.status} です`, 409);
     }
-    const rows = await loadRows(tx, runId, state.next, APPLY_CHUNK);
+    const rows = await loadRows(tx, runId, state.next, applyChunk(state.spec.columns.length));
     if (rows.length) {
       const p = planRows(state.spec, rows);
       if (p.rows.length) await writeRows(tx, run.sheet_id, state, p.rows);

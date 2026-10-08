@@ -36,9 +36,29 @@ export function db(): Sql {
   return pool;
 }
 
+/**
+ * 接続した役割が、行ごとの権限(RLS)を飛ばせないことを確かめる。superuser・BYPASSRLS・fourdb の表の持ち主なら止める(fail-closed)。
+ * workspace の絞り込みは RLS が最後の守りなので、飛ばせる役割では動かさない(DATA_MODEL.md 3.9)。
+ */
+export async function assertSafeRole(sql: Sql): Promise<void> {
+  const [r] = await sql<{ rolsuper: boolean; rolbypassrls: boolean; owns: boolean }[]>`
+    select r.rolsuper, r.rolbypassrls,
+           exists (select 1 from pg_tables t where t.schemaname = 'fourdb' and t.tableowner = current_user) as owns
+      from pg_roles r where r.rolname = current_user`;
+  if (!r || r.rolsuper || r.rolbypassrls || r.owns) {
+    throw new FourdbUnavailable("4D Base のデータベースに、行ごとの権限を飛ばせる役割(superuser・BYPASSRLS・表の持ち主)でつながっています。実行用の役割でつないでください");
+  }
+}
+let roleChecked: Promise<void> | null = null;
+
 /** principal と workspace を設定したトランザクションで fn を動かす(設定はトランザクションの終わりで消える) */
 export async function withScope<T>(scope: Scope, fn: (tx: Tx) => Promise<T>): Promise<T> {
   if (!scope.principal) throw new Error("principal がありません");
+  roleChecked ??= assertSafeRole(db()).catch((e) => {
+    roleChecked = null;
+    throw e;
+  });
+  await roleChecked;
   const result = await db().begin(async (tx) => {
     await tx`select set_config('fourdb.principal', ${scope.principal}, true), set_config('fourdb.workspace_id', ${scope.workspaceId ?? ""}, true)`;
     return fn(tx);

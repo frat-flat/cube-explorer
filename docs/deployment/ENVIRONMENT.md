@@ -25,7 +25,7 @@ Synapse などへ組み込むときは、その組み込み先の分をこの文
 
 [DATA_MODEL.md](../4db/DATA_MODEL.md) 3.9 のとおり。この環境では次のようにする(まだ本番にはつないでいない)。
 
-- 表を作る役割(持ち主)と、アプリが接続する実行用の役割を分ける。実行用の役割は superuser でも BYPASSRLS でもなく、`fourdb` の表の読み書きと関数の実行だけを渡す。
+- 表を作る役割(持ち主)と、アプリが接続する実行用の役割を分ける。実行用の役割は superuser でも BYPASSRLS でもなく、`fourdb` の表の読み書きと関数の実行だけを渡す。アプリは最初の接続で役割を確かめ、superuser・BYPASSRLS・表の持ち主なら止まる(fail-closed)。
 - アプリはトランザクションごとに `fourdb.principal` と `fourdb.workspace_id` を設定してから読み書きする(`set_config(…, true)`)。所属(`workspace_member`)を確かめてから workspace を設定する。
 - principal はログイン(Neon Auth)のユーザー ID を使い、`neon:<ユーザー ID>` の形にする。メールアドレスは表示用。入口の許可リスト(`ALLOWED_EMAILS`)と、workspace の所属の両方を確かめる。
 - 手元の開発用の利用者(ログインの設定がないときの `local-dev`)は、本番のデータベースにつながない。

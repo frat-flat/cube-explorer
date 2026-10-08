@@ -117,10 +117,19 @@ export function Migrate() {
 
   const relayout = (headerRow: number, groupRow: number | null) => runId && guard(() => loadProposal(runId, { headerRow, groupRow }));
 
+  // 全行の確かめは分割して進める(大きい表でも 1 回の要求が長くならないように)。結果を足し合わせる
   const runCheck = () =>
     runId && spec &&
     guard(async () => {
-      setCheck(await api<ApplyCheck>(`/api/4db/runs/${runId}/check`, { method: "POST", body: { spec } }));
+      let acc: ApplyCheck | null = null;
+      for (let from = 0; ; ) {
+        const r: ApplyCheck = await api<ApplyCheck>(`/api/4db/runs/${runId}/check`, { method: "POST", body: { spec, from } });
+        acc = acc === null ? r : mergeCheck(acc, r);
+        if (r.done) break;
+        setProgress({ done: r.next, total: current?.run.rowsRead ?? r.next, label: "全行を確かめています(行番号)" });
+        from = r.next;
+      }
+      setCheck(acc);
     });
 
   const apply = (resume = false) =>
@@ -219,6 +228,23 @@ export function Migrate() {
       {result && <Reconcile r={result} />}
     </main>
   );
+}
+
+/** 分割して確かめた結果を足し合わせる(鍵の重なりと実体の数は最初の分にだけある) */
+function mergeCheck(a: ApplyCheck, r: ApplyCheck): ApplyCheck {
+  return {
+    ...a,
+    errors: [...new Set([...a.errors, ...r.errors])],
+    dataRows: a.dataRows + r.dataRows,
+    aggregateRows: a.aggregateRows + r.aggregateRows,
+    values: a.values + r.values,
+    calculatedValues: a.calculatedValues + r.calculatedValues,
+    totals: a.totals + r.totals,
+    problemCount: a.problemCount + r.problemCount,
+    problems: [...a.problems, ...r.problems].slice(0, 20),
+    next: r.next,
+    done: r.done,
+  };
 }
 
 // ---------- 承認(Saving) ----------

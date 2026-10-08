@@ -7,8 +7,8 @@ import type { SourceCell } from "@/fourdb/core/import/types";
 import { defaultSpec } from "@/fourdb/core/import/spec";
 import type { SourceBook, SourceReader } from "@/fourdb/core/ports";
 import { applyNext } from "./apply";
-import { personalWorkspace, withScope, type Scope } from "./db";
-import { checkApply, ImportError, proposal, readNext, registerBook, startRun } from "./import-store";
+import { assertSafeRole, personalWorkspace, withScope, type Scope } from "./db";
+import { checkApply, ImportError, keyFacts, proposal, readNext, registerBook, startRun } from "./import-store";
 import { applyMigrations, grantApp } from "./migrate";
 import { reconcile } from "./reconcile";
 
@@ -147,6 +147,31 @@ describe.skipIf(!ADMIN)("取り込み(結合)", () => {
     const n = await withScope(bob, async (tx) => (await tx<{ n: string }[]>`select (select count(*) from fourdb.value) + (select count(*) from fourdb.source_sheet) as n`)[0].n);
     expect(n).toBe("0");
     await expect(withScope(bob, (tx) => reconcile(tx, sheetId))).rejects.toThrow(ImportError);
+  });
+
+  it("行ごとの権限を飛ばせる役割(superuser)でつないだら止め、実行用の役割なら通す", async () => {
+    await expect(assertSafeRole(admin)).rejects.toThrow("行ごとの権限を飛ばせる役割");
+    const app = postgres(process.env.FOURDB_DATABASE_URL!, { max: 1, onnotice: () => {} });
+    await expect(assertSafeRole(app)).resolves.toBeUndefined();
+    await app.end();
+  });
+
+  it("行を見分ける列に同じ値があれば知らせる(合計の行は数えない)。確かめは分割して進められる", async () => {
+    reader.set("重複", [["店舗", "1月"], ["A店", 1], ["A店", 2], ["B店", 3], ["合計", [6, "=SUM(B2:B4)"]]]);
+    const sheets = await withScope(alice, async (tx) => registerBook(tx, await reader.book("x")));
+    const dup = sheets.find((x) => x.title === "重複")!;
+    const run = await withScope(alice, (tx) => startRun(tx, dup.id, alice.principal));
+    for (let i = 0; i < 10; i++) if ((await readNext(alice, run.id, reader)).done) break;
+    const spec = defaultSpec((await withScope(alice, (tx) => proposal(tx, run.id))).proposal);
+    expect(spec.rowKeyColumns).toEqual([]);   // 候補では、同じ値のある列は鍵にしない
+    spec.rowKeyColumns = [0];
+    const facts = await withScope(alice, (tx) => keyFacts(tx, run.id, spec));
+    expect(facts.duplicateKeys).toEqual([{ key: "A店", rows: [2, 3] }]);
+    const c0 = await withScope(alice, (tx) => checkApply(tx, run.id, spec, 0));
+    expect(c0.errors.join()).toContain("同じ値の行");
+    expect(c0).toMatchObject({ dataRows: 3, aggregateRows: 1, done: true });
+    const c1 = await withScope(alice, (tx) => checkApply(tx, run.id, spec, 3));
+    expect(c1).toMatchObject({ dataRows: 1, aggregateRows: 1, duplicateKeys: [], done: true });
   });
 
   it("移行完了にした表には、スプシから取り込めない", async () => {

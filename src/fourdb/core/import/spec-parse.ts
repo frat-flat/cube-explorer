@@ -5,6 +5,8 @@ import type { ApprovalSpec, ColumnApproval } from "./plan";
 
 const MAX_COLUMNS = 2000;
 const MAX_NAME = 100;
+/** 合計の列が足す列の数の合計(すべての合計の列で) */
+const MAX_SUMS = 20000;
 const FNS: AggregateFn[] = ["SUM", "COUNT", "AVG", "MIN", "MAX"];
 
 const isInt = (x: unknown, max = 10_000_000): x is number => Number.isInteger(x) && (x as number) >= 0 && (x as number) <= max;
@@ -53,6 +55,7 @@ export function parseSpec(x: unknown): ApprovalSpec | string {
     if (typeof r === "string") return r;
     columns.push(r);
   }
+  if (columns.reduce((n, c) => n + (c.role === "aggregate" ? c.sums.length : 0), 0) > MAX_SUMS) return "合計の列が足す列が多すぎます";
   const a = s.aggregateRows as Record<string, unknown> | undefined;
   const include = ints(a?.include);
   const exclude = ints(a?.exclude);

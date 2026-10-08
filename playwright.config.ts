@@ -4,7 +4,11 @@ import { defineConfig } from "@playwright/test";
 // E2E_4DB_URL があるときは、4D Base の新しい画面のテスト(e2e/migrate.spec.ts)を、すでに動いているそのサーバーで流す(ここでは起動しない)
 export default defineConfig({
   testDir: "e2e",
-  use: { baseURL: "http://localhost:3000" },
+  use: {
+    baseURL: "http://localhost:3000",
+    // GPU のない所(Windows の画面なしの Chromium など)でも 3D(WebGL)を作れるように、ソフトウェアで描く。テストのときだけ
+    launchOptions: { args: ["--enable-unsafe-swiftshader"] },
+  },
   webServer: process.env.E2E_4DB_URL
     ? undefined
     : {

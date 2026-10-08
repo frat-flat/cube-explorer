@@ -4,10 +4,10 @@ import { failure, requireScope } from "@/lib/fourdb";
 import { isUuid, notFound } from "../../../ids";
 
 // POST /api/4db/sheets/:sheetId/runs : 取り込みを始める(途中のものがあればそれを続ける)
-export async function POST(_request: Request, { params }: { params: Promise<{ sheetId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ sheetId: string }> }) {
   const { sheetId } = await params;
   if (!isUuid(sheetId)) return notFound();
-  const scope = await requireScope();
+  const scope = await requireScope(request);
   if (scope instanceof Response) return scope;
   try {
     const run = await withScope(scope, (tx) => startRun(tx, sheetId, scope.principal));

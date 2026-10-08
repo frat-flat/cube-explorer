@@ -4,7 +4,7 @@ import { failure, readJson, requireScope, sourceReader } from "@/lib/fourdb";
 
 // POST /api/4db/books { url } : スプシのリンクを読み、スプシとタブを登録して、タブの一覧を返す
 export async function POST(request: Request) {
-  const scope = await requireScope();
+  const scope = await requireScope(request);
   if (scope instanceof Response) return scope;
   const body = await readJson(request);
   const url = typeof body?.url === "string" ? body.url.trim() : "";

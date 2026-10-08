@@ -67,7 +67,7 @@ export async function listSheets(tx: Tx, containerId?: string): Promise<SheetSum
       from fourdb.source_sheet s
       join fourdb.source_container sc on sc.id = s.container_id
       left join lateral (select * from fourdb.import_run r where r.sheet_id = s.id order by r.started_at desc limit 1) lr on true
-     where s.deleted_at is null ${containerId ? tx`and s.container_id = ${containerId}` : tx``}
+     where s.deleted_at is null and s.workspace_id = fourdb.current_workspace_id() ${containerId ? tx`and s.container_id = ${containerId}` : tx``}
      order by sc.created_at desc, s.created_at`;   // 新しく読んだスプシを上に
   return rows.map((r) => ({
     id: r.id,
@@ -84,7 +84,7 @@ async function sheetSource(tx: Tx, sheetId: string) {
   const [s] = await tx<{ id: string; title: string; migration_status: string; source_row_count: number | null; source_col_count: number | null; external_id: string; book_id: string; deleted_at: Date | null }[]>`
     select s.id, s.title, s.migration_status, s.source_row_count, s.source_col_count, c.external_id, c.external_id as book_id, s.deleted_at
       from fourdb.source_sheet s join fourdb.source_container c on c.id = s.container_id
-     where s.id = ${sheetId}`;
+     where s.id = ${sheetId} and s.workspace_id = fourdb.current_workspace_id()`;
   if (!s || s.deleted_at) throw new ImportError("表が見つかりません", 404);
   return s;
 }
@@ -94,7 +94,7 @@ async function sheetSource(tx: Tx, sheetId: string) {
 export async function startRun(tx: Tx, sheetId: string, by: string): Promise<RunRow> {
   const s = await sheetSource(tx, sheetId);
   if (s.migration_status === "migrated") throw new ImportError("移行完了した表には、スプシから取り込みません(D-002)", 409);
-  const [active] = await tx<RunRow[]>`select * from fourdb.import_run where sheet_id = ${sheetId} and status in ('reading', 'staged', 'applying')`;
+  const [active] = await tx<RunRow[]>`select * from fourdb.import_run where sheet_id = ${sheetId} and workspace_id = fourdb.current_workspace_id() and status in ('reading', 'staged', 'applying')`;
   if (active) return active;
   const cursor: RunCursor = { next: 0, total: s.source_row_count ?? 0, cols: s.source_col_count ?? 0, done: false };
   const [run] = await tx<RunRow[]>`
@@ -105,7 +105,7 @@ export async function startRun(tx: Tx, sheetId: string, by: string): Promise<Run
 }
 
 async function getRun(tx: Tx, runId: string): Promise<RunRow> {
-  const [run] = await tx<RunRow[]>`select * from fourdb.import_run where id = ${runId}`;
+  const [run] = await tx<RunRow[]>`select * from fourdb.import_run where id = ${runId} and workspace_id = fourdb.current_workspace_id()`;
   if (!run) throw new ImportError("取り込みが見つかりません", 404);
   return run;
 }
@@ -165,7 +165,7 @@ export async function proposal(tx: Tx, runId: string, layout?: { headerRow: numb
   const run = await getRun(tx, runId);
   if (run.status === "reading") throw new ImportError("まだ読み取りの途中です", 409);
   const s = await sheetSource(tx, run.sheet_id);
-  const rows = await loadRows(tx, runId, 0, PROPOSAL_ROWS);
+  const rows = (await loadRows(tx, runId, 0, PROPOSAL_ROWS)).filter((r) => r.index < PROPOSAL_ROWS);
   const width = Math.max(0, ...rows.map((r) => r.cells.length));
   const dense: SourceCell[][] = [];
   rows.forEach((r) => (dense[r.index] = r.cells));
@@ -178,7 +178,7 @@ export async function proposal(tx: Tx, runId: string, layout?: { headerRow: numb
   };
 }
 
-// ---------- 承認の確かめ(全行) ----------
+// ---------- 承認の確かめ(全行。分割して呼ぶ) ----------
 export type ApplyCheck = {
   errors: string[];
   dataRows: number;
@@ -190,41 +190,82 @@ export type ApplyCheck = {
   problems: PlanProblem[];
   problemCount: number;
   duplicateKeys: { key: string; rows: number[] }[];
+  /** 次に確かめる行(from に渡す)。done なら終わり */
+  next: number;
+  done: boolean;
 };
 
 const CHECK_CHUNK = 5000;
+/** 1回の呼び出しで確かめる行の数(画面がくり返し呼ぶ) */
+const CHECK_ROWS_PER_CALL = 20000;
+/** 合計・小計の見出し(analyze.ts の TOTAL_LABEL と同じ) */
+const TOTAL_LABEL_SQL = String.raw`(合計|小計|総計|累計|年計|月計|^計$|^total$|^subtotal$|grand\s*total)`;
+const NUM_TEXT_SQL = String.raw`^[¥￥$]?\s?-?[\d,]+(\.\d+)?%?$`;
 
-/** 承認の内容で全行を組み立ててみて、件数と問題を返す(書き込みはしない) */
-export async function checkApply(tx: Tx, runId: string, spec: ApprovalSpec): Promise<ApplyCheck> {
+/**
+ * 置き場の行の「行を見分ける鍵」と「合計の行か(おおよそ)」を SQL で作る(全行を JS に持ってこない)。
+ * 合計の行は見出しの文字で見分ける(関数だけで見分ける合計の行は、鍵が空なら数えないので影響しない)。
+ */
+export function stagedKeys(tx: Tx, runId: string, spec: ApprovalSpec) {
+  const key = spec.rowKeyColumns.length
+    ? tx`array_to_string(array(select coalesce(btrim(r.cells -> u.k ->> 'v'), '') from unnest(${spec.rowKeyColumns}::int[]) with ordinality as u(k, o) order by u.o), '|')`
+    : tx`''`;
+  return tx`
+    select r.row_index, ${key} as key,
+           ((${spec.aggregateRows.auto} and not r.row_index = any(${spec.aggregateRows.exclude}::int[])
+             and exists (select 1 from jsonb_array_elements(r.cells) c where coalesce(c ->> 'v', '') ~* ${TOTAL_LABEL_SQL} and coalesce(c ->> 'v', '') !~ ${NUM_TEXT_SQL}))
+            or r.row_index = any(${spec.aggregateRows.include}::int[])) as is_agg,
+           ${spec.entityColumn === null ? tx`null::text` : tx`nullif(btrim(r.cells -> ${spec.entityColumn}::int ->> 'v'), '')`} as entity
+      from fourdb.import_row r
+     where r.run_id = ${runId} and r.row_index > ${spec.headerRow}`;
+}
+
+/** 鍵の重なり(データの行で同じ鍵)と、実体(Box)の数 */
+export async function keyFacts(tx: Tx, runId: string, spec: ApprovalSpec): Promise<{ duplicateKeys: { key: string; rows: number[] }[]; entities: number }> {
+  const dup = await tx<{ key: string; rows: number[] }[]>`
+    select key, (array_agg(row_index + 1 order by row_index))[1:5] as rows
+      from (${stagedKeys(tx, runId, spec)}) x
+     where not is_agg and key !~ ${String.raw`^\|*$`}
+     group by key having count(*) > 1
+     order by min(row_index) limit 10`;
+  const [{ n }] = await tx<{ n: string }[]>`select count(distinct entity) as n from (${stagedKeys(tx, runId, spec)}) x where not is_agg and entity is not null`;
+  return { duplicateKeys: dup, entities: Number(n) };
+}
+
+/** 承認の内容で、from 行目から一定の数の行を組み立ててみて、件数と問題を返す(書き込みはしない)。from = 0 のときだけ鍵の重なりも見る */
+export async function checkApply(tx: Tx, runId: string, spec: ApprovalSpec, from = 0): Promise<ApplyCheck> {
   const run = await getRun(tx, runId);
-  const out: ApplyCheck = { errors: validateSpec(spec, spec.columns.length), dataRows: 0, aggregateRows: 0, values: 0, calculatedValues: 0, totals: 0, entities: 0, problems: [], problemCount: 0, duplicateKeys: [] };
+  const out: ApplyCheck = { errors: validateSpec(spec, spec.columns.length), dataRows: 0, aggregateRows: 0, values: 0, calculatedValues: 0, totals: 0, entities: 0, problems: [], problemCount: 0, duplicateKeys: [], next: from, done: true };
   if (run.status !== "staged") out.errors.push(run.status === "reading" ? "まだ読み取りの途中です" : `この取り込みは ${run.status} です`);
   if (out.errors.length) return out;
-  const keys = new Map<string, number[]>();
-  const entities = new Set<string>();
-  for (let from = 0; ; ) {
-    const rows = await loadRows(tx, runId, from, CHECK_CHUNK);
-    if (!rows.length) break;
+  if (from === 0) {
+    const f = await keyFacts(tx, runId, spec);
+    out.duplicateKeys = f.duplicateKeys;
+    out.entities = f.entities;
+    if (f.duplicateKeys.length) out.errors.push("行を見分ける列に、同じ値の行があります。列を足すか、行番号で見分ける形にしてください");
+  }
+  let cursor = from;
+  let seen = 0;
+  out.done = false;
+  while (seen < CHECK_ROWS_PER_CALL) {
+    const rows = await loadRows(tx, runId, cursor, CHECK_CHUNK);
+    if (!rows.length) {
+      out.done = true;
+      break;
+    }
     const p = planRows(spec, rows);
     for (const r of p.rows) {
       if (r.kind === "aggregate") out.aggregateRows++;
-      else {
-        out.dataRows++;
-        const k = keys.get(r.rowKey);
-        if (k) k.push(r.rowIndex + 1);
-        else keys.set(r.rowKey, [r.rowIndex + 1]);
-        if (r.entity) entities.add(r.entity);
-      }
+      else out.dataRows++;
       out.values += r.values.length;
       out.calculatedValues += r.values.filter((v) => v.kind === "calculated").length;
       out.totals += r.totals.length;
     }
     out.problemCount += p.problems.length;
     for (const x of p.problems) if (out.problems.length < 20) out.problems.push(x);
-    from = rows[rows.length - 1].index + 1;
+    seen += rows.length;
+    cursor = rows[rows.length - 1].index + 1;
   }
-  out.entities = entities.size;
-  out.duplicateKeys = [...keys.entries()].filter(([, rs]) => rs.length > 1).slice(0, 10).map(([key, rows]) => ({ key, rows: rows.slice(0, 5) }));
-  if (out.duplicateKeys.length) out.errors.push("行を見分ける列に、同じ値の行があります。列を足すか、行番号で見分ける形にしてください");
+  out.next = cursor;
   return out;
 }

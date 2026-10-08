@@ -106,28 +106,44 @@ export async function reconcile(tx: Tx, sheetId: string): Promise<ReconcileResul
     return mergeRanges(out);
   };
 
-  const rows: ReconcileGroup[] = [];
-  for (const ar of aggRows) {
-    const g: ReconcileGroup = { label: rowLabel(ar.row_key, ar.row_index), checked: 0, matched: 0, mismatches: [] };
-    for (const t of totals.filter((x) => Number(x.record_id) === Number(ar.id))) {
-      const col = colById.get(Number(t.column_id));
-      if (!col) continue;
-      const ranges = rangesFor(ar.row_index, col.col_index).filter(([a, b]) => a <= b);
-      const leafIds = idsOf(leaves(col.col_index));
-      if (!ranges.length || !leafIds.length) continue;
-      const [sum] = await tx<{ computed: string }[]>`
-        select coalesce(sum(v.num), 0) as computed
-          from fourdb.record r
-          join unnest(${ranges.map((x) => x[0])}::int[], ${ranges.map((x) => x[1])}::int[]) as rg(a, b) on r.row_index between rg.a and rg.b
-          join fourdb.value v on v.record_id = r.id and v.system_to is null and v.column_id = any(${leafIds}::bigint[])
-         where r.sheet_id = ${sheetId} and r.kind = 'data' and r.system_to is null`;
-      const s = Number(t.num), k = Number(sum.computed);
-      g.checked++;
-      if (Math.abs(s - k) < EPS) g.matched++;
-      else if (g.mismatches.length < MAX_LIST) g.mismatches.push({ where: `${colLetter(col.col_index)} 列「${col.header}」`, sheet: s, computed: k });
-    }
-    rows.push(g);
+  // 合計の行のセルごとに「足す行の範囲」と「足す列」を作り、まとめて1本の SQL で計算する(合計の行が多くても SQL は1本)
+  type Item = { record: number; col: Col; sheet: number };
+  const items: Item[] = [];
+  const rg = { item: [] as number[], a: [] as number[], b: [] as number[] };
+  const lc = { item: [] as number[], col: [] as number[] };
+  for (const t of totals) {
+    const col = colById.get(Number(t.column_id));
+    const ar = recById.get(Number(t.record_id));
+    if (!col || !ar) continue;
+    const ranges = rangesFor(ar.row_index, col.col_index).filter(([a, b]) => a <= b);
+    const leafIds = idsOf(leaves(col.col_index));
+    if (!ranges.length || !leafIds.length) continue;
+    const i = items.push({ record: Number(t.record_id), col, sheet: Number(t.num) }) - 1;
+    for (const [a, b] of ranges) { rg.item.push(i); rg.a.push(a); rg.b.push(b); }
+    for (const c of leafIds) { lc.item.push(i); lc.col.push(c); }
   }
+  const sums = new Map<number, number>();
+  if (items.length) {
+    const res = await tx<{ item: number; computed: string }[]>`
+      with rg as (select * from unnest(${rg.item}::int[], ${rg.a}::int[], ${rg.b}::int[]) as x(item, a, b)),
+           lc as (select * from unnest(${lc.item}::int[], ${lc.col}::bigint[]) as y(item, col))
+      select rg.item, coalesce(sum(v.num), 0) as computed
+        from rg
+        join fourdb.record r on r.sheet_id = ${sheetId} and r.kind = 'data' and r.system_to is null and r.row_index between rg.a and rg.b
+        join lc on lc.item = rg.item
+        join fourdb.value v on v.record_id = r.id and v.column_id = lc.col and v.system_to is null
+       group by rg.item`;
+    for (const r of res) sums.set(r.item, Number(r.computed));
+  }
+  const rows: ReconcileGroup[] = aggRows.map((ar) => ({ label: rowLabel(ar.row_key, ar.row_index), checked: 0, matched: 0, mismatches: [] }));
+  const groupOf = new Map(aggRows.map((ar, i) => [Number(ar.id), rows[i]]));
+  items.forEach((it, i) => {
+    const g = groupOf.get(it.record)!;
+    const k = sums.get(i) ?? 0;
+    g.checked++;
+    if (Math.abs(it.sheet - k) < EPS) g.matched++;
+    else if (g.mismatches.length < MAX_LIST) g.mismatches.push({ where: `${colLetter(it.col.col_index)} 列「${it.col.header}」`, sheet: it.sheet, computed: k });
+  });
 
   const all = [...columns, ...rows];
   return { sheet, columns, rows, summary: { checked: all.reduce((a, g) => a + g.checked, 0), matched: all.reduce((a, g) => a + g.matched, 0) } };
