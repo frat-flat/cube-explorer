@@ -21,6 +21,15 @@ Synapse などへ組み込むときは、その組み込み先の分をこの文
 
 環境変数(名前だけ): `NEON_AUTH_BASE_URL`・`NEON_AUTH_COOKIE_SECRET`・`ALLOWED_EMAILS`・`SUPABASE_URL`・`SUPABASE_SECRET_KEY`・`GOOGLE_SERVICE_ACCOUNT_JSON`。
 
+## 4D Base の芯の表(fourdb)につなぐときの決まり
+
+[DATA_MODEL.md](../4db/DATA_MODEL.md) 3.9 のとおり。この環境では次のようにする(まだ本番にはつないでいない)。
+
+- 表を作る役割(持ち主)と、アプリが接続する実行用の役割を分ける。実行用の役割は superuser でも BYPASSRLS でもなく、`fourdb` の表の読み書きと関数の実行だけを渡す。
+- アプリはトランザクションごとに `fourdb.principal` と `fourdb.workspace_id` を設定してから読み書きする(`set_config(…, true)`)。所属(`workspace_member`)を確かめてから workspace を設定する。
+- principal はログイン(Neon Auth)のユーザー ID を使い、`neon:<ユーザー ID>` の形にする。メールアドレスは表示用。入口の許可リスト(`ALLOWED_EMAILS`)と、workspace の所属の両方を確かめる。
+- 手元の開発用の利用者(ログインの設定がないときの `local-dev`)は、本番のデータベースにつながない。
+
 ## 未確認のこと
 
 - 本番がつないでいる Supabase のプロジェクト。2026-10-08 に接続できる Supabase の組織には、4D Base 用と分かるプロジェクトが見当たらなかった。
