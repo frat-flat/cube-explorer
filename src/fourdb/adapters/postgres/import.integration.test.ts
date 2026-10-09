@@ -147,6 +147,9 @@ describe.skipIf(!ADMIN)("取り込み(結合)", () => {
     const n = await withScope(bob, async (tx) => (await tx<{ n: string }[]>`select (select count(*) from fourdb.value) + (select count(*) from fourdb.source_sheet) as n`)[0].n);
     expect(n).toBe("0");
     await expect(withScope(bob, (tx) => reconcile(tx, sheetId))).rejects.toThrow(ImportError);
+    // 別の人の取り込みは、id を知っていても反映できない(見つからない扱い)
+    const [{ id: runId }] = await withScope(alice, (tx) => tx<{ id: string }[]>`select id from fourdb.import_run where sheet_id = ${sheetId} order by started_at desc limit 1`);
+    await expect(applyNext(bob, runId, null)).rejects.toMatchObject({ status: 404 });
   });
 
   it("行ごとの権限を飛ばせる役割(superuser)でつないだら止め、実行用の役割なら通す。RLS の強制が外れた表があれば実行用の役割でも止める", async () => {
@@ -179,6 +182,149 @@ describe.skipIf(!ADMIN)("取り込み(結合)", () => {
     expect(c0).toMatchObject({ dataRows: 3, aggregateRows: 1, done: true });
     const c1 = await withScope(alice, (tx) => checkApply(tx, run.id, spec, 3));
     expect(c1).toMatchObject({ dataRows: 1, aggregateRows: 1, duplicateKeys: [], done: true });
+  });
+
+  it("反映は時間で区切って続きから書ける(最初の反映と読み直し)。途中で失敗した呼び出しは何も残さず、続けて呼べば一度に書いたときと同じ中身になる", async () => {
+    // 450 行 × (店舗コード・担当・1〜3月・計) + 合計の行。同じ中身のタブを2つ作り、B は時間 0(1回に最小のまとまり)で、A は既定で書く
+    // 読み直し(reread): 45 行がなくなり、値と担当の一部が変わる
+    const split = (reread = false): Raw[][] => {
+      const rows: Raw[][] = [["2026年 分割(試験)"], ["店舗コード", "担当", "1月", "2月", "3月", "計"]];
+      for (let i = 0; i < 450; i++) {
+        if (reread && i % 10 === 4) continue;
+        const r = rows.length + 1;
+        const [a, b, c] = [(i % 7) + 1 + (reread && i % 5 === 1 ? 100 : 0), (i % 11) + 2, (i % 13) + 3];
+        rows.push([`T-${String(i).padStart(4, "0")}`, `担当${(i % 5) + (reread && i % 9 === 0 ? 10 : 0)}`, a, b, c, [a + b + c, `=SUM(C${r}:E${r})`]]);
+      }
+      const last = rows.length;
+      const sum = (k: number) => rows.slice(2).reduce((s, x) => s + (x[k] as number), 0);
+      const total = (k: number, l: string) => [sum(k), `=SUM(${l}3:${l}${last})`] as [number, string];
+      rows.push(["合計", "", total(2, "C"), total(3, "D"), total(4, "E"), [sum(2) + sum(3) + sum(4), `=SUM(F3:F${last})`]]);
+      return rows;
+    };
+    reader.set("2026年 分割A", split());
+    reader.set("2026年 分割B", split());
+    const sheets = await withScope(alice, async (tx) => registerBook(tx, await reader.book("x")));
+    const prepare = async (title: string, reread = false) => {
+      const sheet = sheets.find((x) => x.title === title)!;
+      const run = await withScope(alice, (tx) => startRun(tx, sheet.id, alice.principal));
+      for (let i = 0; i < 20; i++) if ((await readNext(alice, run.id, reader)).done) break;
+      const spec = defaultSpec((await withScope(alice, (tx) => proposal(tx, run.id))).proposal);
+      expect(await withScope(alice, (tx) => checkApply(tx, run.id, spec))).toMatchObject(
+        reread ? { errors: [], dataRows: 405, aggregateRows: 1 } : { errors: [], dataRows: 450, aggregateRows: 1, values: 1800, totals: 454, entities: 450 });
+      return { sheet, run, spec };
+    };
+    const cursorNext = async (runId: string) =>
+      withScope(alice, async (tx) => (await tx<{ n: number | null }[]>`select (cursor -> 'apply' ->> 'next')::int as n from fourdb.import_run where id = ${runId}`)[0].n);
+
+    // B: 1回ごとに最小のまとまりだけ書く。3回目の呼び出しは、値を書いたあとでわざと失敗させる
+    const b = await prepare("2026年 分割B");
+    let writes = 0;
+    const failOnce = { budgetMs: 0, trace: (phase: string) => { if (phase === "write.values" && ++writes === 2) throw new Error("試験: 途中で止める"); } };
+    const seen: number[] = [];
+    let failures = 0;
+    let r = await applyNext(alice, b.run.id, b.spec, failOnce);
+    seen.push(r.next);
+    for (let i = 0; !r.done && i < 50; i++) {
+      const before = await cursorNext(b.run.id);
+      try {
+        r = await applyNext(alice, b.run.id, null, failOnce);
+        seen.push(r.next);
+      } catch (e) {
+        expect((e as Error).message).toBe("試験: 途中で止める");
+        failures++;
+        expect(await cursorNext(b.run.id)).toBe(before);   // 失敗した呼び出しの分は残らない(位置も進まない)
+      }
+    }
+    expect(r.done).toBe(true);
+    expect(failures).toBe(1);
+    expect(seen.length).toBeGreaterThanOrEqual(4);   // 準備 → まとまりごと → 片付け、と分かれた
+    expect(seen).toEqual([...seen].sort((x, y) => x - y));   // 進み具合は戻らない
+
+    // A: 既定の時間で書く(この大きさなら1回で終わる)
+    const a = await prepare("2026年 分割A");
+    const ra = await applyNext(alice, a.run.id, a.spec);
+    expect(ra.done).toBe(true);
+    expect(r.counts).toEqual(ra.counts);
+    expect(ra.counts).toEqual({ rows: 451, values: 1800, totals: 454, closedValues: 0 });
+
+    // 中身(行・値・スプシの合計・Card)と照合が、A と B で同じ
+    const contents = (sheetId: string) =>
+      withScope(alice, async (tx) => {
+        const [x] = await tx<{ recs: string; vals: string; tots: string; cards: string; staged: string; status: string }[]>`
+          select (select string_agg(r.row_key || ':' || r.row_index || ':' || r.kind || ':' || coalesce(b.name, '-'), ',' order by r.row_index)
+                    from fourdb.record r left join fourdb.box b on b.id = r.box_id where r.sheet_id = ${sheetId} and r.system_to is null) as recs,
+                 (select string_agg(r.row_key || ':' || c.col_index || ':' || v.kind || ':' || coalesce(v.num::text, v.txt), ',' order by r.row_index, c.col_index)
+                    from fourdb.value v join fourdb.record r on r.id = v.record_id join fourdb.source_column c on c.id = v.column_id
+                   where v.sheet_id = ${sheetId} and v.system_to is null) as vals,
+                 (select string_agg(r.row_key || ':' || c.col_index || ':' || t.num || ':' || coalesce(t.formula, '-'), ',' order by r.row_index, c.col_index)
+                    from fourdb.source_total t join fourdb.record r on r.id = t.record_id join fourdb.source_column c on c.id = t.column_id
+                   where t.sheet_id = ${sheetId} and t.system_to is null) as tots,
+                 (select count(*) from fourdb.card_attribute ca where ca.source_reference ->> 'sheet_id' = ${sheetId}) as cards,
+                 (select count(*) from fourdb.import_row ir join fourdb.import_run ru on ru.id = ir.run_id where ru.sheet_id = ${sheetId}) as staged,
+                 (select string_agg(status, ',') from fourdb.import_run where sheet_id = ${sheetId}) as status`;
+        return x;
+      });
+    const ca = await contents(a.sheet.id);
+    expect(await contents(b.sheet.id)).toEqual(ca);
+    expect(ca).toMatchObject({ cards: "450", staged: "0", status: "applied" });
+    const [ka, kb] = await Promise.all([a, b].map((x) => withScope(alice, (tx) => reconcile(tx, x.sheet.id))));
+    expect(ka.summary).toEqual({ checked: 454, matched: 454 });
+    expect(kb.summary).toEqual(ka.summary);
+
+    // 読み直し(前に行がある = なくなった行を閉じる段階あり)。B は時間 0・置き場を 50 行ずつ消し、
+    // 「なくなった行を閉じる」段階と、片付け(置き場を消す)の途中で1回ずつ失敗させる。A は既定で書く
+    reader.set("2026年 分割A", split(true));
+    reader.set("2026年 分割B", split(true));
+    await withScope(alice, async (tx) => registerBook(tx, await reader.book("x")));
+    const b2 = await prepare("2026年 分割B", true);
+    const pending = new Set(["finish.close", "finish.cleanup"]);
+    let cleanups = 0;
+    const opts2 = {
+      budgetMs: 0,
+      cleanupRows: 50,
+      trace: (phase: string) => {
+        if (phase === "finish.close" && pending.delete(phase)) throw new Error("試験: 途中で止める");
+        if (phase === "finish.cleanup" && ++cleanups === 3 && pending.delete(phase)) throw new Error("試験: 途中で止める");
+      },
+    };
+    const finishOf = async (runId: string) =>
+      withScope(alice, async (tx) => (await tx<{ f: { closed: boolean; cleaned: boolean; cleanedTo: number } | null; had: boolean }[]>`
+        select cursor -> 'apply' -> 'finish' as f, (cursor -> 'apply' ->> 'hadRecords')::boolean as had from fourdb.import_run where id = ${runId}`)[0]);
+    let r2 = await applyNext(alice, b2.run.id, b2.spec, opts2);
+    let failures2 = 0;
+    let midCleanup = false;
+    for (let i = 0; !r2.done && i < 200; i++) {
+      try {
+        r2 = await applyNext(alice, b2.run.id, null, opts2);
+      } catch (e) {
+        expect((e as Error).message).toBe("試験: 途中で止める");
+        failures2++;
+        continue;
+      }
+      const x = await finishOf(b2.run.id);
+      if (x.f?.closed && !x.f.cleaned && x.f.cleanedTo > 0) {
+        midCleanup = true;   // 置き場を一部消したところで区切られ、次の呼び出しが続きを消した
+        expect(x.had).toBe(false);   // 閉じ終えたら hadRecords は false(前のつくりで続けても閉じ直さない)
+      }
+    }
+    expect(r2.done).toBe(true);
+    expect(failures2).toBe(2);
+    expect(midCleanup).toBe(true);
+
+    const a2 = await prepare("2026年 分割A", true);
+    const ra2 = await applyNext(alice, a2.run.id, a2.spec);
+    expect(ra2.done).toBe(true);
+    expect(r2.counts).toEqual(ra2.counts);
+    expect((await contents(b.sheet.id))).toEqual(await contents(a.sheet.id));
+    const lastLines = (sheetId: string) =>
+      withScope(alice, async (tx) => (await tx<{ l: string[] }[]>`
+        select detail -> 'lines' as l from fourdb.history where detail ->> 'sheet_id' = ${sheetId} order by id desc limit 1`)[0].l);
+    const la = await lastLines(a.sheet.id);
+    expect(await lastLines(b.sheet.id)).toEqual(la);
+    expect(la.join()).toContain("スプシからなくなった行 46 行を閉じた");   // 45 行 + 位置のずれた合計の行
+    const [ka2, kb2] = await Promise.all([a, b].map((x) => withScope(alice, (tx) => reconcile(tx, x.sheet.id))));
+    expect(kb2.summary).toEqual(ka2.summary);
+    expect(ka2.summary.checked).toBe(ka2.summary.matched);
   });
 
   it("移行完了にした表には、スプシから取り込めない", async () => {

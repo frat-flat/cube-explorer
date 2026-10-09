@@ -56,16 +56,22 @@ export async function reconcile(tx: Tx, sheetId: string): Promise<ReconcileResul
   const idsOf = (indexes: number[]) => indexes.map((i) => Number(byIndex.get(i)!.id));
 
   // ---------- 合計の列(行ごと) ----------
+  // 表の今のデータの行を1回なめ、行ごとにスプシの合計と値を「行の id から始まる索引」で引く(LATERAL)。
+  // 列の条件は column_id + 0 と書いて、列から始まる索引を使えなくする。統計がない・古い・空のときに vacuum された
+  // ときでも、「列の値を全部なめる」「表の側を外にして何度もなめる」手順にならないように(3,000 行で 10 秒以上かかっていた)
   const columns: ReconcileGroup[] = [];
   for (const c of cols.filter((x) => x.role === "aggregate")) {
     const leafIds = idsOf(leaves(c.col_index));
     const rows = await tx<{ row_key: string; row_index: number; sheet: string; computed: string }[]>`
-      select r.row_key, r.row_index, t.num as sheet, coalesce(sum(v.num), 0) as computed
-        from fourdb.source_total t
-        join fourdb.record r on r.id = t.record_id and r.kind = 'data' and r.system_to is null
-        left join fourdb.value v on v.record_id = t.record_id and v.system_to is null and v.column_id = any(${leafIds}::bigint[])
-       where t.column_id = ${c.id} and t.system_to is null and t.num is not null
-       group by r.row_key, r.row_index, t.num
+      select r.row_key, r.row_index, t.num as sheet, coalesce(s.computed, 0) as computed
+        from fourdb.record r
+        cross join lateral (
+          select t.num from fourdb.source_total t
+           where t.record_id = r.id and t.column_id + 0 = ${c.id} and t.system_to is null and t.num is not null limit 1) t
+        cross join lateral (
+          select sum(v.num) as computed from fourdb.value v
+           where v.record_id = r.id and v.system_to is null and v.column_id + 0 = any(${leafIds}::bigint[])) s
+       where r.sheet_id = ${sheetId} and r.kind = 'data' and r.system_to is null
        order by r.row_index`;
     const g: ReconcileGroup = { label: `${colLetter(c.col_index)} 列「${c.header}」`, checked: rows.length, matched: 0, mismatches: [] };
     for (const r of rows) {
@@ -126,14 +132,22 @@ export async function reconcile(tx: Tx, sheetId: string): Promise<ReconcileResul
   }
   const sums = new Map<number, number>();
   if (items.length) {
+    // 値は行ごとに索引で引き(足す列の分をまとめて)、小さな組にしてから範囲と突き合わせる(上と同じく、統計が古くても手順が崩れないように)
     const res = await tx<{ item: number; computed: string }[]>`
       with rg as (select * from unnest(${rg.item}::int[], ${rg.a}::int[], ${rg.b}::int[]) as x(item, a, b)),
-           lc as (select * from unnest(${lc.item}::int[], ${lc.col}::bigint[]) as y(item, col))
-      select rg.item, coalesce(sum(v.num), 0) as computed
+           lc as (select * from unnest(${lc.item}::int[], ${lc.col}::bigint[]) as y(item, col)),
+           vals as materialized (
+             select r.row_index, v.column_id, v.num
+               from fourdb.record r
+               cross join lateral (
+                 select v.column_id, v.num from fourdb.value v
+                  where v.record_id = r.id and v.system_to is null and v.column_id + 0 = any(${[...new Set(lc.col)]}::bigint[])
+                 offset 0) v   -- offset 0: 結びの中に溶かさず、行ごとに引く。column_id + 0: 行の id から始まる索引だけを使う
+              where r.sheet_id = ${sheetId} and r.kind = 'data' and r.system_to is null)
+      select rg.item, coalesce(sum(vals.num), 0) as computed
         from rg
-        join fourdb.record r on r.sheet_id = ${sheetId} and r.kind = 'data' and r.system_to is null and r.row_index between rg.a and rg.b
         join lc on lc.item = rg.item
-        join fourdb.value v on v.record_id = r.id and v.column_id = lc.col and v.system_to is null
+        join vals on vals.column_id = lc.col and vals.row_index between rg.a and rg.b
        group by rg.item`;
     for (const r of res) sums.set(r.item, Number(r.computed));
   }
