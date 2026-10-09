@@ -1,6 +1,9 @@
 // 集計(Projection Engine)の結合テスト。FOURDB_TEST_ADMIN_URL がなければ飛ばす。
 // 取り込みの結合テストとぶつからないよう、別のデータベース(<名前>_proj)を作って使う。
 // 試験用のスプシ(e2e/fixtures/sheets/fixture-uriage-2026.json)を取り込んでから集計し、スプシの合計と同じになるかを見る。
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { defaultSpec } from "@/fourdb/core/import/spec";
@@ -19,6 +22,7 @@ describe.skipIf(!ADMIN)("集計(結合)", () => {
   let admin: postgres.Sql;
   let alice: Scope;
   let cat: Catalog;
+  let uriageSheetId = "";
   const measure = (name: string) => cat.measures.find((m) => m.name === name)!.id;
   const dim = (name: string) => cat.dimensions.find((d) => d.name === name)!.id;
   const run = (req: Partial<ProjectionRequest>) =>
@@ -42,9 +46,13 @@ describe.skipIf(!ADMIN)("集計(結合)", () => {
     process.env.FOURDB_DATABASE_URL = app.toString();
     alice = { principal: "test:alice", workspaceId: await personalWorkspace("test:alice") };
 
-    // 試験用のスプシを取り込む(取り込みの画面と同じ流れ)
-    const reader = fixtureReader("e2e/fixtures/sheets");
-    const sheets = await withScope(alice, async (tx) => registerBook(tx, await reader.book("fixture:fixture-uriage-2026")));
+    uriageSheetId = await importFixtureSheet("fixture-uriage-2026");
+    cat = await withScope(alice, (tx) => catalog(tx));
+  });
+  /** 試験用のスプシの「2026年度」のシートを取り込む(取り込みの画面と同じ流れ)。シートの id を返す */
+  async function importFixtureSheet(fixtureId: string, dir = "e2e/fixtures/sheets"): Promise<string> {
+    const reader = fixtureReader(dir);
+    const sheets = await withScope(alice, async (tx) => registerBook(tx, await reader.book(`fixture:${fixtureId}`)));
     const sheet = sheets.find((x) => x.title === "2026年度")!;
     const r = await withScope(alice, (tx) => startRun(tx, sheet.id, alice.principal));
     for (let i = 0; i < 20; i++) if ((await readNext(alice, r.id, reader)).done) break;
@@ -52,8 +60,8 @@ describe.skipIf(!ADMIN)("集計(結合)", () => {
     expect((await withScope(alice, (tx) => checkApply(tx, r.id, spec))).errors).toEqual([]);
     let a = await applyNext(alice, r.id, spec);
     for (let i = 0; !a.done && i < 20; i++) a = await applyNext(alice, r.id, null);
-    cat = await withScope(alice, (tx) => catalog(tx));
-  });
+    return sheet.id;
+  }
   afterAll(async () => {
     await admin?.end();
   });
@@ -134,5 +142,84 @@ describe.skipIf(!ADMIN)("集計(結合)", () => {
     await expect(withScope(bob, (tx) => saveDefinition(tx, { id: def.id, name: "横取り", request: req }))).rejects.toThrow("見つかりません");
     expect(await withScope(bob, (tx) => searchMembers(tx, dim("店舗コード"), null, ""))).toEqual([]);
     expect((await withScope(alice, (tx) => getDefinition(tx, def.id))).name).toBe(def.name);
+  });
+
+  // 画面の「対象のシート」で数値の一覧を絞るため、数値ごとに、そのカラムを持つシートの id を返す(P1)。ほかの試験の数や並びを変えないよう、最後に置く
+  it("数値ごとに、そのカラムを持つシートの id を返す。シートが増えれば増え、消したシートは外れ、別の人には見えない", async () => {
+    const byName = (c: Catalog) => Object.fromEntries(c.measures.map((m) => [m.name, m.sheetIds]));
+    expect(byName(cat)).toEqual({ 売上: [uriageSheetId], 精算額: [uriageSheetId] });
+    expect(cat.measures.every((m) => m.sheets === m.sheetIds.length)).toBe(true);
+
+    // 経費のファイルのシートを足すと、経費は経費のシートだけ。売上・精算額は変わらない
+    const keihiSheetId = await importFixtureSheet("fixture-keihi-2026");
+    const both = await withScope(alice, (tx) => catalog(tx));
+    expect(byName(both)).toEqual({ 売上: [uriageSheetId], 精算額: [uriageSheetId], 経費: [keihiSheetId] });
+
+    // 同じ名前の数値が別のファイルの 2 つのシートにあれば、数値は 1 つで、両方のシートの id が出る(複数のシートにまたがる数値)
+    const dir = await mkdtemp(join(tmpdir(), "fourdb-fixture-"));
+    try {
+      await copyFile("e2e/fixtures/sheets/fixture-uriage-2026.json", join(dir, "uriage-copy.json"));
+      const copySheetId = await importFixtureSheet("uriage-copy", dir);
+      const three = await withScope(alice, (tx) => catalog(tx));
+      expect(three.measures.filter((m) => m.name === "売上")).toHaveLength(1);
+      expect(byName(three).売上).toEqual([uriageSheetId, copySheetId].sort());
+      expect(three.measures.find((m) => m.name === "売上")!.sheets).toBe(2);
+      expect(byName(three).経費).toEqual([keihiSheetId]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+
+    // 消した(deleted_at が付いた)シートは外れる。数値の持ち主がいなくなれば、数値ごと一覧から消える
+    await admin`update fourdb.source_sheet set deleted_at = now() where id = ${keihiSheetId}`;
+    expect(Object.keys(byName(await withScope(alice, (tx) => catalog(tx)))).sort()).toEqual(["売上", "精算額"]);
+    await admin`update fourdb.source_sheet set deleted_at = null where id = ${keihiSheetId}`;
+
+    // 別の人(workspace)には、シートの id も見えない
+    const carol: Scope = { principal: "test:carol", workspaceId: await personalWorkspace("test:carol") };
+    expect((await withScope(carol, (tx) => catalog(tx))).measures).toEqual([]);
+  });
+
+  // 保存した表を開いたとき、その数値が今のデータになくなっている場合(P-1)。画面が「その数値がない」と知らせるために、数値の名前を返す
+  it("保存した表の数値が今のデータからなくなっても(読み直して数値の列がなくなった・シートを消した)、保存した表は開けて、数値の名前が分かる", async () => {
+    const measureId = measure("精算額");
+    const req: ProjectionRequest = { measureId, fn: "SUM", rows: null, columns: null, filters: [], sheetIds: [uriageSheetId] };
+    const saved = await withScope(alice, (tx) => saveDefinition(tx, { id: null, name: "精算額の表(数値がなくなる)", request: req }));
+    const names = async () => (await withScope(alice, (tx) => catalog(tx))).measures.map((m) => m.name);
+    expect(await names()).toContain("精算額");
+    expect((await withScope(alice, (tx) => getDefinition(tx, saved.id))).measureName).toBe("精算額");
+
+    // 読み直して、精算額の列を「使わない」にした状態(その列の取り込み元の定義が閉じる)。数値は一覧から消えるが、保存した表は開け、名前が分かる
+    await admin`update fourdb.source_column set system_to = now() where column_definition_id = ${measureId} and system_to is null`;
+    try {
+      expect(await names()).not.toContain("精算額");
+      const opened = await withScope(alice, (tx) => getDefinition(tx, saved.id));
+      expect(opened.request).toEqual(req);
+      expect(opened.measureName).toBe("精算額");
+    } finally {
+      await admin`update fourdb.source_column set system_to = null where column_definition_id = ${measureId}`;
+    }
+    expect(await names()).toContain("精算額");
+
+    // シートがすべて消えた(deleted_at)とき(同じ数値を持つ別のシートも含めて)。数値も一覧から消えるが、保存した表は開け、名前も分かり、シートの指定も残る
+    const active = (await admin<{ id: string }[]>`select id from fourdb.source_sheet where deleted_at is null`).map((r) => r.id);
+    expect(active).toContain(uriageSheetId);
+    await admin`update fourdb.source_sheet set deleted_at = now() where id = any(${active}::uuid[])`;
+    try {
+      expect(await names()).toEqual([]);
+      const opened = await withScope(alice, (tx) => getDefinition(tx, saved.id));
+      expect(opened.measureName).toBe("精算額");
+      expect(opened.request.sheetIds).toEqual([uriageSheetId]);
+    } finally {
+      await admin`update fourdb.source_sheet set deleted_at = null where id = any(${active}::uuid[])`;
+    }
+
+    // 数値の定義そのものがない(別の作業で消えた など)ときは、名前なし(null)
+    const ghost: ProjectionRequest = { ...req, measureId: "00000000-0000-4000-8000-000000000001" };
+    const ghostSaved = await withScope(alice, (tx) => saveDefinition(tx, { id: null, name: "存在しない数値の表", request: ghost }));
+    expect((await withScope(alice, (tx) => getDefinition(tx, ghostSaved.id))).measureName).toBeNull();
+
+    // 別の人(workspace)の定義から、数値の名前は見えない(定義そのものが 404)
+    const dave: Scope = { principal: "test:dave", workspaceId: await personalWorkspace("test:dave") };
+    await expect(withScope(dave, (tx) => getDefinition(tx, saved.id))).rejects.toThrow("見つかりません");
   });
 });

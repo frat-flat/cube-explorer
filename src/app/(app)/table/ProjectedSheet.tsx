@@ -1,11 +1,13 @@
 "use client";
 
-// 取り込んだデータを表で見る画面(Projected Sheet)。数値・集計のしかた・行・列・段・小計・絞り込みを選ぶと、サーバーがその場で元の値から計算する。
+// 取り込んだデータを表で見る画面(Projected Sheet。画面の名前は Table)。数値・集計のしかた・行・列・段・小計・絞り込みを選ぶと、サーバーがその場で元の値から計算する。
 // 合計・小計は Σ 付きの行・列として出し、軸の値としては扱わない。計算された値には ƒ の印を付ける(色だけにしない)。
+import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { Catalog, ProjectionOutput } from "@/fourdb/adapters/postgres/projection";
 import type { SheetSummary } from "@/fourdb/adapters/postgres/import-store";
 import type { ProjCell, ProjectionFn, ProjectionRequest } from "@/fourdb/core/projection/types";
+import { measureGoneMessage, measureLabel, measureMissingMessage, measuresIn } from "./measures";
 import s from "./sheet.module.css";
 
 const FNS: [ProjectionFn, string][] = [
@@ -58,9 +60,12 @@ export function ProjectedSheet() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<Saved[]>([]);
   const [opened, setOpened] = useState<Opened | null>(null);
+  /** 保存した表を開いたときの数値(id と、分かれば名前)。その数値が今のデータになくなっていたら知らせるため */
+  const [savedMeasure, setSavedMeasure] = useState<{ id: string; name: string | null } | null>(null);
   const [name, setName] = useState("");
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(true);
 
   const dimOf = useCallback((id: string | undefined) => cat?.dimensions.find((d) => d.id === id), [cat]);
   const loadSaved = useCallback(async () => {
@@ -88,8 +93,16 @@ export function ProjectedSheet() {
     })();
   }, [loadSaved]);
 
+  // 数値の一覧は、選んだシートにあるものだけ。選んでいる数値がそのシートにないときは、別の数値に切り替えず、知らせて選び直してもらう
+  const available = useMemo(() => (cat ? measuresIn(cat.measures, sheetIds) : []), [cat, sheetIds]);
+  const current = cat?.measures.find((m) => m.id === measureId);
+  const missing = current !== undefined && !available.some((m) => m.id === measureId);
+  // 保存した表の数値が、今のデータにそもそもない(取り込みを読み直して数値の列がなくなった・シートが消えた など)。別の数値に切り替えず、知らせて選び直してもらう
+  const gone = measureId !== "" && cat !== null && current === undefined;
+  const goneName = gone && savedMeasure?.id === measureId ? savedMeasure.name : null;
+
   const request = useMemo<ProjectionRequest | null>(() => {
-    if (!measureId) return null;
+    if (!measureId || missing || gone) return null;
     return {
       measureId,
       fn,
@@ -98,7 +111,7 @@ export function ProjectedSheet() {
       filters: filters.filter((f) => f.members.length > 0).map((f) => ({ dimensionId: f.dimensionId, memberIds: f.members.map((m) => m.id) })),
       sheetIds,
     };
-  }, [measureId, fn, rows, subtotal, cols, filters, sheetIds]);
+  }, [measureId, missing, gone, fn, rows, subtotal, cols, filters, sheetIds]);
   const requestKey = request ? JSON.stringify(request) : "";
 
   useEffect(() => {
@@ -154,7 +167,7 @@ export function ProjectedSheet() {
         f.dimensionId !== dimensionId ? f : { ...f, members: f.members.some((x) => x.id === m.id) ? f.members.filter((x) => x.id !== m.id) : [...f.members, m] },
       ),
     );
-  // 対象のタブ: 何も選ばなければすべて
+  // 対象のシート: 何も選ばなければすべて
   const toggleTab = (id: string) =>
     setSheetIds((ids) => {
       const next = ids?.includes(id) ? ids.filter((x) => x !== id) : [...(ids ?? []), id];
@@ -179,8 +192,10 @@ export function ProjectedSheet() {
   };
   const open = (id: string) =>
     guard(async () => {
-      const d = await api<Opened & { request: ProjectionRequest; filterMembers: Member[] }>(`/api/4db/sheet-definitions/${id}`);
+      const d = await api<Opened & { request: ProjectionRequest; filterMembers: Member[]; measureName: string | null }>(`/api/4db/sheet-definitions/${id}`);
       const names = new Map(d.filterMembers.map((m) => [m.id, m.name]));
+      setError("");
+      setSavedMeasure({ id: d.request.measureId, name: d.measureName });
       setMeasureId(d.request.measureId);
       setFn(d.request.fn);
       setRows(d.request.rows && { dimensionId: d.request.rows.dimensionId, level: d.request.rows.level });
@@ -207,60 +222,71 @@ export function ProjectedSheet() {
   const colDim = dimOf(cols?.dimensionId);
 
   return (
-    <main className={s.page}>
-      <div className={s.top}>
-        <h1>表で見る</h1>
-        <a href="/migrate">スプシから移す</a>
-        <a href="/">ダッシュボードへ戻る</a>
-      </div>
-      <p className={s.lead}>
-        取り込んだ元の値から、選んだ行・列・段で、その場で計算した表を出します。
-        合計・小計は Σ を付けて出し、軸の値としては扱いません。スプシの関数で計算された値には ƒ を付けます。
-      </p>
+    <div className={`view ${s.fill}`}>
+      <header className="vhead">
+        <div className="vtitle">
+          <h1>
+            Table<small>表で見る</small>
+          </h1>
+          <Link href="/migrate">ファイルから移す</Link>
+          <button type="button" className={`small ${s.foldBtn}`} onClick={() => setSetupOpen(!setupOpen)} aria-expanded={setupOpen} aria-controls="table-setup">
+            {setupOpen ? "組み方の欄を畳む" : "組み方の欄を開く"}
+          </button>
+        </div>
+        <p className="lead">
+          取り込んだ元の値から、選んだ行・列・段で、その場で計算した表を出します。
+          合計・小計は Σ を付けて出し、軸の値としては扱いません。スプシの関数で計算された値には ƒ を付けます。
+        </p>
+      </header>
       {cat && cat.measures.length === 0 && (
-        <p className={s.card}>
-          まだ表にできるデータがありません。<a href="/migrate">スプシから移す</a>で取り込んでください。
+        <p className="card">
+          まだ表にできるデータがありません。<Link href="/migrate">ファイルから移す</Link>で取り込んでください。
         </p>
       )}
 
-      <section className={s.card}>
+      <div className={s.workspace} data-setup={setupOpen ? "open" : "closed"}>
+      <div className={s.setup} id="table-setup">
+      <section className="card">
         <h2>表の定義</h2>
-        <div className={s.row}>
+        <div className="row">
           <select value="" onChange={(e) => e.target.value && void open(e.target.value)} aria-label="保存した表を開く" disabled={busy || saved.length === 0}>
             <option value="">{saved.length ? "保存した表を開く…" : "保存した表はまだありません"}</option>
             {saved.map((d) => (
               <option key={d.id} value={d.id}>{d.name}(版 {d.version})</option>
             ))}
           </select>
-          <input className={s.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="表の名前" aria-label="表の名前" maxLength={100} />
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="表の名前" aria-label="表の名前" maxLength={100} />
           {opened && <button onClick={() => void save(true)} disabled={busy || !name.trim() || !request}>上書き保存</button>}
-          <button className={s.primary} onClick={() => void save(false)} disabled={busy || !name.trim() || !request}>新しく保存</button>
+          <button className="primary" onClick={() => void save(false)} disabled={busy || !name.trim() || !request}>新しく保存</button>
         </div>
-        {opened && <p className={s.muted}>開いている表: 「{opened.name}」(版 {opened.version})。上書き保存すると版が上がり、前の定義は履歴に残ります。</p>}
-        {saveMsg && <p className={saveMsg.ok ? s.ok : s.error} role="status">{saveMsg.text}</p>}
+        {opened && <p className="muted">開いている表: 「{opened.name}」(版 {opened.version})。上書き保存すると版が上がり、前の定義は履歴に残ります。</p>}
+        {saveMsg && <p className={saveMsg.ok ? "ok" : "error"} role="status">{saveMsg.text}</p>}
       </section>
 
       {cat && cat.measures.length > 0 && (
-        <section className={s.card}>
+        <section className="card">
           <h2>表の組み方</h2>
-          <div className={s.controls}>
-            <label className={s.field}>
+          <div className="controls">
+            <label className="field">
               <span>数値</span>
-              <select value={measureId} onChange={(e) => setMeasureId(e.target.value)}>
-                {cat.measures.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name}(タブ {m.sheets})</option>
+              <select value={measureId} onChange={(e) => setMeasureId(e.target.value)} aria-invalid={missing || gone || undefined}>
+                {/* 選んでいる数値が選んだシートにないとき・今のデータにないときも、選択肢に残す(勝手に別の数値に切り替えない) */}
+                {missing && current && <option value={current.id}>{current.name}</option>}
+                {gone && <option value={measureId}>{goneName ?? "(見つからない数値)"}</option>}
+                {available.map((m) => (
+                  <option key={m.id} value={m.id}>{measureLabel(m)}</option>
                 ))}
               </select>
             </label>
-            <label className={s.field}>
+            <label className="field">
               <span>集計のしかた</span>
               <select value={fn} onChange={(e) => setFn(e.target.value as ProjectionFn)}>
                 {FNS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
               </select>
             </label>
-            <div className={s.field}>
+            <div className="field">
               <span>行</span>
-              <div className={s.row}>
+              <div className="row">
                 <select value={rows?.dimensionId ?? ""} onChange={(e) => setRowDim(e.target.value)} aria-label="行の軸">
                   <option value="">なし</option>
                   {cat.dimensions.map((d) => <option key={d.id} value={d.id} disabled={d.id === cols?.dimensionId}>{d.name}{d.id === cols?.dimensionId ? "(列で使用中)" : ""}</option>)}
@@ -268,16 +294,16 @@ export function ProjectedSheet() {
                 {rowDim && <LevelSelect dim={rowDim} value={rows!.level} onChange={setRowLevel} label="行の段" />}
               </div>
             </div>
-            <div className={s.field}>
+            <div className="field">
               <span>小計(行を上の段でまとめる)</span>
               <select value={subtotal ?? ""} onChange={(e) => setSubtotal(e.target.value === "" ? null : Number(e.target.value))} disabled={!rowDim || rows?.level === null} aria-label="小計の段">
                 <option value="">なし</option>
                 {rowDim?.levels.filter((l) => rows?.level !== null && rows?.level !== undefined && l.level < rows.level).map((l) => <option key={l.level} value={l.level}>{l.name}ごと</option>)}
               </select>
             </div>
-            <div className={s.field}>
+            <div className="field">
               <span>列</span>
-              <div className={s.row}>
+              <div className="row">
                 <select value={cols?.dimensionId ?? ""} onChange={(e) => setColDim(e.target.value)} aria-label="列の軸">
                   <option value="">なし</option>
                   {cat.dimensions.map((d) => <option key={d.id} value={d.id} disabled={d.id === rows?.dimensionId}>{d.name}{d.id === rows?.dimensionId ? "(行で使用中)" : ""}</option>)}
@@ -285,23 +311,23 @@ export function ProjectedSheet() {
                 {colDim && <LevelSelect dim={colDim} value={cols!.level} onChange={setColLevel} label="列の段" />}
               </div>
             </div>
-            <div className={s.field}>
+            <div className="field">
               <span>&nbsp;</span>
               <button onClick={swap} disabled={!rows && !cols}>行と列を入れ替える</button>
             </div>
           </div>
 
           <h3>絞り込み</h3>
-          {filters.length === 0 && <p className={s.muted}>絞り込んでいません(すべての値)。</p>}
+          {filters.length === 0 && <p className="muted">絞り込んでいません(すべての値)。</p>}
           {filters.map((f) => {
             const d = dimOf(f.dimensionId);
             return (
               <div key={f.dimensionId} className={s.filter}>
-                <div className={s.row}>
+                <div className="row">
                   <b>{d?.name ?? "(見つからない軸)"}</b>
-                  {f.members.length === 0 && <span className={s.muted}>(まだ選んでいません)</span>}
+                  {f.members.length === 0 && <span className="muted">(まだ選んでいません)</span>}
                   {f.members.map((m) => (
-                    <span key={m.id} className={s.chip}>
+                    <span key={m.id} className="chip">
                       {m.name}
                       <button onClick={() => toggleMember(f.dimensionId, m)} aria-label={`${m.name} を外す`}>×</button>
                     </span>
@@ -318,34 +344,41 @@ export function ProjectedSheet() {
             {cat.dimensions.filter((d) => !filters.some((f) => f.dimensionId === d.id)).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
 
-          <h3>対象のタブ</h3>
+          <h3>対象のシート</h3>
+          {/* 開く前でも目に入るよう、折りたたみの外に出す */}
+          {sheetIds?.some((id) => !tabs.some((x) => x.id === id)) && <p className="muted" role="status">保存した表の指定に、今は見つからないシートがあります。</p>}
           <details className={s.sources}>
-            <summary>{sheetIds ? `選んだタブ ${sheetIds.length} 個` : `すべてのタブ(${tabs.length} 個)`}</summary>
-            {sheetIds && <button onClick={() => setSheetIds(null)}>すべてのタブにする</button>}
+            <summary>{sheetIds ? `選んだシート ${sheetIds.length} 個` : `すべてのシート(${tabs.length} 個)`}</summary>
+            {sheetIds && <button onClick={() => setSheetIds(null)}>すべてのシートにする</button>}
             {byBook(tabs).map(({ book, items }) => (
               <div key={book.id} className={s.book}>
-                <div className={s.muted}>スプシ「{book.title}」</div>
+                <div className="muted">ファイル「{book.title}」</div>
                 {items.map((x) => (
                   <label key={x.id} className={s.tab}>
                     <input type="checkbox" checked={sheetIds?.includes(x.id) ?? false} onChange={() => toggleTab(x.id)} aria-label={`${book.title} の ${x.title}`} /> {x.title}
-                    <span className={s.muted}>({x.records} 行)</span>
+                    <span className="muted">({x.records} 行)</span>
                   </label>
                 ))}
               </div>
             ))}
-            {sheetIds?.some((id) => !tabs.some((x) => x.id === id)) && <p className={s.muted}>保存した表の指定に、今は見つからないタブがあります。</p>}
           </details>
         </section>
       )}
+      </div>
 
-      {error && <p className={s.error} role="alert">{error}</p>}
-      {loading && <p className={s.muted} aria-live="polite">集計しています…</p>}
-      {shown && <Result shown={shown} />}
-    </main>
+      <div className={s.result}>
+        {missing && current && <p className="error" role="alert">{measureMissingMessage(current.name)}</p>}
+        {gone && <p className="error" role="alert">{measureGoneMessage(goneName)}</p>}
+        {error && <p className="error" role="alert">{error}</p>}
+        {loading && <p className="muted" aria-live="polite"><span className="spin" aria-hidden="true" />集計しています…</p>}
+        {request && shown && <Result shown={shown} />}
+      </div>
+      </div>
+    </div>
   );
 }
 
-/** タブの一覧をスプシごとにまとめる(並びは保つ) */
+/** シートの一覧をファイルごとにまとめる(並びは保つ) */
 function byBook(tabs: SheetSummary[]): { book: SheetSummary["book"]; items: SheetSummary[] }[] {
   const out: { book: SheetSummary["book"]; items: SheetSummary[] }[] = [];
   for (const x of tabs) {
@@ -392,28 +425,28 @@ function MemberPicker({ dim, selected, onToggle }: { dim: Dim; selected: Set<str
   const levelName = (lv: number) => dim.levels.find((l) => l.level === lv)?.name ?? "";
   return (
     <div className={s.picker}>
-      <div className={s.row}>
+      <div className="row">
         <select value={level} onChange={(e) => setLevel(e.target.value)} aria-label={`${dim.name}の段`}>
           <option value="">すべての段</option>
           {dim.levels.map((l) => <option key={l.level} value={l.level}>{l.name}</option>)}
         </select>
-        <input className={s.input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="名前で探す" aria-label={`${dim.name}を名前で探す`} />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="名前で探す" aria-label={`${dim.name}を名前で探す`} />
       </div>
-      {err && <p className={s.error}>{err}</p>}
-      {list && list.length === 0 && <p className={s.muted}>見つかりません。</p>}
+      {err && <p className="error">{err}</p>}
+      {list && list.length === 0 && <p className="muted">見つかりません。</p>}
       {list && list.length > 0 && (
         <ul className={s.pickList}>
           {list.map((m) => (
             <li key={m.id}>
               <label>
                 <input type="checkbox" checked={selected.has(m.id)} onChange={() => onToggle({ id: m.id, name: m.name })} /> {m.name}
-                {dim.levels.length > 1 && <span className={s.muted}>({levelName(m.level)})</span>}
+                {dim.levels.length > 1 && <span className="muted">({levelName(m.level)})</span>}
               </label>
             </li>
           ))}
         </ul>
       )}
-      {list && list.length >= 200 && <p className={s.muted}>200 件まで出しています。名前で絞ってください。</p>}
+      {list && list.length >= 200 && <p className="muted">200 件まで出しています。名前で絞ってください。</p>}
     </div>
   );
 }
@@ -426,29 +459,29 @@ function Result({ shown: { r, fn } }: { shown: Shown }) {
   const rowLabel = axisLabel(r.rowAxis);
   const colLabel = axisLabel(r.columnAxis);
   return (
-    <section className={s.card}>
+    <section className={`card ${s.resultCard}`}>
       <h2>
         {r.measure.name} の{fnName(fn)}
-        {r.rowAxis?.subtotalLevelName && <span className={s.muted}>(小計: {r.rowAxis.subtotalLevelName}ごと)</span>}
+        {r.rowAxis?.subtotalLevelName && <span className="muted">(小計: {r.rowAxis.subtotalLevelName}ごと)</span>}
       </h2>
-      <p className={s.muted}>
+      <p className="muted">
         行: {rowLabel ?? "なし"} ・ 列: {colLabel ?? "なし"} ・ 集計した値 {fmt(r.valueCount)} 個 ・ {(r.elapsedMs / 1000).toFixed(2)} 秒
       </p>
-      <ul className={s.legend}>
-        <li><b>Σ</b> 合計・小計・総計(元の値からその場で計算。軸の値ではありません)</li>
-        <li><span className={s.mark}>ƒ</span> スプシの関数で計算された値の集計 ・ <span className={s.mark}>ƒ+</span> 元の値と計算された値の両方を含む集計</li>
+      <ul className="legend">
+        <li><b><span className="sig">Σ</span></b> 合計・小計・総計(元の値からその場で計算。軸の値ではありません)</li>
+        <li><span className="mark">ƒ</span> スプシの関数で計算された値の集計 ・ <span className="mark">ƒ+</span> 元の値と計算された値の両方を含む集計</li>
         <li>(なし) その軸の値を持たない値</li>
       </ul>
       {r.valueCount === 0 ? (
-        <p className={s.muted}>値がありません。絞り込みを見直してください。</p>
+        <p className="muted">値がありません。絞り込みを見直してください。</p>
       ) : (
-        <div className={s.tableWrap}>
-          <table className={s.table}>
+        <div className={`tableWrap ${s.tableArea}`}>
+          <table className="table withMarks">
             <thead>
               <tr>
-                <th className={s.corner} scope="col">{[rowLabel, colLabel].filter(Boolean).join(" × ")}</th>
-                {r.columns.map((c, j) => <th key={c.key ?? `none${j}`} className={s.num} scope="col">{c.name}</th>)}
-                {r.rowTotals && <th className={`${s.num} ${s.totalCol}`} scope="col">Σ 合計</th>}
+                <th className="corner" scope="col">{[rowLabel, colLabel].filter(Boolean).join(" × ")}</th>
+                {r.columns.map((c, j) => <th key={c.key ?? `none${j}`} className="num" scope="col">{c.name}</th>)}
+                {r.rowTotals && <th className="num totalCol" scope="col"><span className="sig">Σ</span> 合計</th>}
               </tr>
             </thead>
             <tbody>
@@ -458,13 +491,13 @@ function Result({ shown: { r, fn } }: { shown: Shown }) {
                 return (
                   <Fragment key={row.key ?? `none${i}`}>
                     <tr>
-                      <th className={s.rowHead} scope="row">{row.name}</th>
+                      <th className="rowHead" scope="row">{row.name}</th>
                       {r.cells[i].map((c, j) => <Cell key={j} c={c} />)}
                       {r.rowTotals && <Cell c={r.rowTotals[i]} total edge />}
                     </tr>
                     {sub && (
-                      <tr className={s.subtotal}>
-                        <th className={s.rowHead} scope="row">Σ 小計 {sub.name}</th>
+                      <tr className="subtotal">
+                        <th className="rowHead" scope="row"><span className="sig">Σ</span> 小計 {sub.name}</th>
                         {sub.cells.map((c, j) => <Cell key={j} c={c} total />)}
                         {sub.total && <Cell c={sub.total} total edge />}
                       </tr>
@@ -475,8 +508,8 @@ function Result({ shown: { r, fn } }: { shown: Shown }) {
             </tbody>
             {r.columnTotals && (
               <tfoot>
-                <tr className={s.grand}>
-                  <th className={s.rowHead} scope="row">Σ 総計</th>
+                <tr className="grand">
+                  <th className="rowHead" scope="row"><span className="sig">Σ</span> 総計</th>
                   {r.columnTotals.map((c, j) => <Cell key={j} c={c} total />)}
                   {r.rowTotals && <Cell c={r.grand} total edge />}
                 </tr>
@@ -491,14 +524,14 @@ function Result({ shown: { r, fn } }: { shown: Shown }) {
 
 /** 1つのセル。total = 合計・小計・総計、edge = 右端の「Σ 合計」の列 */
 function Cell({ c, total, edge }: { c: ProjCell; total?: boolean; edge?: boolean }) {
-  const cls = [s.num, total ? s.totalCell : "", edge ? s.totalCol : "", c.kind === "calculated" ? s.calc : ""].filter(Boolean).join(" ");
+  const cls = ["num", total ? "totalCell" : "", edge ? "totalCol" : "", c.kind === "calculated" ? "calc" : ""].filter(Boolean).join(" ");
   if (c.n === 0 || c.v === null) return <td className={cls} />;
   const mark = c.kind === "calculated" ? "ƒ" : c.kind === "mixed" ? "ƒ+" : "";
   const what = c.kind === "calculated" ? "すべてスプシの関数で計算された値" : c.kind === "mixed" ? "元の値と、スプシの関数で計算された値を含む" : "元の値";
   return (
     <td className={cls} title={`値 ${fmt(c.n)} 個から(${what})`}>
       {fmt(c.v)}
-      {mark && <span className={s.mark}>{mark}</span>}
+      {mark && <span className="mark">{mark}</span>}
     </td>
   );
 }

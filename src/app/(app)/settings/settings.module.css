@@ -1,0 +1,65 @@
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--sunken);
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--accent);
+}
+
+/* 選んでいるもの: 枠の色とふとさで分かるようにする(色だけにしない。ラジオボタンの丸も出ている) */
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+/* 小さな見本。data-theme を付けた .half の中は、その見た目の色になる */
+.swatch {
+  display: inline-flex;
+  width: 52px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.half {
+  flex: 1;
+  position: relative;
+  background: var(--bg);
+}
+
+.bar {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.dot {
+  position: absolute;
+  left: 5px;
+  bottom: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hl);
+}

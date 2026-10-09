@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "tokens": "node tools/design/tokens.mjs",
     "test:e2e": "playwright test",
     "fourdb:migrate": "tsx scripts/fourdb-migrate.ts",
     "fourdb:setup-remote": "tsx scripts/fourdb-setup-remote.ts"

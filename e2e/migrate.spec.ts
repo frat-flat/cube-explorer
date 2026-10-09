@@ -1,7 +1,7 @@
 import { copyFile, rm } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
-// スプシから 4D Base へ移す画面(/migrate)。手元のデータベースと試験用のスプシで動いている画面を相手にする:
+// ファイル(Google スプレッドシート)から 4DB へ移す画面(/migrate)。手元のデータベースと試験用のスプシで動いている画面を相手にする:
 //   1) 手元の使い捨てデータベースに fourdb を作る(npm run fourdb:migrate。docs/deployment/ENVIRONMENT.md)
 //   2) node scripts/dev-fourdb.mjs --fixture --port 3100 で起動する
 //   3) E2E_4DB_URL=http://localhost:3100 npx playwright test e2e/migrate.spec.ts
@@ -11,7 +11,9 @@ const FIXTURES = "e2e/fixtures/sheets";
 // 毎回まっさらなスプシとして試すため、試験用のスプシを別の ID で写す(新しく読んだスプシは一覧のいちばん上に来る)
 const id = `e2e-${Date.now()}`;
 
-test.describe("スプシから 4D Base へ移す", () => {
+const LINK = "ファイル(Google スプレッドシート)のリンク";
+
+test.describe("ファイルから 4DB へ移す", () => {
   test.skip(!BASE, "E2E_4DB_URL がないので飛ばす");
   test.beforeAll(async () => {
     await copyFile(`${FIXTURES}/fixture-uriage-2026.json`, `${FIXTURES}/${id}.json`);
@@ -20,21 +22,29 @@ test.describe("スプシから 4D Base へ移す", () => {
     await rm(`${FIXTURES}/${id}.json`, { force: true });
   });
 
-  test("リンクを読み、タブを取り込み、候補を確かめて反映し、照合が一致する。読み直して役割を直すと確かめの結果が変わる", async ({ page }) => {
+  test("リンクを読み、シートを取り込み、候補を確かめて反映し、照合が一致する。読み直して役割を直すと確かめの結果が変わる", async ({ page }) => {
     await page.goto(`${BASE}/migrate`);
+    // 題は Table と同じ形(英語の題 + 日本語の添え書き)。ブラウザのタブは「Import | 4DB」
+    await expect(page).toHaveTitle("Import | 4DB");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Importファイルから取り込む");
+    await expect(page.getByRole("heading", { level: 1 }).locator("small")).toHaveText("ファイルから取り込む");
     // 開いた直後(開発用のサーバーが画面を作っている間)は入力が効かないことがあるので、ボタンが押せるまで入れ直す
     await expect(async () => {
-      await page.getByLabel("スプシのリンク").fill(`https://docs.google.com/spreadsheets/d/${id}/edit`);
+      await page.getByLabel(LINK).fill(`https://docs.google.com/spreadsheets/d/${id}/edit`);
       await expect(page.getByRole("button", { name: "読み取る" })).toBeEnabled({ timeout: 1000 });
     }).toPass();
     await page.getByRole("button", { name: "読み取る" }).click();
     await expect(page.getByText("「店舗別売上(試験用)」を読み取りました")).toBeVisible();
-    // タブの一覧はスプシごとにまとまる(見出しにスプシの名前)
-    await expect(page.getByText("スプシ「店舗別売上(試験用)」").first()).toBeVisible();
+    // シートの一覧はファイルごとにまとまる(見出しにファイルの名前)。画面の中の名前は「ファイル」「シート」
+    await expect(page.getByText("ファイル「店舗別売上(試験用)」").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "元のファイルを開く" }).first()).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "シート", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "移す表(シート)" })).toBeVisible();
 
     const row = page.getByRole("row").filter({ hasText: "2026年度" }).filter({ hasText: "7 行 × 13 列" }).first();
     await row.getByRole("button", { name: "取り込む" }).click();
-    await expect(page.getByRole("heading", { name: "2. 「2026年度」の承認(Saving)" })).toBeVisible();
+    // 承認の見出しは「ファイル名 › シート名」(照合の見出しと同じ形)
+    await expect(page.getByRole("heading", { name: "2. 「店舗別売上(試験用) › 2026年度」の承認(Saving)", exact: true })).toBeVisible();
 
     // 候補: 年度のタブ名から月、合計の列(足している列)、合計の行、計算された値
     await expect(page.getByLabel("D 列の月")).toHaveValue("2026-04");
@@ -43,6 +53,13 @@ test.describe("スプシから 4D Base へ移す", () => {
     await expect(page.getByLabel("L 列が足している列")).toHaveValue("G,K");
     await expect(page.getByText("7 行目を合計の行にする")).toBeVisible();
     await expect(page.getByText("関数で計算された値が 3 個あります")).toBeVisible();
+    // 「合計の行」のチェックの一覧には、先頭の点を付けない。「知らせ」の関数の例は、等幅の書体
+    expect(await page.getByText("7 行目を合計の行にする").locator("xpath=ancestor::ul").evaluate((el) => getComputedStyle(el).listStyleType)).toBe("none");
+    const example = page.locator("li", { hasText: "関数で計算された値が 3 個あります" }).locator("code").first();
+    await expect(example).toBeVisible();
+    await expect(example).toContainText(/^[A-Z]+\d+ =/);
+    expect(await example.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/IBM Plex Mono/);
+    expect(await page.getByRole("heading", { name: "知らせ" }).locator("xpath=following-sibling::ul[1]").evaluate((el) => getComputedStyle(el).listStyleType)).toBe("disc"); // 知らせの一覧は、点つきのまま
 
     // 確かめてから反映する(確かめるまでは反映できない)
     await expect(page.getByRole("button", { name: "この内容で反映する" })).toBeDisabled();
@@ -52,6 +69,8 @@ test.describe("スプシから 4D Base へ移す", () => {
 
     await expect(page.getByRole("heading", { name: "反映しました" })).toBeVisible();
     await expect(page.getByText("スプシの合計 19 個のうち 19 個が、4DB が元の値から計算した合計と一致しました")).toBeVisible();
+    // 照合の見出しは「ファイル名 › シート名」(外側の「」はない)
+    await expect(page.getByRole("heading", { name: "照合: 店舗別売上(試験用) › 2026年度", exact: true })).toBeVisible();
     await expect(row.getByText("取り込み済み(移行中)")).toBeVisible();
     await expect(page.getByRole("cell", { name: "7 行目(合計の行)" })).toBeVisible();
 

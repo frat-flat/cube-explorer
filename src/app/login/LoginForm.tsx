@@ -7,6 +7,24 @@ import styles from "./login.module.css";
 
 const authClient = createAuthClient();
 
+// 画面に出すのは、ここに決めた文だけ。上流(Neon Auth)が返す文は、内部の事情や英語の文が混じるので見せない(何も記録もしない)
+const SEND_TOO_OFTEN = "コードを送れませんでした。しばらく待ってから、もう一度送ってください。";
+const SEND_FAILED = "コードを送れませんでした。メールアドレスを確かめて、もう一度送ってください。";
+const SEND_NO_NETWORK = "コードを送れませんでした。通信できなかったようです。通信の状態を確かめて、もう一度送ってください。";
+const CODE_WRONG = "コードが違うか、期限が切れています。もう一度確かめるか、コードを送り直してください。";
+const SIGN_IN_NO_NETWORK = "ログインできませんでした。通信できなかったようです。通信の状態を確かめて、もう一度試してください。";
+
+/**
+ * 失敗の HTTP の状態(429 など)。Neon Auth の部品は、サーバーが断ったときは status 付きの例外を投げ(返り値の error のこともある)、
+ * 通信そのものができなかったときは status のない例外(TypeError: Failed to fetch など)を投げる。status がなければ 0
+ */
+function httpStatus(e: unknown): number {
+  const n = Number((e as { status?: unknown } | null)?.status);
+  return Number.isFinite(n) ? n : 0;
+}
+const sendFailureMessage = (status: number) => (status === 429 ? SEND_TOO_OFTEN : status >= 400 ? SEND_FAILED : SEND_NO_NETWORK);
+const signInFailureMessage = (status: number) => (status >= 400 ? CODE_WRONG : SIGN_IN_NO_NETWORK);
+
 // メールアドレスに届く6桁のコードでログインする(Neon Auth のメールコード)
 export function LoginForm({ deniedEmail }: { deniedEmail?: string }) {
   const [email, setEmail] = useState("");
@@ -15,28 +33,42 @@ export function LoginForm({ deniedEmail }: { deniedEmail?: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
+  // サーバーが断ったときも、通信そのものが失敗したとき(ネットワークが切れている・中継の API に届かない)も、例外になる。
+  // どちらでもボタンを元に戻し、何が起きたかと次にすることを出す(以前は「送信中…」のまま止まっていた)
   async function sendCode(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setMessage("");
-    const { error } = await authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" });
-    setBusy(false);
-    if (error) setMessage(`コードを送れませんでした:${error.message ?? error.statusText}`);
-    else setStep("code");
+    try {
+      const { error } = await authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" });
+      if (error) setMessage(sendFailureMessage(httpStatus(error) || 500));
+      else setStep("code");
+    } catch (err) {
+      setMessage(sendFailureMessage(httpStatus(err)));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setMessage("");
-    const { error } = await authClient.signIn.emailOtp({ email, otp: otp.trim() });
-    if (error) {
-      setBusy(false);
-      setMessage("コードが違うか、期限が切れています。もう一度確かめるか、コードを送り直してください。");
-      return;
+    let leaving = false;
+    try {
+      const { error } = await authClient.signIn.emailOtp({ email, otp: otp.trim() });
+      if (error) {
+        setMessage(signInFailureMessage(httpStatus(error) || 400));
+        return;
+      }
+      leaving = true; // 画面を読み込み直すので、ボタンは戻さない
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 入金キューブは素の JS なので読み込み直す
+      location.href = "/"; // 見てよい人かどうかはサーバー側で確かめる
+    } catch (err) {
+      setMessage(signInFailureMessage(httpStatus(err)));
+    } finally {
+      if (!leaving) setBusy(false);
     }
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 入金キューブは素の JS なので読み込み直す
-    location.href = "/"; // 見てよい人かどうかはサーバー側で確かめる
   }
 
   if (deniedEmail) {
@@ -78,7 +110,7 @@ export function LoginForm({ deniedEmail }: { deniedEmail?: string }) {
           </p>
         </form>
       )}
-      {message && <p className={styles.error}>{message}</p>}
+      {message && <p className={styles.error} role="alert">{message}</p>}
     </main>
   );
 }
