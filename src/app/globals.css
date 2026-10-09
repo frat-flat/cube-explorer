@@ -1,65 +1,100 @@
+/* 全画面の土台。色はすべて src/styles/tokens.css の変数(「明るい」「暗い」は設定で切り替わる。ここに色を直書きしない)。
+   共通の部品(枠・メニュー・カード・表など)は src/styles/components.css */
 :root {
-  --bg: #f5f6f8;
-  --surface: #ffffff;
-  --ink: #1d2433;
-  --muted: #5d6679;
-  --line: #dde1e8;
-  --accent: #2459c7;
-  --accent-soft: #e6edfb;
-  --danger: #b42318;
-  --heat: 36, 89, 199;
-  --heat-max: 0.55;
-  --font-body: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12151c;
-    --surface: #1a1f29;
-    --ink: #e6e9ef;
-    --muted: #9aa3b5;
-    --line: #2c3342;
-    --accent: #7ea3f2;
-    --accent-soft: #1f2b45;
-    --danger: #f97066;
-    --heat: 126, 163, 242;
-    --heat-max: 0.45;
-    color-scheme: dark;
-  }
+  --font-ui: var(--font-sans), "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  --font-num: var(--font-display), var(--font-sans), sans-serif;
+  --font-code: var(--font-mono), ui-monospace, Consolas, monospace;
+  --r-sm: 5px;
+  --r: 7px;
+  --r-lg: 10px;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.6;
+  height: 100%;
 }
 
+body {
+  margin: 0;
+  background: var(--body-bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+button,
 select,
-button {
+input,
+textarea {
   font: inherit;
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 10px;
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  padding: 5px 10px;
 }
 
 button {
   cursor: pointer;
+  background: var(--raised);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 button:hover:not(:disabled) {
   border-color: var(--accent);
+  color: var(--ink-strong);
+}
+
+button:disabled,
+select:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: var(--focus-halo);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  vertical-align: -2px;
+}
+
+::placeholder {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+
+select {
+  padding-right: 6px;
+}
+
+code {
+  font-family: var(--font-code);
+  font-size: 12px;
 }
