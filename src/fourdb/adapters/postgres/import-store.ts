@@ -224,14 +224,19 @@ export function stagedKeys(tx: Tx, runId: string, spec: ApprovalSpec) {
      where r.run_id = ${runId} and r.row_index > ${spec.headerRow}`;
 }
 
-/** 鍵の重なり(データの行で同じ鍵)と、実体(Box)の数 */
-export async function keyFacts(tx: Tx, runId: string, spec: ApprovalSpec): Promise<{ duplicateKeys: { key: string; rows: number[] }[]; entities: number }> {
-  const dup = await tx<{ key: string; rows: number[] }[]>`
+/** 鍵の重なり(データの行で同じ鍵。最初の 10 個) */
+export async function duplicateKeys(tx: Tx, runId: string, spec: ApprovalSpec): Promise<{ key: string; rows: number[] }[]> {
+  return tx<{ key: string; rows: number[] }[]>`
     select key, (array_agg(row_index + 1 order by row_index))[1:5] as rows
       from (${stagedKeys(tx, runId, spec)}) x
      where not is_agg and key !~ ${String.raw`^\|*$`}
      group by key having count(*) > 1
      order by min(row_index) limit 10`;
+}
+
+/** 鍵の重なり(データの行で同じ鍵)と、実体(Box)の数 */
+export async function keyFacts(tx: Tx, runId: string, spec: ApprovalSpec): Promise<{ duplicateKeys: { key: string; rows: number[] }[]; entities: number }> {
+  const dup = await duplicateKeys(tx, runId, spec);
   const [{ n }] = await tx<{ n: string }[]>`select count(distinct entity) as n from (${stagedKeys(tx, runId, spec)}) x where not is_agg and entity is not null`;
   return { duplicateKeys: dup, entities: Number(n) };
 }
