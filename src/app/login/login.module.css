@@ -1,15 +1,7 @@
-/* ログイン画面は、OS の明るい・暗い設定によらず黒地にして、ロゴを元の絵のまま見せる(2026-10-08 オーナー「ログイン時は真っ黒でいい」)。
-   文字や入力欄の色は globals.css の暗い画面の値と同じ。ほかの画面の色は変えない */
-.page {
+/* ログイン画面は、設定(明るい)や OS の明るい・暗い設定によらず黒地にして、ロゴを元の絵のまま見せる(2026-10-08 オーナー「ログイン時は真っ黒でいい」)。
+   外側(page.tsx)に data-theme="dark" を付けて「暗い」の色(tokens.css)にし、地だけ真っ黒にする。ほかの画面の色は変えない */
+.page[data-theme="dark"] {
   --bg: #000;
-  --surface: #1a1f29;
-  --ink: #e6e9ef;
-  --muted: #9aa3b5;
-  --line: #2c3342;
-  --accent: #7ea3f2;
-  --accent-soft: #1f2b45;
-  --danger: #f97066;
-  color-scheme: dark;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg);
@@ -22,9 +14,9 @@
 .title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .form { display: grid; gap: 8px; }
 .form label { font-size: 13px; color: var(--muted); }
-.form input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
-.form button { font: inherit; padding: 8px 12px; border: 0; border-radius: 6px; background: var(--accent); color: var(--surface); cursor: pointer; }
+.form input { font: inherit; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--sunken); color: var(--ink); }
+.form button { font: inherit; padding: 8px 12px; border: 0; border-radius: 6px; background: var(--accent); color: var(--on-accent); font-weight: 700; cursor: pointer; }
 .form button:disabled { opacity: .6; }
 .note { font-size: 13px; color: var(--muted); margin: 0; }
 .error { font-size: 13px; color: var(--danger); margin: 0; }
-.form .link { background: none; color: var(--accent); padding: 0 0 0 4px; text-decoration: underline; }
+.form .link { background: none; color: var(--accent); padding: 0 0 0 4px; text-decoration: underline; font-weight: 400; }

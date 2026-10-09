@@ -31,7 +31,7 @@ npm run fourdb:setup-remote
 
 表を作り、実行用の役割 `fourdb_app`(パスワードはランダム)を作って、その接続先を `.env.local` の `FOURDB_DATABASE_URL` に書く(値は画面に出さない)。公開(Vercel)するときは、同じ値を Vercel の環境変数 `FOURDB_DATABASE_URL` に入れる。
 
-表の作り替え(`migrations/` に新しい番号のファイルが増えたとき)も同じコマンドで流す。役割がすでにあればパスワードは変えず、まだ流していないファイルだけを流して権限を渡し直す。新しいコードを公開する前に流す(例: 0003・0004 がないと、表で見る画面 `/sheet` と集計が動かない)。本番のデータベースを変えるので、流す前にユーザーの承認を得る。
+表の作り替え(`migrations/` に新しい番号のファイルが増えたとき)も同じコマンドで流す。役割がすでにあればパスワードは変えず、まだ流していないファイルだけを流して権限を渡し直す。新しいコードを公開する前に流す(例: 0003・0004 がないと、表で見る画面 `/table`(以前の `/sheet`)と集計が動かない)。本番のデータベースを変えるので、流す前にユーザーの承認を得る。
 
 ## 4D Base の芯の表(fourdb)につなぐときの決まり
 
@@ -51,7 +51,7 @@ npm run fourdb:setup-remote
 
 [README](../../README.md) のとおり `npm run dev`。手元の `.env.local` にはログイン(Neon Auth)の設定だけがあり、スプシのリンク読み取りと Supabase への保存は手元では動かない(2026-10-08 時点)。
 
-### 4D Base の新しい画面(/migrate・/sheet)を手元で動かす
+### 4D Base の新しい画面(/migrate・/table・/settings)を手元で動かす
 
 本番のデータベースはまだない(置き場所と費用は未決)ので、手元の使い捨てデータベースで動かす。パソコンの PostgreSQL(18)の、すでに動いているもの(5432 番)は使わず、別のフォルダに別のものを立てる。
 
@@ -62,7 +62,7 @@ npm run fourdb:setup-remote
 "C:/Program Files/PostgreSQL/18/bin/createdb.exe" -h localhost -p 55432 -U fourdb fourdb_dev
 # 2. fourdb の表を作り、実行用の役割 fourdb_app_local を作って権限を渡す
 FOURDB_ADMIN_URL=postgres://fourdb@localhost:55432/fourdb_dev FOURDB_APP_ROLE=fourdb_app_local npm run fourdb:migrate
-# 3. 起動(ログインなし。--fixture を付けると e2e/fixtures/sheets の試験用スプシを読む)→ http://localhost:3100/migrate(取り込み)・/sheet(表で見る)
+# 3. 起動(ログインなし。--fixture を付けると e2e/fixtures/sheets の試験用スプシを読む)→ http://localhost:3100/migrate(取り込み)・/table(表で見る。以前の /sheet は転送される)・/settings(見た目の設定)
 node scripts/dev-fourdb.mjs --fixture
 ```
 

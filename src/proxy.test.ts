@@ -27,7 +27,7 @@ describe("ログインの入口(proxy)が動く URL", () => {
   });
 
   it("画面には動く(ログインしていなければ /login へ送る)", () => {
-    for (const url of ["/", "/migrate", "/sheet", "/sheets/axes.html"]) expect(runsOn(url), url).toBe(true);
+    for (const url of ["/", "/migrate", "/table", "/settings", "/sheet", "/sheets/axes.html"]) expect(runsOn(url), url).toBe(true);
   });
 
   it("/login と API にも動くが、中で素通しする(PUBLIC_PATHS。API は各ルートが自分で確かめる)", () => {

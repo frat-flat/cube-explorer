@@ -183,13 +183,14 @@ export async function project(tx: Tx, req: ProjectionRequest): Promise<Projectio
 
 // ---------- 選べるもの(数値のカラム・軸と段) ----------
 export type Catalog = {
-  measures: { id: string; name: string; sheets: number }[];
+  /** sheetIds = その数値のカラムを持つシート(画面の「対象のシート」で数値の一覧を絞るため)。sheets はその数 */
+  measures: { id: string; name: string; sheets: number; sheetIds: string[] }[];
   dimensions: { id: string; name: string; semanticType: string; levels: { level: number; name: string; count: number }[] }[];
 };
 
 export async function catalog(tx: Tx): Promise<Catalog> {
-  const measures = await tx<{ id: string; name: string; sheets: string }[]>`
-    select d.id, d.name, count(distinct c.sheet_id) as sheets
+  const measures = await tx<{ id: string; name: string; sheet_ids: string[] }[]>`
+    select d.id, d.name, array_agg(distinct c.sheet_id::text) as sheet_ids
       from fourdb.column_definition d
       join fourdb.source_column c on c.column_definition_id = d.id and c.system_to is null and c.role = 'measure'
       join fourdb.source_sheet s on s.id = c.sheet_id and s.deleted_at is null
@@ -203,7 +204,7 @@ export async function catalog(tx: Tx): Promise<Catalog> {
      where d.workspace_id = (select fourdb.current_workspace_id())
      order by d.name`;
   return {
-    measures: measures.map((m) => ({ id: m.id, name: m.name, sheets: Number(m.sheets) })),
+    measures: measures.map((m) => ({ id: m.id, name: m.name, sheets: m.sheet_ids.length, sheetIds: [...m.sheet_ids].sort() })),
     dimensions: dims
       .filter((d) => d.present.length > 0)
       .map((d) => ({
@@ -238,7 +239,7 @@ export async function listDefinitions(tx: Tx) {
 export async function getDefinition(
   tx: Tx,
   id: string,
-): Promise<{ id: string; name: string; version: number; request: ProjectionRequest; filterMembers: { id: string; name: string }[] }> {
+): Promise<{ id: string; name: string; version: number; request: ProjectionRequest; filterMembers: { id: string; name: string }[]; measureName: string | null }> {
   const [d] = await tx<{ id: string; name: string; version: number; definition: unknown }[]>`
     select id, name, version, definition from fourdb.sheet_definition
      where id = ${id} and deleted_at is null and workspace_id = (select fourdb.current_workspace_id())`;
@@ -249,7 +250,11 @@ export async function getDefinition(
   const filterMembers = await tx<{ id: string; name: string }[]>`
     select id, name from fourdb.dimension_member
      where id = any(${request.filters.flatMap((x) => x.memberIds)}::uuid[]) and workspace_id = (select fourdb.current_workspace_id())`;
-  return { id: d.id, name: d.name, version: d.version, request, filterMembers: [...filterMembers] };
+  // 保存した数値の名前。取り込みを読み直して数値がなくなっていても、カラムの定義は残るので名前が分かる(画面が「その数値がない」と知らせるため)。定義もなければ null
+  const [measure] = await tx<{ name: string }[]>`
+    select name from fourdb.column_definition
+     where id = ${request.measureId} and kind = 'measure' and workspace_id = (select fourdb.current_workspace_id())`;
+  return { id: d.id, name: d.name, version: d.version, request, filterMembers: [...filterMembers], measureName: measure?.name ?? null };
 }
 
 /** 保存する(id があれば上書きして版を上げる)。前の定義は履歴に残す */

@@ -1,6 +1,7 @@
 "use client";
 
-// スプシから 4D Base へ移す画面。リンクを読む → タブを選んで全行を読む(Saving)→ 候補を直して承認 → 反映 → 照合
+// ファイル(Google スプレッドシート)から 4DB へ移す画面。リンクを読む → シートを選んで全行を読む(Saving)→ 候補を直して承認 → 反映 → 照合
+import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import type { SheetProposal } from "@/fourdb/core/import/analyze";
 import type { ApprovalSpec, ColumnApproval } from "@/fourdb/core/import/plan";
@@ -8,7 +9,6 @@ import type { SourceCell } from "@/fourdb/core/import/types";
 import type { ApplyCheck, SheetSummary } from "@/fourdb/adapters/postgres/import-store";
 import type { ReconcileResult } from "@/fourdb/adapters/postgres/reconcile";
 import { colLetter } from "@/fourdb/core/import/a1";
-import s from "./migrate.module.css";
 
 type Role = ColumnApproval["role"];
 const ROLES: [Role, string][] = [
@@ -21,7 +21,7 @@ const ROLES: [Role, string][] = [
 const roleName = (r: Role) => ROLES.find(([k]) => k === r)?.[1] ?? r;
 const fmt = (n: number) => n.toLocaleString("ja-JP");
 
-/** タブの一覧をスプシごとにまとめる(並びは保つ。新しく読んだスプシが上) */
+/** シートの一覧をファイルごとにまとめる(並びは保つ。新しく読んだファイルが上) */
 function byBook(sheets: SheetSummary[]): { book: SheetSummary["book"]; tabs: SheetSummary[] }[] {
   const out: { book: SheetSummary["book"]; tabs: SheetSummary[] }[] = [];
   for (const x of sheets) {
@@ -167,64 +167,67 @@ export function Migrate() {
     });
 
   return (
-    <main className={s.page}>
-      <div className={s.top}>
-        <h1>スプシから 4DB へ移す</h1>
-        <a href="/sheet">取り込んだデータを表で見る</a>
-        <a href="/">ダッシュボードへ戻る</a>
-      </div>
-      <p className={s.lead}>
-        スプシのタブを全行読み、合計の行・列と、関数で計算された値を見分けます。候補を確かめて直してから反映します。
-        反映したあと、スプシの合計と、4DB が元の値から計算した合計が合っているかを照合します。元のスプシは書き換えません。
-      </p>
-      {error && <p className={s.error} role="alert">{error}</p>}
+    <div className="view">
+      <header className="vhead">
+        <div className="vtitle">
+          <h1>
+            Import<small>ファイルから取り込む</small>
+          </h1>
+          <Link href="/table">取り込んだデータを表で見る</Link>
+        </div>
+        <p className="lead">
+          ファイルのシートを全行読み、合計の行・列と、関数で計算された値を見分けます。候補を確かめて直してから反映します。
+          反映したあと、スプシの合計と、4DB が元の値から計算した合計が合っているかを照合します。元のファイルは書き換えません。
+        </p>
+      </header>
+      {error && <p className="error" role="alert">{error}</p>}
       {progress && (
-        <div className={s.card} aria-live="polite">
-          <div>{progress.label}… {fmt(progress.done)} / {fmt(progress.total)} 行</div>
-          <div className={s.progress}><div style={{ width: `${progress.total ? Math.min(100, (progress.done / progress.total) * 100) : 0}%` }} /></div>
+        <div className="card" aria-live="polite">
+          <div><span className="spin" aria-hidden="true" />{progress.label}… {fmt(progress.done)} / {fmt(progress.total)} 行</div>
+          <div className="progress"><div style={{ width: `${progress.total ? Math.min(100, (progress.done / progress.total) * 100) : 0}%` }} /></div>
         </div>
       )}
 
-      <section className={s.card}>
-        <h2>1. スプシのリンク</h2>
-        <div className={s.row}>
-          <input className={s.input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" aria-label="スプシのリンク" />
-          <button className={`${s.button} ${s.primary}`} onClick={readBook} disabled={busy || !url.trim()}>読み取る</button>
+      <section className="card">
+        <h2>1. ファイル(Google スプレッドシート)のリンク</h2>
+        <div className="row">
+          <input className="input wide" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" aria-label="ファイル(Google スプレッドシート)のリンク" />
+          <button className="primary lg" onClick={readBook} disabled={busy || !url.trim()}>読み取る</button>
         </div>
-        {book && <p className={s.muted}>「{book.title}」を読み取りました。下の一覧から、移すタブを選んでください。</p>}
+        {book && <p className="muted">「{book.title}」を読み取りました。下の一覧から、移すシートを選んでください。</p>}
       </section>
 
-      <section className={s.card}>
-        <h2>移す表(タブ)</h2>
+      <section className="card">
+        <h2>移す表(シート)</h2>
         {sheets.length === 0 ? (
-          <p className={s.muted}>まだありません。上でスプシのリンクを読み取ると、タブがここに並びます。</p>
+          <p className="muted">まだありません。上でファイルのリンクを読み取ると、シートがここに並びます。</p>
         ) : (
-          <div className={s.tableWrap}>
-            <table className={s.table}>
-              <thead><tr><th>タブ</th><th className={s.num}>大きさ</th><th>状態</th><th className={s.num}>4DB の行</th><th /></tr></thead>
+          <div className="tableWrap">
+            <table className="table">
+              <thead><tr><th scope="col">シート</th><th scope="col" className="num">大きさ</th><th scope="col">状態</th><th scope="col" className="num">4DB の行</th><th scope="col" /></tr></thead>
               <tbody>
                 {byBook(sheets).map(({ book, tabs }) => (
                   <Fragment key={book.id}>
-                    <tr className={s.bookRow}>
+                    <tr className="bookRow">
                       <th colSpan={5}>
-                        スプシ「{book.title}」{book.url && <> <a href={book.url} target="_blank" rel="noopener noreferrer">元のスプシを開く</a></>}
+                        ファイル「{book.title}」{book.url && <> <a href={book.url} target="_blank" rel="noopener noreferrer">元のファイルを開く</a></>}
                       </th>
                     </tr>
-                {tabs.map((x) => (
-                  <tr key={x.id}>
-                    <td className={s.tabCell}>{x.title}</td>
-                    <td className={s.num}>{x.rowCount === null ? "—" : `${fmt(x.rowCount)} 行 × ${fmt(x.colCount ?? 0)} 列`}</td>
-                    <td>{x.migrationStatus === "migrated" ? "移行完了" : x.lastRun ? ({ reading: "読み取り中", staged: "承認待ち", applying: "反映の途中", applied: "取り込み済み(移行中)", failed: "失敗", cancelled: "取りやめ" } as Record<string, string>)[x.lastRun.status] ?? x.lastRun.status : "まだ"}</td>
-                    <td className={s.num}>{fmt(x.records)}</td>
-                    <td>
-                      <div className={s.row}>
-                        {x.migrationStatus !== "migrated" && <button className={s.button} disabled={busy} onClick={() => startImport(x)}>{x.lastRun?.status === "applied" ? "読み直す" : "取り込む"}</button>}
-                        {x.lastRun?.status === "applying" && <button className={s.button} disabled={busy} onClick={() => { setRunId(x.lastRun!.id); void apply(true); }}>反映を続ける</button>}
-                        {x.records > 0 && <button className={s.button} disabled={busy} onClick={() => showReconcile(x)}>照合</button>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                    {tabs.map((x) => (
+                      <tr key={x.id}>
+                        <td className="tabCell">{x.title}</td>
+                        <td className="num">{x.rowCount === null ? "—" : `${fmt(x.rowCount)} 行 × ${fmt(x.colCount ?? 0)} 列`}</td>
+                        <td><Status sheet={x} /></td>
+                        <td className="num">{fmt(x.records)}</td>
+                        <td>
+                          <div className="row">
+                            {x.migrationStatus !== "migrated" && <button className="small" disabled={busy} onClick={() => startImport(x)}>{x.lastRun?.status === "applied" ? "読み直す" : "取り込む"}</button>}
+                            {x.lastRun?.status === "applying" && <button className="small" disabled={busy} onClick={() => { setRunId(x.lastRun!.id); void apply(true); }}>反映を続ける</button>}
+                            {x.records > 0 && <button className="small" disabled={busy} onClick={() => showReconcile(x)}>照合</button>}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </Fragment>
                 ))}
               </tbody>
@@ -233,22 +236,32 @@ export function Migrate() {
         )}
       </section>
 
-      {current && spec && <Approval p={current} spec={spec} setSpec={(x) => { setSpec(x); setCheck(null); }} busy={busy} relayout={relayout} onCheck={runCheck} check={check} onApply={() => apply(false)} />}
+      {current && spec && <Approval p={current} fileTitle={sheets.find((x) => x.id === current.sheet.id)?.book.title} spec={spec} setSpec={(x) => { setSpec(x); setCheck(null); }} busy={busy} relayout={relayout} onCheck={runCheck} check={check} onApply={() => apply(false)} />}
 
       {applied && (
-        <section className={s.card}>
+        <section className="card">
           <h2>反映しました</h2>
-          <div className={s.stats}>
-            <div><span className={s.muted}>行</span><b>{fmt(applied.rows)}</b></div>
-            <div><span className={s.muted}>新しく入れた値</span><b>{fmt(applied.values)}</b></div>
-            <div><span className={s.muted}>スプシの合計</span><b>{fmt(applied.totals)}</b></div>
-            {applied.closedValues > 0 && <div><span className={s.muted}>前の版として残した値</span><b>{fmt(applied.closedValues)}</b></div>}
+          <div className="stats">
+            <div><span className="muted">行</span><b>{fmt(applied.rows)}</b></div>
+            <div><span className="muted">新しく入れた値</span><b>{fmt(applied.values)}</b></div>
+            <div><span className="muted">スプシの合計</span><b>{fmt(applied.totals)}</b></div>
+            {applied.closedValues > 0 && <div><span className="muted">前の版として残した値</span><b>{fmt(applied.closedValues)}</b></div>}
           </div>
         </section>
       )}
-      {result && <Reconcile r={result} />}
-    </main>
+      {result && <Reconcile r={result} fileTitle={sheets.find((x) => x.id === result.sheet.id)?.book.title} />}
+    </div>
   );
+}
+
+const STATUS_NAMES: Record<string, string> = { reading: "読み取り中", staged: "承認待ち", applying: "反映の途中", applied: "取り込み済み(移行中)", failed: "失敗", cancelled: "取りやめ" };
+// 状態の点の色(文字は必ず添える): 待ち = 金、取り込み済み = 青、移行完了 = 緑、失敗 = 赤、まだ・取りやめ = 白抜き
+const STATUS_DOTS: Record<string, string> = { reading: "wait", staged: "wait", applying: "wait", applied: "applied", failed: "failed", cancelled: "none" };
+
+function Status({ sheet: x }: { sheet: SheetSummary }) {
+  if (x.migrationStatus === "migrated") return <span className="status done">移行完了</span>;
+  if (!x.lastRun) return <span className="status none">まだ</span>;
+  return <span className={`status ${STATUS_DOTS[x.lastRun.status] ?? "none"}`}>{STATUS_NAMES[x.lastRun.status] ?? x.lastRun.status}</span>;
 }
 
 /** 分割して確かめた結果を足し合わせる(鍵の重なりと実体の数は最初の分にだけある) */
@@ -271,6 +284,8 @@ function mergeCheck(a: ApplyCheck, r: ApplyCheck): ApplyCheck {
 // ---------- 承認(Saving) ----------
 function Approval(props: {
   p: ProposalResponse;
+  /** このシートのファイルの名前(見出しを「ファイル名 › シート名」にする)。一覧にまだなければ undefined */
+  fileTitle: string | undefined;
   spec: ApprovalSpec;
   setSpec: (s: ApprovalSpec) => void;
   busy: boolean;
@@ -321,12 +336,12 @@ function Approval(props: {
   const options = Array.from({ length: Math.min(10, Math.max(1, p.preview.length)) }, (_, i) => i);
 
   return (
-    <section className={s.card}>
-      <h2>2. 「{p.sheet.title}」の承認(Saving)</h2>
-      <p className={s.muted}>読み取った行 {fmt(p.run.rowsRead)} 行。先頭の行から候補を出しています。役割と名前を確かめ、違うところは直してください。</p>
+    <section className="card">
+      <h2>2. 「{props.fileTitle ? `${props.fileTitle} › ${p.sheet.title}` : p.sheet.title}」の承認(Saving)</h2>
+      <p className="muted">読み取った行 {fmt(p.run.rowsRead)} 行。先頭の行から候補を出しています。役割と名前を確かめ、違うところは直してください。</p>
 
       <h3>表の読み方</h3>
-      <div className={s.row}>
+      <div className="row">
         <label>列名の行{" "}
           <select value={spec.headerRow} onChange={(e) => props.relayout(Number(e.target.value), spec.groupRow !== null && spec.groupRow < Number(e.target.value) ? spec.groupRow : null)} disabled={busy}>
             {options.map((i) => <option key={i} value={i}>{i + 1} 行目</option>)}
@@ -341,18 +356,18 @@ function Approval(props: {
       </div>
 
       <h3>先頭の行(Σ = 合計の行)</h3>
-      <div className={s.tableWrap} style={{ maxHeight: 320 }}>
-        <table className={s.table}>
+      <div className="tableWrap" style={{ maxHeight: 320 }}>
+        <table className="table withMarks">
           <thead>
-            <tr><th>行</th>{spec.columns.map((c) => <th key={c.index}>{colLetter(c.index)} <span className={`${s.tag} ${s["role_" + c.role]}`}>{roleName(c.role)}</span></th>)}</tr>
+            <tr><th scope="col">行</th>{spec.columns.map((c) => <th key={c.index} scope="col"><span className="colL">{colLetter(c.index)}</span> <span className={`tag role_${c.role}`}>{roleName(c.role)}</span></th>)}</tr>
           </thead>
           <tbody>
             {p.preview.slice(0, 20).map((r) => (
-              <tr key={r.index} className={r.index === spec.headerRow ? s.headerRow : aggSet.has(r.index) ? s.aggRow : undefined}>
-                <td>{r.index + 1}{aggSet.has(r.index) ? " Σ" : ""}</td>
+              <tr key={r.index} className={r.index === spec.headerRow ? "headerRow" : aggSet.has(r.index) ? "aggRow" : undefined}>
+                <td>{r.index + 1}{aggSet.has(r.index) && <> <span className="sig">Σ</span></>}</td>
                 {spec.columns.map((c) => {
                   const cell = r.cells[c.index];
-                  return <td key={c.index} className={cell?.n !== null && cell?.n !== undefined ? s.num : undefined} title={cell?.f ?? undefined}>{cell?.v ?? ""}{cell?.f ? " ƒ" : ""}</td>;
+                  return <td key={c.index} className={cell?.n !== null && cell?.n !== undefined ? "num" : undefined} title={cell?.f ?? undefined}>{cell?.v ?? ""}{cell?.f && <span className="mark">ƒ</span>}</td>;
                 })}
               </tr>
             ))}
@@ -361,18 +376,18 @@ function Approval(props: {
       </div>
 
       <h3>列の役割</h3>
-      <div className={s.tableWrap}>
-        <table className={s.table}>
+      <div className="tableWrap">
+        <table className="table">
           <thead>
-            <tr><th>列</th><th>見出し</th><th>役割</th><th>名前</th><th>月 / 足している列</th><th>行を見分ける</th>{hasAttr && <th>行が表す実体</th>}<th>理由</th></tr>
+            <tr><th scope="col">列</th><th scope="col">見出し</th><th scope="col">役割</th><th scope="col">名前</th><th scope="col">月 / 足している列</th><th scope="col">行を見分ける</th>{hasAttr && <th scope="col">行が表す実体</th>}<th scope="col">理由</th></tr>
           </thead>
           <tbody>
             {spec.columns.map((c) => {
               const pc = byIndex.get(c.index)!;
               return (
                 <tr key={c.index}>
-                  <td>{colLetter(c.index)}</td>
-                  <td>{pc.group ? <span className={s.muted}>{pc.group} › </span> : null}{pc.label}<div className={s.muted}>{pc.samples.join(" / ")}</div></td>
+                  <td><span className="colL">{colLetter(c.index)}</span></td>
+                  <td>{pc.group ? <span className="muted">{pc.group} › </span> : null}{pc.label}<div className="muted">{pc.samples.join(" / ")}</div></td>
                   <td>
                     <select value={c.role} onChange={(e) => setColumn(c.index, e.target.value as Role)} aria-label={`${colLetter(c.index)} 列の役割`}>
                       {ROLES.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
@@ -381,16 +396,16 @@ function Approval(props: {
                   <td>
                     {c.role === "dimension" && (
                       <>
-                        <input className={s.small} value={c.dimension} onChange={(e) => patch(c.index, { dimension: e.target.value, definition: e.target.value })} aria-label={`${colLetter(c.index)} 列の軸の名前`} />
+                        <input className="small" value={c.dimension} onChange={(e) => patch(c.index, { dimension: e.target.value, definition: e.target.value })} aria-label={`${colLetter(c.index)} 列の軸の名前`} />
                       </>
                     )}
-                    {(c.role === "measure" || c.role === "attribute") && <input className={s.small} value={c.definition} onChange={(e) => patch(c.index, { definition: e.target.value })} aria-label={`${colLetter(c.index)} 列のカラムの名前`} />}
-                    {c.role === "aggregate" && <span className={s.muted}>{c.fn}</span>}
+                    {(c.role === "measure" || c.role === "attribute") && <input className="small" value={c.definition} onChange={(e) => patch(c.index, { definition: e.target.value })} aria-label={`${colLetter(c.index)} 列のカラムの名前`} />}
+                    {c.role === "aggregate" && <span className="muted">{c.fn}</span>}
                   </td>
                   <td>
-                    {c.role === "measure" && <input className={s.small} value={c.month ?? ""} placeholder="(月の列でない)" onChange={(e) => patch(c.index, { month: e.target.value.trim() || null })} aria-label={`${colLetter(c.index)} 列の月`} />}
+                    {c.role === "measure" && <input className="small" value={c.month ?? ""} placeholder="(月の列でない)" onChange={(e) => patch(c.index, { month: e.target.value.trim() || null })} aria-label={`${colLetter(c.index)} 列の月`} />}
                     {c.role === "aggregate" && (
-                      <input className={s.small} value={c.sums.map(colLetter).join(",")} onChange={(e) => {
+                      <input className="small" value={c.sums.map(colLetter).join(",")} onChange={(e) => {
                         const sums = e.target.value.toUpperCase().split(/[,\s、]+/).filter((x) => /^[A-Z]{1,3}$/.test(x)).map((x) => [...x].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1);
                         patch(c.index, { sums });
                       }} aria-label={`${colLetter(c.index)} 列が足している列`} />
@@ -398,21 +413,21 @@ function Approval(props: {
                   </td>
                   <td>{["dimension", "attribute"].includes(c.role) && <input type="checkbox" checked={spec.rowKeyColumns.includes(c.index)} onChange={() => toggleKey(c.index)} aria-label={`${colLetter(c.index)} 列で行を見分ける`} />}</td>
                   {hasAttr && <td>{c.role === "dimension" && <input type="radio" name="entity" checked={spec.entityColumn === c.index} onChange={() => setSpec({ ...spec, entityColumn: c.index })} aria-label={`${colLetter(c.index)} 列の値ごとに Box を作る`} />}</td>}
-                  <td className={s.wrap}>{pc.reasons.join("。")}</td>
+                  <td className="wrap">{pc.reasons.join("。")}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <p className={s.muted}>
+      <p className="muted">
         「行を見分ける」列がなければ、行番号で見分けます(読み直しで行がずれると、別の行として扱います)。
         {hasAttr && "属性(Card)の列があるときは、「行が表す実体」の列の値ごとに Box を作り、属性をその Box の Card にします。"}
       </p>
 
       <h3>合計の行</h3>
-      {pr.aggregateRows.length === 0 && spec.aggregateRows.include.length === 0 ? <p className={s.muted}>見つかりませんでした。</p> : (
-        <ul className={s.list}>
+      {pr.aggregateRows.length === 0 && spec.aggregateRows.include.length === 0 ? <p className="muted">見つかりませんでした。</p> : (
+        <ul className="list plain">
           {pr.aggregateRows.map((r) => (
             <li key={r.index}><label><input type="checkbox" checked={!spec.aggregateRows.exclude.includes(r.index)} onChange={() => toggleAgg(r.index)} /> {r.index + 1} 行目を合計の行にする({r.reasons.join("。")})</label></li>
           ))}
@@ -421,45 +436,45 @@ function Approval(props: {
           ))}
         </ul>
       )}
-      <div className={s.row}>
-        <input className={s.small} value={extraRows} onChange={(e) => setExtraRows(e.target.value)} placeholder="例: 12, 25" aria-label="合計の行として足す行番号" />
-        <button className={s.button} onClick={addAggRows} disabled={!extraRows.trim()}>合計の行を足す</button>
+      <div className="row">
+        <input className="small" value={extraRows} onChange={(e) => setExtraRows(e.target.value)} placeholder="例: 12, 25" aria-label="合計の行として足す行番号" />
+        <button onClick={addAggRows} disabled={!extraRows.trim()}>合計の行を足す</button>
       </div>
 
       {(pr.warnings.length > 0 || pr.calculatedCellCount > 0) && (
         <>
           <h3>知らせ</h3>
-          <ul className={s.list}>
+          <ul className="list">
             {pr.warnings.map((w) => <li key={w}>{w}</li>)}
-            {pr.calculatedCellCount > 0 && <li>関数で計算された値が {fmt(pr.calculatedCellCount)} 個あります(先頭の行の分)。元の値とは区別して入れ、4DB では直せません。例: {pr.calculatedCells.slice(0, 3).map((c) => `${colLetter(c.col)}${c.row + 1} ${c.formula}`).join("、")}</li>}
+            {pr.calculatedCellCount > 0 && <li>関数で計算された値が {fmt(pr.calculatedCellCount)} 個あります(先頭の行の分)。元の値とは区別して入れ、4DB では直せません。例: {pr.calculatedCells.slice(0, 3).map((c, i) => <Fragment key={`${c.row}:${c.col}`}>{i > 0 && "、"}<code>{colLetter(c.col)}{c.row + 1} {c.formula}</code></Fragment>)}</li>}
           </ul>
         </>
       )}
 
       <h3>3. 確かめて反映する</h3>
-      <div className={s.row}>
-        <button className={s.button} onClick={props.onCheck} disabled={busy}>全行で確かめる</button>
-        <button className={`${s.button} ${s.primary}`} onClick={props.onApply} disabled={busy || !check || check.errors.length > 0}>この内容で反映する</button>
+      <div className="row">
+        <button onClick={props.onCheck} disabled={busy}>全行で確かめる</button>
+        <button className="primary lg" onClick={props.onApply} disabled={busy || !check || check.errors.length > 0}>この内容で反映する</button>
       </div>
       {check && (
         <div>
-          {check.errors.length > 0 && <p className={s.error}>{check.errors.join("\n")}</p>}
-          <div className={s.stats}>
-            <div><span className={s.muted}>データの行</span><b>{fmt(check.dataRows)}</b></div>
-            <div><span className={s.muted}>合計の行</span><b>{fmt(check.aggregateRows)}</b></div>
-            <div><span className={s.muted}>入れる値</span><b>{fmt(check.values)}</b></div>
-            <div><span className={s.muted}>うち計算された値</span><b>{fmt(check.calculatedValues)}</b></div>
-            <div><span className={s.muted}>スプシの合計</span><b>{fmt(check.totals)}</b></div>
-            {check.entities > 0 && <div><span className={s.muted}>Box(実体)</span><b>{fmt(check.entities)}</b></div>}
+          {check.errors.length > 0 && <p className="error">{check.errors.join("\n")}</p>}
+          <div className="stats">
+            <div><span className="muted">データの行</span><b>{fmt(check.dataRows)}</b></div>
+            <div><span className="muted">合計の行</span><b>{fmt(check.aggregateRows)}</b></div>
+            <div><span className="muted">入れる値</span><b>{fmt(check.values)}</b></div>
+            <div><span className="muted">うち計算された値</span><b>{fmt(check.calculatedValues)}</b></div>
+            <div><span className="muted">スプシの合計</span><b>{fmt(check.totals)}</b></div>
+            {check.entities > 0 && <div><span className="muted">Box(実体)</span><b>{fmt(check.entities)}</b></div>}
           </div>
-          {check.duplicateKeys.length > 0 && <ul className={s.list}>{check.duplicateKeys.map((d) => <li key={d.key}>「{d.key}」が {d.rows.join("・")} 行目にあります</li>)}</ul>}
+          {check.duplicateKeys.length > 0 && <ul className="list">{check.duplicateKeys.map((d) => <li key={d.key}>「{d.key}」が {d.rows.join("・")} 行目にあります</li>)}</ul>}
           {check.problemCount > 0 && (
             <>
               <p>入れずに知らせるセルが {fmt(check.problemCount)} 個あります:</p>
-              <ul className={s.list}>{check.problems.map((x) => <li key={`${x.row}:${x.col}`}>{colLetter(x.col)}{x.row + 1}: {x.message}</li>)}</ul>
+              <ul className="list">{check.problems.map((x) => <li key={`${x.row}:${x.col}`}>{colLetter(x.col)}{x.row + 1}: {x.message}</li>)}</ul>
             </>
           )}
-          {check.errors.length === 0 && <p className={s.ok}>問題はありません。「この内容で反映する」で 4DB に書きます。</p>}
+          {check.errors.length === 0 && <p className="ok">問題はありません。「この内容で反映する」で 4DB に書きます。</p>}
         </div>
       )}
     </section>
@@ -467,27 +482,27 @@ function Approval(props: {
 }
 
 // ---------- 照合 ----------
-function Reconcile({ r }: { r: ReconcileResult }) {
+function Reconcile({ r, fileTitle }: { r: ReconcileResult; fileTitle: string | undefined }) {
   const all = [...r.columns, ...r.rows];
   const ok = r.summary.checked === r.summary.matched;
   return (
-    <section className={s.card}>
-      <h2>照合: 「{r.sheet.title}」</h2>
-      <p className={ok ? s.ok : s.error}>
+    <section className="card">
+      <h2>照合: {fileTitle ? `${fileTitle} › ${r.sheet.title}` : r.sheet.title}</h2>
+      <p className={ok ? "ok" : "error"}>
         スプシの合計 {fmt(r.summary.checked)} 個のうち {fmt(r.summary.matched)} 個が、4DB が元の値から計算した合計と一致しました。
         {!ok && " 合わないものは下のとおりです(スプシの関数の範囲がずれている、値で上書きされている、などが考えられます)。"}
       </p>
-      {all.length === 0 ? <p className={s.muted}>合計の行・列がない表です。</p> : (
-        <div className={s.tableWrap}>
-          <table className={s.table}>
-            <thead><tr><th>合計</th><th className={s.num}>照合した数</th><th className={s.num}>一致</th><th>合わないもの(スプシ / 4DB)</th></tr></thead>
+      {all.length === 0 ? <p className="muted">合計の行・列がない表です。</p> : (
+        <div className="tableWrap">
+          <table className="table">
+            <thead><tr><th scope="col">合計</th><th scope="col" className="num">照合した数</th><th scope="col" className="num">一致</th><th scope="col">合わないもの(スプシ / 4DB)</th></tr></thead>
             <tbody>
               {all.map((g) => (
                 <tr key={g.label}>
                   <td>{g.label}</td>
-                  <td className={s.num}>{fmt(g.checked)}</td>
-                  <td className={s.num}>{fmt(g.matched)}</td>
-                  <td className={s.wrap}>{g.mismatches.length === 0 ? "—" : g.mismatches.slice(0, 10).map((m) => `${m.where}: ${fmt(m.sheet)} / ${fmt(m.computed)}`).join("、")}{g.mismatches.length > 10 ? " ほか" : ""}</td>
+                  <td className="num">{fmt(g.checked)}</td>
+                  <td className="num">{fmt(g.matched)}</td>
+                  <td className="wrap">{g.mismatches.length === 0 ? "—" : g.mismatches.slice(0, 10).map((m) => `${m.where}: ${fmt(m.sheet)} / ${fmt(m.computed)}`).join("、")}{g.mismatches.length > 10 ? " ほか" : ""}</td>
                 </tr>
               ))}
             </tbody>

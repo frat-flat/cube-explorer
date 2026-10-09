@@ -1,0 +1,964 @@
+/* 共通の部品。元は デザインの見本(app.css)。色は tokens.css の変数だけを使い、ここに色を直書きしない。
+   明るい・暗いの違いは tokens.css が持つ(部品の側で見た目ごとに分けない)。画面ごとの置き方は、その画面の module.css に書く。 */
+
+/* ---------- ロゴの帯 ---------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.brand .logo {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.word {
+  font-family: var(--font-num);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.26em;
+  margin-right: -0.26em;
+  background: linear-gradient(90deg, var(--word-1), var(--word-2) 50%, var(--word-3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- ロゴのモチーフ(控えめに): 点・細い線・点線の軌道 ---------- */
+/* 小さな点(見出しの頭・状態) */
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+  flex: none;
+}
+
+/* 読み込み中: 点線の軌道を光の点がまわる */
+.spin {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1px dashed var(--line-strong);
+  position: relative;
+  animation: spin 1.6s linear infinite;
+}
+
+.spin::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  margin-left: -2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+/* 進み具合: 細い線の上を光の点が進む */
+.progress {
+  position: relative;
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+  margin: 10px 0;
+}
+
+.progress > div {
+  position: relative;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 35%, transparent), var(--accent));
+}
+
+.progress > div::after {
+  content: "";
+  position: absolute;
+  right: -4px;
+  top: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hl-strong);
+  box-shadow: var(--glow-hl), 0 0 0 2px var(--surface);
+}
+
+/* 状態の点(色だけにせず、文字を必ず添える) */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.status.wait::before {
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+}
+
+.status.applied::before {
+  background: var(--accent);
+}
+
+.status.done::before {
+  background: var(--ok);
+}
+
+.status.failed::before {
+  background: var(--danger);
+}
+
+.status.none::before {
+  background: transparent;
+  border: 1px solid var(--muted);
+}
+
+/* ---------- 1つのアプリの枠: 上の帯・左のメニュー・本文 ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* 左のメニューを閉じているとき(開閉はクッキーに覚える。src/lib/prefs.ts) */
+.shell[data-nav="closed"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.shell[data-nav="closed"] .side {
+  display: none;
+}
+
+.top {
+  grid-area: 1 / 1 / 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  background: var(--head-bg);
+  color: var(--head-ink);
+  position: relative;
+  min-width: 0;
+}
+
+/* 帯の下の細い線: 金から青へ、右へ消える */
+.top::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hl) 65%, transparent) 0, color-mix(in srgb, var(--accent) 40%, transparent) 26%, var(--head-line) 58%);
+}
+
+.top .sp {
+  flex: 1;
+}
+
+/* 黒い帯の上は、見た目によらず金のフォーカスの輪にする(明るい見た目のフォーカスの青は黒地で見えにくいため) */
+.top :focus-visible {
+  outline-color: var(--word-3);
+  box-shadow: none;
+}
+
+.navbtn {
+  border: none;
+  background: none;
+  color: var(--head-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.navbtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--head-ink) 8%, transparent);
+  color: var(--head-ink);
+}
+
+.crumb {
+  color: var(--head-muted);
+  font-size: 13px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crumb::before {
+  content: "";
+  width: 1px;
+  height: 14px;
+  background: color-mix(in srgb, var(--head-muted) 45%, transparent);
+}
+
+.top .who {
+  font-size: 12px;
+  color: var(--head-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.top .who::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex: none;
+}
+
+/* ログアウト: POST のフォームのボタン。見た目はリンクと同じ(枠・地なし) */
+.top .signout {
+  margin: 0;
+  display: flex;
+}
+
+.top .out {
+  font: inherit;
+  font-size: 13px;
+  color: var(--head-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 0;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.top .out:hover:not(:disabled) {
+  color: var(--head-ink);
+  text-decoration: underline;
+}
+
+.side {
+  grid-area: 2 / 1 / 3 / 2;
+  background: var(--side-bg);
+  border-right: 1px solid var(--line);
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+}
+
+.nv {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--r);
+  padding: 8px 10px 8px 14px;
+  text-align: left;
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 13.5px;
+  width: 100%;
+}
+
+.nv:hover {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+}
+
+.nv[aria-current="page"] {
+  background: var(--nav-on-bg);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* 今いる画面: 縦の細い線と、光る点(ロゴの軸と点) */
+.nv[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7px;
+  bottom: 7px;
+  width: 1px;
+  background: linear-gradient(transparent, var(--hl) 30%, var(--hl) 70%, transparent);
+  opacity: 0.8;
+}
+
+.nv[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  margin-top: -2.5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hl-strong);
+  box-shadow: var(--glow-hl);
+}
+
+.nv .ic {
+  width: 18px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.nv .lb {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.nv .lb small {
+  display: block;
+  white-space: normal;
+  line-height: 1.3;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: -1px;
+}
+
+.nv.sub {
+  padding-left: 22px;
+}
+
+/* 区切りの見出しのない項目(設定)は、上に少しあける */
+.nv.top-gap {
+  margin-top: 10px;
+}
+
+/* メニューの区切りの見出し */
+.ngh {
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 14px 10px 4px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ngh::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+
+/* 細い十字の線(仕切り): 金の点から始まり、右へ消える */
+.hair {
+  position: relative;
+  height: 1px;
+  margin: 10px 4px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hl) 70%, transparent), var(--line) 55%, transparent);
+}
+
+.hair::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+}
+
+.content {
+  grid-area: 2 / 2 / 3 / 3;
+  overflow: auto;
+  padding: 20px 24px 32px;
+  min-width: 0;
+}
+
+.shell[data-nav="closed"] .content {
+  grid-area: 2 / 1 / 3 / 2;
+}
+
+/* ---------- 画面の見出し ---------- */
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.vhead {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 12px;
+  position: relative;
+}
+
+.vhead::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hl) 70%, transparent), var(--line) 55%, transparent);
+}
+
+.vhead::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+  z-index: 1;
+}
+
+.vtitle {
+  display: flex;
+  align-items: baseline;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+}
+
+.vhead h1 {
+  font-size: 21px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-strong);
+}
+
+/* 英語の見出しに添える日本語(D-015) */
+.vhead h1 small {
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.vtitle a {
+  font-size: 13.5px;
+}
+
+.vhead .lead {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0;
+  max-width: 920px;
+  line-height: 1.7;
+}
+
+/* ---------- カード ---------- */
+.card,
+section.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  margin: 0;
+  box-shadow: var(--card-shadow);
+  min-width: 0;
+}
+
+/* 見出し: 頭に点、うしろに細い線 */
+.card h2,
+section.panel h2 {
+  font-size: 15.5px;
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-strong);
+  letter-spacing: 0.03em;
+}
+
+.card h2::before,
+section.panel h2::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+  flex: none;
+}
+
+.card h2::after,
+section.panel h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+  opacity: 0.55;
+  min-width: 24px;
+}
+
+.card h2 .muted {
+  font-size: 13.5px;
+  font-weight: 400;
+}
+
+.card h3 {
+  font-size: 13.5px;
+  margin: 18px 0 8px;
+  color: var(--ink);
+}
+
+.card > p {
+  margin: 10px 0 0;
+}
+
+.card > h2 + p,
+.card > h3 + p {
+  margin-top: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.ok {
+  color: var(--ok);
+  margin: 8px 0 0;
+}
+
+.error {
+  color: var(--danger);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+/* ---------- 入力・ボタン ---------- */
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.input.wide {
+  flex-basis: 320px;
+  padding: 7px 10px;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
+  box-shadow: var(--glow-ac);
+}
+
+button.lg {
+  padding: 7px 16px;
+}
+
+button.small {
+  font-size: 12px;
+  padding: 1px 8px;
+}
+
+input.small {
+  width: 120px;
+  padding: 3px 7px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field select {
+  width: 100%;
+}
+
+.field .row select {
+  width: auto;
+  flex: 1;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0 0 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.chip button {
+  border: 0;
+  background: transparent;
+  padding: 0 8px;
+  color: var(--muted);
+}
+
+/* ---------- 凡例・数字・箇条書き ---------- */
+.card > p + .legend {
+  margin-top: 8px;
+}
+
+.legend {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.legend b {
+  color: var(--ink);
+}
+
+.stats {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.stats div {
+  min-width: 110px;
+  display: grid;
+}
+
+.stats span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stats b {
+  font-family: var(--font-num);
+  font-weight: 400;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink-strong);
+  letter-spacing: 0.01em;
+}
+
+.list {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.list li {
+  margin: 2px 0;
+}
+
+/* チェックボックスの一覧など、先頭に点を付けない */
+.list.plain {
+  list-style: none;
+  padding-left: 0;
+}
+
+/* ---------- 表 ---------- */
+.tableWrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  min-width: 100%;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 12px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--th-bg);
+  color: var(--th-ink);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.table tbody tr:hover td,
+.table tbody tr:hover th {
+  background-color: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+.table td.wrap {
+  white-space: normal;
+  min-width: 240px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* 数字: 右そろえ・桁をそろえる書体 */
+.num {
+  text-align: right !important;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+thead .num {
+  font-weight: 600;
+}
+
+.rowHead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  font-weight: 400;
+  border-right: 1px solid var(--line);
+}
+
+.table thead th.corner {
+  left: 0;
+  z-index: 3;
+  color: var(--muted);
+  font-weight: 500;
+  border-right: 1px solid var(--line);
+}
+
+.none,
+.table th.none {
+  color: var(--muted);
+}
+
+/* 計算された値: ƒ の印 + 斜体(色だけにしない) */
+.calc {
+  font-style: italic;
+}
+
+.mark {
+  display: inline-block;
+  width: 16px;
+  margin-left: 4px;
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 700;
+  color: var(--calc-mark);
+  text-align: left;
+}
+
+.legend .mark {
+  width: auto;
+  margin: 0 4px 0 0;
+}
+
+/* 数字の桁をそろえる: 印のないマスにも、印の幅をあける */
+.withMarks td.num:not(:has(.mark)),
+.withMarks thead th.num {
+  padding-right: 32px;
+}
+
+/* 合計・小計・総計: Σ・太字・罫線の形で見分ける(色だけにしない) */
+.sig {
+  font-family: var(--font-num);
+  font-weight: 600;
+  color: var(--accent);
+  margin-right: 2px;
+}
+
+.totalCol {
+  border-left: 2px solid var(--line-strong) !important;
+}
+
+.totalCell {
+  font-weight: 600;
+  background: var(--tot-bg);
+}
+
+.subtotal th,
+.subtotal td {
+  font-weight: 600;
+  background: var(--sub-bg) !important;
+  border-top: 1px dashed var(--sub-line);
+  border-bottom: 1px solid var(--line);
+}
+
+.subtotal th.rowHead {
+  background: var(--sub-bg);
+}
+
+.grand th,
+.grand td {
+  position: sticky;
+  bottom: 0;
+  font-weight: 700;
+  border-top: 3px double var(--grand-line);
+  border-bottom: 0;
+  background: var(--grand-bg) !important;
+  color: var(--ink-strong);
+}
+
+.grand .sig {
+  color: var(--hl-text);
+}
+
+.grand th.rowHead {
+  z-index: 2;
+}
+
+/* 取り込みの表 */
+.bookRow th {
+  position: static;
+  background: var(--accent-soft) !important;
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+.bookRow a {
+  font-weight: 400;
+  margin-left: 10px;
+  font-size: 12.5px;
+}
+
+.tabCell {
+  padding-left: 28px !important;
+}
+
+.headerRow td {
+  font-weight: 700;
+  background: var(--accent-soft);
+}
+
+.aggRow td {
+  background: var(--sub-bg);
+  border-top: 1px dashed var(--sub-line);
+  font-weight: 600;
+}
+
+.colL {
+  font-family: var(--font-num);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* 列の役割の札(色だけにせず、文字を必ず添える) */
+.tag {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  margin-left: 4px;
+  line-height: 18px;
+  border: 1px solid transparent;
+}
+
+.role_dimension {
+  background: var(--tag-dim-bg);
+  color: var(--tag-dim-ink);
+}
+
+.role_measure {
+  background: var(--tag-mea-bg);
+  color: var(--tag-mea-ink);
+}
+
+.role_attribute {
+  background: var(--tag-att-bg);
+  color: var(--tag-att-ink);
+}
+
+.role_aggregate {
+  background: var(--tag-agg-bg);
+  color: var(--tag-agg-ink);
+}
+
+.role_dimension,
+.role_measure,
+.role_attribute,
+.role_aggregate {
+  border-color: color-mix(in srgb, currentColor 24%, transparent);
+}
+
+.role_ignore {
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+}

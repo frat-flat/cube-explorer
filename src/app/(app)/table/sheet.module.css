@@ -1,0 +1,122 @@
+/* Table 画面の置き方。部品(カード・表・Σ・ƒ など)は src/styles/components.css、色は tokens.css。ここに色を直書きしない */
+
+/* 組み方(左)と結果(右)を並べる入れ物。狭いときは上下に並べる */
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.foldBtn {
+  display: none;
+  margin-left: auto;
+}
+
+.tableArea {
+  max-height: 72vh;
+}
+
+/* 1100px 以上: 左に組み方の欄(畳める)、右に結果。画面いっぱいの高さの中で、結果の表がいつも見える(読み込んだあと、表の見出しが最初の画面に出る)。
+   組み方の欄は中で縦に動き、結果の表は見出し(上)と総計の行(下)を固定したまま中で動く(表が低いときは、枠も表の高さまで) */
+@media (min-width: 1100px) {
+  .fill {
+    height: 100%;
+    min-height: 520px;
+  }
+
+  .foldBtn {
+    display: inline-block;
+  }
+
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .workspace[data-setup="closed"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace[data-setup="closed"] .setup {
+    display: none;
+  }
+
+  .setup {
+    overflow: auto;
+    min-height: 0;
+    padding-bottom: 2px;
+  }
+
+  .result {
+    min-height: 0;
+  }
+
+  /* 結果の枠は、表の高さに合わせる(短い表の下に空きを作らない)。表が高いときだけ、枠が画面の高さに収まるまで縮み、表の中で動く */
+  .resultCard {
+    display: flex;
+    flex-direction: column;
+    flex: 0 1 auto;
+    min-height: 0;
+  }
+
+  .tableArea {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: none;
+  }
+}
+
+/* 絞り込み・対象のシート */
+.filter {
+  margin: 0 0 8px;
+}
+
+.sources summary {
+  cursor: pointer;
+  margin: 0 0 4px;
+}
+
+.book {
+  margin: 8px 0 0;
+}
+
+.tab {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 16px 0 12px;
+}
+
+.picker {
+  margin: 8px 0 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+
+.pickList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+  columns: 3 180px;
+}

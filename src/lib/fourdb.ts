@@ -2,6 +2,7 @@
 // 取り込み元(スプシ)を選ぶ。API の入口で使う。
 import { connection } from "next/server";
 import { auth, authBypassed, isAllowedEmail } from "@/lib/auth";
+import { sameOrigin } from "@/lib/same-origin";
 import { fixtureReader } from "@/fourdb/adapters/google-sheets/fixture";
 import { googleSheetsReader } from "@/fourdb/adapters/google-sheets/reader";
 import { FourdbUnavailable, fourdbConfigured, isLocalDatabase, personalWorkspace, type Scope } from "@/fourdb/adapters/postgres/db";
@@ -51,19 +52,6 @@ export async function requireScope(request?: Request): Promise<Scope | Response>
     return { principal, workspaceId: ws.id };
   } catch (e) {
     return failure(e);
-  }
-}
-
-/** ブラウザが付ける Sec-Fetch-Site / Origin で、同じサイトからの要求かを見る(どちらもなければ、ブラウザ以外からの要求として通す) */
-function sameOrigin(request: Request): boolean {
-  const site = request.headers.get("sec-fetch-site");
-  if (site) return site === "same-origin";
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).host === new URL(request.url).host;
-  } catch {
-    return false;
   }
 }
 
