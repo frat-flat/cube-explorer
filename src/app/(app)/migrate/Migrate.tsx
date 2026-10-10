@@ -9,6 +9,7 @@ import type { SourceCell } from "@/fourdb/core/import/types";
 import type { ApplyCheck, SheetSummary } from "@/fourdb/adapters/postgres/import-store";
 import type { ReconcileResult } from "@/fourdb/adapters/postgres/reconcile";
 import { colLetter } from "@/fourdb/core/import/a1";
+import { TASKS_CHANGED_EVENT } from "../task-count";
 
 type Role = ColumnApproval["role"];
 const ROLES: [Role, string][] = [
@@ -20,6 +21,8 @@ const ROLES: [Role, string][] = [
 ];
 const roleName = (r: Role) => ROLES.find(([k]) => k === r)?.[1] ?? r;
 const fmt = (n: number) => n.toLocaleString("ja-JP");
+/** やること(承認待ち・反映の途中など)が変わったことを、メニューの Task の件数の印に知らせる(印が読み直す) */
+const tasksChanged = () => window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
 
 /** シートの一覧をファイルごとにまとめる(並びは保つ。新しく読んだファイルが上) */
 function byBook(sheets: SheetSummary[]): { book: SheetSummary["book"]; tabs: SheetSummary[] }[] {
@@ -123,6 +126,7 @@ export function Migrate() {
         setProgress({ done: r.rowsRead, total: r.total, label: `「${sheet.title}」を読み取っています` });
         r = await api(`/api/4db/runs/${run.id}/read`, { method: "POST" });
       }
+      tasksChanged(); // 読み終えて承認待ちになった
       await loadProposal(run.id);
     });
 
@@ -152,6 +156,7 @@ export function Migrate() {
         setProgress({ done: r.next, total: r.total, label: "4DB に書いています" });
         r = await api(`/api/4db/runs/${runId}/apply`, { method: "POST", body: {} });
       }
+      tasksChanged(); // 承認して反映し終えた
       setApplied(r.counts);
       const sheetId = current?.sheet.id ?? sheets.find((x) => x.lastRun?.id === runId)?.id;
       if (sheetId) setResult(await api<ReconcileResult>(`/api/4db/sheets/${sheetId}/reconcile`));

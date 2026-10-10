@@ -39,9 +39,9 @@ test.describe("ログイン: 通信が失敗したとき", () => {
     await expect(alert).toContainText("コードを送れませんでした");
   });
 
-  test("サーバーがエラーを返したときも、ボタンが元に戻り、決まった文のエラーが出る(上流の文はそのまま見せない)", async ({ page }) => {
+  test("サーバーが断った(400)ときは、ボタンが元に戻り、メールアドレスを確かめるよう知らせる(上流の文はそのまま見せない)", async ({ page }) => {
     // 上流が返す文(内部の事情・英語)が画面に出ないことを、目印の語で確かめる
-    await page.route("**/api/auth/**", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "boom-upstream-detail", code: "SECRET_INTERNAL_CODE" }) }));
+    await page.route("**/api/auth/**", (route) => route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ message: "boom-upstream-detail", code: "SECRET_INTERNAL_CODE" }) }));
     await page.goto("/login");
     await fillEmail(page);
     const send = page.getByRole("button", { name: "ログイン用のコードを送る" });
@@ -52,6 +52,23 @@ test.describe("ログイン: 通信が失敗したとき", () => {
     await expect(page.locator("main")).not.toContainText("boom-upstream-detail");
     await expect(page.locator("main")).not.toContainText("SECRET_INTERNAL_CODE");
   });
+
+  // L-1: サーバー側の失敗(500・503)なのに「メールアドレスを確かめて」と出ていた。原因に合う文にする
+  for (const status of [500, 502, 503]) {
+    test(`サーバー側の失敗(${status})のときは、サーバー側の問題と知らせる。メールアドレスのせいにしない。上流の文は出さない`, async ({ page }) => {
+      await page.route("**/api/auth/**", (route) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ message: "boom-upstream-detail", code: "SECRET_INTERNAL_CODE" }) }));
+      await page.goto("/login");
+      await fillEmail(page);
+      const send = page.getByRole("button", { name: "ログイン用のコードを送る" });
+      await send.click();
+      await expect(send).toBeEnabled();
+      const alert = page.locator("main").getByRole("alert");
+      await expect(alert).toHaveText("コードを送れませんでした。サーバー側で問題が起きているようです。しばらく待ってから、もう一度送ってください。");
+      await expect(alert).not.toContainText("メールアドレス");
+      await expect(page.locator("main")).not.toContainText("boom-upstream-detail");
+      await expect(page.locator("main")).not.toContainText("SECRET_INTERNAL_CODE");
+    });
+  }
 
   test("送りすぎ(429)のときは、しばらく待つよう知らせる。上流の文は出さない", async ({ page }) => {
     await page.route("**/api/auth/**", (route) => route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ message: "Too many requests: boom-upstream-detail" }) }));
@@ -79,6 +96,31 @@ test.describe("ログイン: 通信が失敗したとき", () => {
     await expect(page.locator("main").getByRole("alert")).toHaveText("コードが違うか、期限が切れています。もう一度確かめるか、コードを送り直してください。");
     await expect(page.locator("main")).not.toContainText("boom-upstream-detail");
   });
+
+  // L-1: コードの確認が 429・500 で失敗しても「コードが違うか、期限が切れています」と出ていた。原因に合う文にする
+  for (const [status, expected] of [
+    [429, "ログインできませんでした。確認の回数が多すぎます。しばらく待ってから、もう一度試してください。"],
+    [500, "ログインできませんでした。サーバー側で問題が起きているようです。しばらく待ってから、もう一度試してください。"],
+    [503, "ログインできませんでした。サーバー側で問題が起きているようです。しばらく待ってから、もう一度試してください。"],
+  ] as const) {
+    test(`コードの確認が ${status} で失敗したときは、コードが違うとは言わず、原因に合う文を出す。ボタンが元に戻る。上流の文は出さない`, async ({ page }) => {
+      await page.route("**/api/auth/**", (route) => {
+        if (route.request().url().includes("send-verification-otp")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true }) });
+        return route.fulfill({ status, contentType: "application/json", body: JSON.stringify({ message: "boom-upstream-detail" }) });
+      });
+      await page.goto("/login");
+      await fillEmail(page);
+      await page.getByRole("button", { name: "ログイン用のコードを送る" }).click();
+      await page.getByLabel(/に届いた6桁のコード/).fill("000000");
+      const signIn = page.getByRole("button", { name: "ログイン", exact: true });
+      await signIn.click();
+      await expect(signIn).toBeEnabled();
+      const alert = page.locator("main").getByRole("alert");
+      await expect(alert).toHaveText(expected);
+      await expect(alert).not.toContainText("コードが違う");
+      await expect(page.locator("main")).not.toContainText("boom-upstream-detail");
+    });
+  }
 
   test("コードの確認の通信が失敗しても、ボタンが元に戻り、エラーが出る", async ({ page }) => {
     // 送信は成功させて(中継を空の成功で返す)、コードの入力の段階へ進む

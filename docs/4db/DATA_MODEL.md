@@ -34,6 +34,8 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
  ├─ sheet_definition(表の定義: 名前・行・列・数値・絞り込み・小計など。版つき)
  ├─ history(履歴)
  └─ card_attribute(ビュー: Box の属性 = Card)
+
+principal_pref(アカウント = principal ごとの設定: 明暗・World・ホームの見た目。workspace には属さない。3.15)
 ```
 
 ## 3. 大事な決め方と理由
@@ -95,6 +97,7 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 2. **行ごとの権限(RLS)を全表で強制**: 処理はトランザクションごとに `fourdb.workspace_id` を設定してから読み書きします。設定した workspace の行しか見えず、書けません。設定がなければ何も見えません。表の持ち主の接続でも強制されます。
 3. **入れ物は実行用の役割で接続する**: 表の持ち主でも、行ごとの権限を飛ばせる役割(superuser・BYPASSRLS)でもない役割で接続し、必要な権限だけを渡します。役割の作り方は組み込み先ごとに決めます([ENVIRONMENT.md](../deployment/ENVIRONMENT.md))。
 
+- 例外: `principal_pref`(3.15)は、workspace ではなく **principal** ごとのデータなので、`workspace_id` を持ちません。行ごとの権限(RLS)は、`fourdb.workspace_id` ではなく、同じトランザクションで設定する `fourdb.principal`(`fourdb.current_principal()`)で絞ります。強制(FORCE)は他の表と同じです。
 - `workspace_member` だけは、workspace を決める前でも「自分(`fourdb.principal`)の所属」を引けます。
 - principal は入れ物が決める**変わらない印**にします(例: `neon:<ユーザー ID>`)。メールアドレスは持ち主が変わりうるので使いません。
 - 関数・表・ビューは、誰にも(PUBLIC)渡していません。ビューは呼んだ人の権限で動きます(`security_invoker`)。
@@ -127,6 +130,24 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 - 名前は workspace の中で1つ(消したものは除く)。上書きすると版(`version`)が上がり、保存のたびに定義を `history` に残します。
 - 保存した定義を開くときも、届いた指定と同じ確かめ(形・ID・段・上限)を通します。
 
+### 3.15 アカウントごとの設定(`principal_pref`。D-017)
+- `principal_pref`([0006](../../src/fourdb/adapters/postgres/migrations/0006_principal_pref.sql))に、アカウント(principal)ごとに **1 行**、画面の見た目の設定を残します。元に戻すときは [0006_principal_pref.down.sql](../../src/fourdb/adapters/postgres/migrations/0006_principal_pref.down.sql)。
+- 持ち主は workspace ではなく **principal**(入れ物が決める、変わらない利用者の印。3.9)です。どのパソコンで開いても同じ見た目にするためです。共有(`workspace_member` を足す)をしても、見た目は人ごとに別のままです。
+
+| 列 | 意味 | 決まり(表の check) |
+|---|---|---|
+| `principal` | アカウントの印(主キー) | 1〜200 文字 |
+| `theme` | 画面の明暗 | `dark`・`light`、または null(null = パソコンの設定に合わせる) |
+| `world` | まわりの世界の id(P2 は `plain` だけ。P5 で増える) | null にできない。既定 `plain`。小文字で始まり、小文字・数字・`_`・`-` で 32 文字まで |
+| `look` | ホームの見た目の部品(形・向き・台座・札・背景・並べ方) | JSON のオブジェクト。既定 `{}`。2KB まで |
+| `updated_at` | 最後に変えた時刻 | 既定は今 |
+
+- **中身の確かめ(許可リスト)は芯**(`src/fourdb/core/prefs/`)が行い、**表は形と大きさだけ**を見ます。部品や World が増えても、表の作り替えは要りません。書くときは厳しく(知らないキー・値は拒否)、読むときはゆるく(知らない値は既定に直す)します。
+- **守り方**: 行ごとの権限(RLS)を有効かつ**強制**(FORCE。表の持ち主にもかかる)にし、方針 `principal_scope` で、`principal = fourdb.current_principal()`(読みの `using` も書きの `with check` も)の行だけを読み書きできます。利用者を設定していなければ何も見えず、書けません。つなぎ(`adapters/postgres/prefs.ts`)は、SQL のパラメータでも principal を絞ります(RLS は重ねの守り)。
+- **作らないもの**: 新しい設定(GUC)、SECURITY DEFINER の関数、トリガー。PUBLIC には何の権限も渡しません。実行用の役割への読み書きの権限は、入れ物が渡します(表の SQL に役割の名前を書かない)。
+- **表がない・権限がないとき**、アプリは止まりません。設定の読み取りは「使えない」と既定の設定を返し、書き込みは「使えない」(503)で断ります。画面は、その端末のクッキーだけで動きます。
+- **消すとき**: `down` は、保存された設定が 1 行でもあれば**消さずに止まり**、行の数を知らせます。消すと決めたときだけ、同じ取引の中で消す数を設定して流し直します(数が今の行の数と同じときだけ通る)。表を消すと、保存された設定は戻りません(明暗はクッキーに残ります)。
+
 ## 4. ② 技術設計の Entity との対応
 
 | ② の Entity | このモデル | いつ作るか |
@@ -142,16 +163,32 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 | Snapshot | 読み取りの記録は `import_run`、値の前後は `value` の版 | 今回 |
 | Aggregation | 取り込みで見つけた合計は `record.kind`・`source_column.role`。表示の合計・小計は集計のたびに計算し(3.13)、その指定は SheetDefinition の中 | D-003 の 3・4(作った) |
 | SheetDefinition | `sheet_definition`(3.14) | D-003 の 4(作った) |
+| (② にない)アカウントごとの画面の設定 | `principal_pref`(3.15) | D-017(P2) |
 | Selection・DrillContext | 後で足す | D-003 の 7 |
 | CubeDefinition・AxisConfiguration | 後で足す | D-003 の 8 |
 | ViewState | 後で足す | D-003 の 7・8 |
 | Calculation・LineageEdge | 後で足す。今は `value.kind = calculated` と `formula`、元のセル(行 × 列)と `history` | 後に回すもの |
 
-## 5. 今の画面のデータとの対応(参考)
+(ViewState の行は「後で足す」のままです。`principal_pref` は、保存した見方(ViewState)ではなく、アカウントごとの画面の既定の設定です。)
 
-本番のデータは移行しません(この環境の決定)。今の画面の考え方が、新しい表のどこに当たるかだけを示します。
+### 4.1 画面の呼び名と、中の名前(D-015)
 
-| 今(`public/sheets/axes.html` の `S`) | 新しい表 |
+画面では、Google スプレッドシートの単位と、4DB が計算して見せる表を、次の呼び名で出します。文書・コード・表の中の名前は変えません(この文書群では、画面の「Table」＝要件・設計の「Sheet」と読みます)。
+
+| 画面の呼び名 | 意味 | 中の名前(表・コード) | 要件・設計の名前 |
+|---|---|---|---|
+| ファイル | Google スプレッドシート 1 つ(1 つの ID) | `source_container` | SourceContainer |
+| シート | ファイルの中の 1 枚(タブ。取り込む単位) | `source_sheet` | SourceSheet |
+| Table | 4DB が元の値から計算して見せる表(行・列・数値・絞り込み・小計を選んだもの) | `sheet_definition`(保存した定義)。画面は `/table`・中のコードは Projected Sheet | Sheet・Projected Sheet・SheetDefinition |
+| 暗い・明るい | 画面の見た目(D-012) | アカウントの設定 `principal_pref.theme`(3.15)。クッキー `fourdb_theme`(`dark`・`light`)は写し | — |
+
+「シート」と「Table」は音が重ならないように分けています(D-015)。要件・設計の「Sheet」は、画面では「Table」です。
+
+## 5. 旧ダッシュボードのデータとの対応(参考。旧ダッシュボードは P2 で外した)
+
+本番のデータは移行しません(この環境の決定)。旧ダッシュボードの考え方が、新しい表のどこに当たるかだけを示します。
+
+| 旧(`public/sheets/axes.html`(P2 で外した。git の履歴にある)の `S`) | 新しい表 |
 |---|---|
 | `axes`(Column Registry のカラム) | `column_definition`(分類の軸は `dimension` も) |
 | `groups` | `column_group` |
@@ -211,6 +248,27 @@ workspace(誰のデータか)── workspace_member(入れ物の利用者 princ
 ### 別の立場での確認
 DB 担当とセキュリティ担当の AI が、この表の定義を確認しました。最初の案に対する指摘(workspace を消せない、軸の値の組に別の人の値を入れられる、値が別のタブの列を指せる、軸の値の段の矛盾で二重に数える、Box の輪、属性の期間の重なり、合計の行への書き込み、移行完了の表の物理削除、持ち主の接続で行ごとの権限が効かない など)は、すべてこの版で直し、上の 60 項目で確かめています。
 
+### アカウントごとの設定(0006。[0006_principal_pref.check.sql](../../src/fourdb/adapters/postgres/test/0006_principal_pref.check.sql)、48 項目すべて通過)
+上の 2026-10-08 の確かめとは別の、P2(D-017)の確かめです。手元の使い捨てデータベース(PostgreSQL 18)。拒否されたものは、狙った理由(SQLSTATE)で拒否されたことを見ています。
+- **RLS**: 有効かつ強制(表の持ち主にもかかる)/ 方針は 1 つ(`principal_scope`、すべての操作・すべての役割)で、読みも書きも「principal = 今の利用者」/ 利用者を設定しなければ何も見えず、書けない / alice は bob の行を読めない・直せない・消せない・足せない・上書きできない・自分の行を別の人に付け替えられない / 表の持ち主でも、利用者を設定しなければ何も見えない
+- **表の決まり**: 既定(明暗 null・World `plain`・見た目 `{}`)/ 明暗の大文字・知らない値、World の大文字始まり・空・33 文字・使えない文字・null、見た目の配列・文字・2KB 超・null、principal の空・201 文字・重複は拒否
+- **権限**: PUBLIC には何もない / トリガーはない / `fourdb.current_principal()` は呼んだ人の権限で動き(SECURITY DEFINER でない)、search_path が固定
+- **元に戻す**: 行があれば止まる(表・行・RLS の強制が残る)/ 消す数が違えば止まる / 数が合えば表と方針が一緒に外れる / もう一度流しても何もしない / 行がなければ数の設定なしで外れる
+- 同じ 48 項目を、DB 担当・QA・修正の担当が、それぞれ別に手元で流し、3 回とも 48 項目すべて通過した。
+
+### ホーム・Task の規模(0007。[home.sql.md](../../src/fourdb/adapters/postgres/test/home.sql.md)、架空のデータ)
+上の規模のデータ(行 28.8 万・値 288 万)に、Box 8,500・Box に結んだ行 29.6 万・計算された値 28.8 万・シート 990 などを足したデータ([scale_home.sql](../../src/fourdb/adapters/postgres/test/scale_home.sql))で、実行用の役割で、行ごとの権限がかかった状態で測った(5 回の真ん中。手元のパソコン)。
+下の数値は、QA 担当が、製品のつなぎの関数(`loadHome`・`loadTasks`・`countTasks`。測る試験は [home.scale.adapter.test.ts](../../src/fourdb/adapters/postgres/home.scale.adapter.test.ts))を独立に測ったものです。作った担当の下書きの SQL を測った数値(home.sql.md にある。少し違う)は使っていません。
+
+| | 0007 あり | 0007 なし | 目安 |
+|---|---:|---:|---:|
+| ホーム V1(法人 500 + 店舗 8,000 の親子あり) | 89ms | 1,098ms | 300ms |
+| ホーム V2(8,500 がいちばん上) | 315ms | 2,382ms | 1,000ms |
+| Task | 26〜32ms | 25〜26ms | 100ms |
+| 件数(メニューの印) | 14〜15ms | 15〜17ms | 50ms |
+
+0007(計算された値の今の版だけの部分索引)がないと、数値ごとに「計算された値があるか」を引くのに、その列の値をすべてなめるため、ホームが目安を超えます。Task と件数は、0007 の有無でほとんど変わりません。Neon では未確認です。
+
 ## 7. 容量と費用の見込み
 
 - 値1つあたり約 300 バイト(行と軸の値の分、索引込み)。数十万行 × 10 項目で約 0.9GB、100 万行 × 10 項目で約 3GB の見込みです。
@@ -225,4 +283,5 @@ DB 担当とセキュリティ担当の AI が、この表の定義を確認し�
 - 列の意味を承認し直したときの履歴の残し方(D-003 の 2)。
 - 外部へ出すとき(② 28章)に出さない列(直した人・元のセルの場所など): 書き出しを作るときに決める。
 - 本番のデータベースの置き場所と料金プラン(上の 7)。
+- ホームの Box の親子(法人 › 店舗)での大枠のまとめ方、取り込まないシートの印(どこに持たせるか・表の作り替えが要るかは P3 で確かめる)は、P3・P4 で決める(D-017)。
 - 途中でやめた取り込みの置き場(`import_row`。元のセルの中身)の片付け: 今は反映したときだけ消す。取り消しの操作と、古い置き場を消す期限を足す(2026-10-08 のセキュリティ確認の指摘)。

@@ -6,14 +6,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: "/sheet", destination: "/table", permanent: true }];
   },
-  // 入口(/)は 4D Base のダッシュボード(public/sheets/axes.html)。ログインは src/proxy.ts で確かめる
-  async rewrites() {
-    return {
-      beforeFiles: [{ source: "/", destination: "/sheets/axes.html" }],
-      afterFiles: [],
-      fallback: [],
-    };
-  },
+  // 入口(/)は src/app/(app)/page.tsx のホーム。旧ダッシュボードへの読み替えは P2 で外した。ログインは src/proxy.ts で確かめる
 };
 
 export default nextConfig;

@@ -3,16 +3,12 @@
 import { useState } from "react";
 import { createAuthClient } from "@neondatabase/auth/next";
 import { LoginLogo } from "./LoginLogo";
+import { sendFailureMessage, signInFailureMessage } from "./messages";
 import styles from "./login.module.css";
 
 const authClient = createAuthClient();
 
-// 画面に出すのは、ここに決めた文だけ。上流(Neon Auth)が返す文は、内部の事情や英語の文が混じるので見せない(何も記録もしない)
-const SEND_TOO_OFTEN = "コードを送れませんでした。しばらく待ってから、もう一度送ってください。";
-const SEND_FAILED = "コードを送れませんでした。メールアドレスを確かめて、もう一度送ってください。";
-const SEND_NO_NETWORK = "コードを送れませんでした。通信できなかったようです。通信の状態を確かめて、もう一度送ってください。";
-const CODE_WRONG = "コードが違うか、期限が切れています。もう一度確かめるか、コードを送り直してください。";
-const SIGN_IN_NO_NETWORK = "ログインできませんでした。通信できなかったようです。通信の状態を確かめて、もう一度試してください。";
+// 画面に出すのは、messages.ts に決めた文だけ。上流(Neon Auth)が返す文は、内部の事情や英語の文が混じるので見せない(何も記録もしない)
 
 /**
  * 失敗の HTTP の状態(429 など)。Neon Auth の部品は、サーバーが断ったときは status 付きの例外を投げ(返り値の error のこともある)、
@@ -22,8 +18,6 @@ function httpStatus(e: unknown): number {
   const n = Number((e as { status?: unknown } | null)?.status);
   return Number.isFinite(n) ? n : 0;
 }
-const sendFailureMessage = (status: number) => (status === 429 ? SEND_TOO_OFTEN : status >= 400 ? SEND_FAILED : SEND_NO_NETWORK);
-const signInFailureMessage = (status: number) => (status >= 400 ? CODE_WRONG : SIGN_IN_NO_NETWORK);
 
 // メールアドレスに届く6桁のコードでログインする(Neon Auth のメールコード)
 export function LoginForm({ deniedEmail }: { deniedEmail?: string }) {

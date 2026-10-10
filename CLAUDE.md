@@ -9,7 +9,7 @@
 
 この環境(このリポジトリ・公開先)だけの決まりは [docs/deployment/ENVIRONMENT.md](./docs/deployment/ENVIRONMENT.md)、現状の調査は [docs/deployment/AUDIT-2026-10-08.md](./docs/deployment/AUDIT-2026-10-08.md)。
 
-[DESIGN.md](./DESIGN.md) は旧設計(v0.1)と、2026-10 上旬までの画面ごとの決定記録。今の画面(`public/sheets/axes.html`)の挙動を確かめるときに参照する。新しい作りでも次は守る:
+[DESIGN.md](./DESIGN.md) は旧設計(v0.1)と、2026-10 上旬までの画面ごとの決定記録。旧の画面(`public/sheets/axes.html`。P2 で外した。中身は git の履歴にある)の挙動を確かめるときに参照する。新しい作りでも次は守る:
 
 - SQL の表名・列名はメタデータの値からだけ組み立て、値はすべてパラメータで渡す(DESIGN.md 7.2)
 - 区切りごとに、ロジックは Vitest、画面は Playwright で実際に動かして確かめる(DESIGN.md 12)

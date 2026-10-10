@@ -34,8 +34,3 @@ export async function currentUserEmail(): Promise<string | null> {
   const email = await sessionEmail();
   return isAllowedEmail(email) ? email : null;
 }
-
-/** API の入口で使う。ログインしていなければ 401 を返す */
-export async function requireUser(): Promise<Response | null> {
-  return (await currentUserEmail()) ? null : Response.json({ error: "ログインが必要です" }, { status: 401 });
-}

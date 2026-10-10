@@ -279,6 +279,61 @@ test.describe("Table(Projected Sheet)", () => {
     // 見つかるシートの分で、表は出る
     await expect(page.getByRole("heading", { name: "売上 の合計" })).toBeVisible();
   });
+
+  test("/table?def=<id>: 保存した表を開いた状態で出る(履歴からの移動)。id の形でないものは、ないものとして扱い、エラーを出さない", async ({ page }) => {
+    test.setTimeout(120_000);
+    await importFixture(page, id, "7 行 × 13 列");
+    const catalog = await (await page.request.get(`${BASE}/api/4db/catalog`)).json();
+    const sales = catalog.measures.find((m: { name: string }) => m.name === "売上");
+    const name = `試験 def ${stamp}`;
+    const saved = await page.request.post(`${BASE}/api/4db/sheet-definitions`, {
+      data: { name, request: { measureId: sales.id, fn: "AVG", rows: null, columns: null, filters: [], sheetIds: [sales.sheetIds[0]] } },
+    });
+    expect(saved.ok()).toBe(true);
+    const { id: defId } = (await saved.json()) as { id: string };
+
+    // 開いた状態で出る: 名前・集計のしかた・対象のシートが保存したとおりで、初めの組み方に上書きされない
+    await page.goto(`${BASE}/table?def=${defId}`);
+    await expect(page.getByText(`「${name}」を開きました(版 1)`)).toBeVisible();
+    await expect(page.getByLabel("表の名前")).toHaveValue(name);
+    await expect(page.getByLabel("集計のしかた")).toHaveValue("AVG");
+    await expect(page.getByText("選んだシート 1 個")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "売上 の平均" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "上書き保存" })).toBeEnabled();
+
+    // 形の違う def・ない id・def なし: 開かない。「見つかりません」などのエラーも出さない(形の違うものは、そもそも API に渡さない)
+    for (const q of ["?def=abc", "?def=", "?def=1&def=2", ""]) {
+      await page.goto(`${BASE}/table${q}`);
+      await expect(page.getByRole("heading", { name: "Table", level: 1 })).toBeVisible();
+      await expect(page.getByLabel("保存した表を開く")).toBeVisible();
+      await expect(page.getByText("を開きました")).toHaveCount(0);
+      await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+    }
+    // 形は正しいが、ない id: 開けなかったと知らせる(別の表を開いたりしない)
+    await page.goto(`${BASE}/table?def=00000000-0000-4000-8000-0000000000bb`);
+    await expect(page.getByText("表の定義が見つかりません")).toBeVisible();
+    await expect(page.getByText("を開きました")).toHaveCount(0);
+  });
+
+  // L-2: 保存した表のシートがすべてなくなって、選べる数値が 1 つもないとき、選びようがないのに「数値を選び直してください」と出ていた。
+  // 上の「まだ表にできるデータがありません」に任せる(データのない状態は、API の返事を差し替えて作る)
+  test("表にできるデータが 1 つもないとき、保存した表を開いても「数値を選び直してください」とは出さない(「まだ表にできるデータがありません」だけ)", async ({ page }) => {
+    const defId = "11111111-2222-4333-8444-555555555555";
+    const ghostMeasure = "22222222-3333-4444-8555-666666666666";
+    await page.route("**/api/4db/catalog", (route) => route.fulfill({ json: { measures: [], dimensions: [] } }));
+    await page.route("**/api/4db/sheets", (route) => route.fulfill({ json: { sheets: [] } }));
+    await page.route("**/api/4db/sheet-definitions", (route) => route.fulfill({ json: { definitions: [{ id: defId, name: "消えた表", version: 1, updated_at: "2026-10-08T00:00:00.000Z" }] } }));
+    await page.route(`**/api/4db/sheet-definitions/${defId}`, (route) =>
+      route.fulfill({
+        json: { id: defId, name: "消えた表", version: 1, request: { measureId: ghostMeasure, fn: "SUM", rows: null, columns: null, filters: [], sheetIds: [ghostMeasure] }, filterMembers: [], measureName: "売上" },
+      }),
+    );
+    await page.goto(`${BASE}/table?def=${defId}`);
+    await expect(page.getByText("まだ表にできるデータがありません。")).toBeVisible();
+    await expect(page.getByText("「消えた表」を開きました(版 1)")).toBeVisible(); // 開く処理は終わっている
+    await expect(page.getByText("数値を選び直してください")).toHaveCount(0);
+    await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  });
 });
 
 /** 「数値」を名前で選ぶ(選択肢にはシートの数が付き、前の試験の取り込みで変わるため、名前の始まりで探す) */
