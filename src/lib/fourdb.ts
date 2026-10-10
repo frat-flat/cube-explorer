@@ -32,6 +32,28 @@ const WORKSPACE_TTL_MS = 5 * 60 * 1000;
 const workspaceOf = new Map<string, { id: string; until: number }>();
 
 /**
+ * 印(principal)のある人が、4DB のデータベースを使えない理由(使えるなら null)。requireScope と fourdbUsable が同じ決まりを見る。
+ * not_configured = データベースが設定されていない / local_only = ログインなしの開発用の利用者が、手元以外のデータベースにつなごうとした
+ */
+function databaseProblem(principal: string): "not_configured" | "local_only" | null {
+  if (!fourdbConfigured()) return "not_configured";
+  if (principal === LOCAL_DEV && !isLocalDatabase(process.env.FOURDB_DATABASE_URL!)) return "local_only";
+  return null;
+}
+
+/**
+ * この要求で、アカウント向けの 4DB の API(設定・Task の件数など)が使えるか。requireScope がデータベースに入る前に断る条件
+ * (ログインなしの 401・設定なしの 503・手元以外の DB への local-dev の 403)に当たらないこと
+ * (許可されたログイン、または手元だけの開発用の利用者がいて、データベースが設定されている)。
+ * 画面が要求を出すかの判断だけに使う。守りは API の requireScope が行う(別サイトの 403 や DB の失敗はここでは分からない)。
+ * 画面の枠が、使えない所(ログインなしで FOURDB_LOCAL_DEV もない開発サーバーなど)で、必ず失敗する要求を出さないために使う。
+ */
+export async function fourdbUsable(): Promise<boolean> {
+  const principal = await currentPrincipal();
+  return principal !== null && databaseProblem(principal) === null;
+}
+
+/**
  * API の入口で使う。だめなら返す Response、よければ Scope。
  * GET 以外は、同じサイトからの要求だけを受け付ける(別のサイトから書き込ませない)。
  */
@@ -39,10 +61,9 @@ export async function requireScope(request?: Request): Promise<Scope | Response>
   if (request && request.method !== "GET" && !sameOrigin(request)) return Response.json({ error: "この画面からの操作だけを受け付けます" }, { status: 403 });
   const principal = await currentPrincipal();
   if (!principal) return Response.json({ error: "ログインが必要です" }, { status: 401 });
-  if (!fourdbConfigured()) return Response.json({ error: "4DB のデータベースがまだ設定されていません(FOURDB_DATABASE_URL)", code: "not_configured" }, { status: 503 });
-  if (principal === LOCAL_DEV && !isLocalDatabase(process.env.FOURDB_DATABASE_URL!)) {
-    return Response.json({ error: "ログインなしの開発用の利用者は、手元のデータベースにしかつなげません" }, { status: 403 });
-  }
+  const problem = databaseProblem(principal);
+  if (problem === "not_configured") return Response.json({ error: "4DB のデータベースがまだ設定されていません(FOURDB_DATABASE_URL)", code: "not_configured" }, { status: 503 });
+  if (problem === "local_only") return Response.json({ error: "ログインなしの開発用の利用者は、手元のデータベースにしかつなげません" }, { status: 403 });
   try {
     let ws = workspaceOf.get(principal);
     if (!ws || ws.until < Date.now()) {
@@ -78,13 +99,45 @@ export function failure(e: unknown): Response {
   return Response.json({ error: "処理できませんでした。少し時間をおいてもう一度試してください" }, { status: 500 });
 }
 
-/** 届いた JSON(1MB まで) */
+/** 届いた JSON の大きさの上限(バイト)の既定: 1MB */
 const MAX_BODY = 1_000_000;
-export async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+
+/** 本文を maxBytes までだけ読む(超えたら読むのをやめて null。content-length がない・偽りのときも、メモリに溜め込まない) */
+async function readTextWithin(request: Request, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    // getReader() は、本文がすでに読まれている(使用済み・ロックされている)と throw する。その場合も 500 にせず、読めなかった(null → 400)として返す
+    const reader = request.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
+/** 届いた JSON({ … } の形だけ)。maxBytes(既定 1MB)を超える・JSON でない・{ … } の形でなければ null */
+export async function readJson(request: Request, maxBytes: number = MAX_BODY): Promise<Record<string, unknown> | null> {
   const len = Number(request.headers.get("content-length") ?? "0");
-  if (len > MAX_BODY) return null;
-  const text = await request.text().catch(() => "");
-  if (text.length > MAX_BODY) return null;
+  if (len > maxBytes) return null;
+  const text = await readTextWithin(request, maxBytes);
+  if (text === null) return null;
   try {
     const body = JSON.parse(text || "null");
     return body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : null;

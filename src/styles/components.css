@@ -351,11 +351,28 @@
   margin-top: -1px;
 }
 
+/* メニューの Task の横の件数の印(0 のときは出さない。閉じた ☰ には出さない) */
+.nv .nvbadge {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--hl);
+  color: var(--on-hl);
+  font-family: var(--font-num);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .nv.sub {
   padding-left: 22px;
 }
 
-/* 区切りの見出しのない項目(設定)は、上に少しあける */
+/* 区切りの見出しのある項目(Import・Table)のあとに続く、見出しのない項目(履歴)は、上に少しあける */
 .nv.top-gap {
   margin-top: 10px;
 }
@@ -379,26 +396,6 @@
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg, var(--line), transparent);
-}
-
-/* 細い十字の線(仕切り): 金の点から始まり、右へ消える */
-.hair {
-  position: relative;
-  height: 1px;
-  margin: 10px 4px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--hl) 70%, transparent), var(--line) 55%, transparent);
-}
-
-.hair::before {
-  content: "";
-  position: absolute;
-  left: -2px;
-  top: -2px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--hl);
-  box-shadow: var(--glow-hl);
 }
 
 .content {
@@ -599,6 +596,25 @@ button.primary:hover:not(:disabled) {
   box-shadow: var(--glow-ac);
 }
 
+/* ボタンの形のリンク(次の操作へ移る)。見た目は button.primary と同じ */
+a.primary {
+  display: inline-block;
+  padding: 7px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+a.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
+  box-shadow: var(--glow-ac);
+}
+
 button.lg {
   padding: 7px 16px;
 }
@@ -702,6 +718,18 @@ input.small {
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--ink-strong);
   letter-spacing: 0.01em;
+}
+
+/* ---------- 履歴の種類の札 ---------- */
+.pill {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 17px;
+  padding: 0 8px;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  white-space: nowrap;
+  color: var(--accent);
 }
 
 .list {

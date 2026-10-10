@@ -14,7 +14,7 @@ const mono = IBM_Plex_Mono({ weight: ["400", "500"], subsets: ["latin"], preload
 
 export const metadata: Metadata = {
   title: "4DB",
-  // タブとホーム画面のアイコン(tools/brand/build.mjs で作る。ダッシュボード public/sheets/axes.html も同じ画像を使う)
+  // タブとホーム画面のアイコン(tools/brand/build.mjs で作る)
   icons: {
     icon: [
       { url: "/brand/icon-32.png", sizes: "32x32", type: "image/png" },

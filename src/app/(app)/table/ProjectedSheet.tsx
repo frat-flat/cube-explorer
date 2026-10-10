@@ -3,7 +3,7 @@
 // 取り込んだデータを表で見る画面(Projected Sheet。画面の名前は Table)。数値・集計のしかた・行・列・段・小計・絞り込みを選ぶと、サーバーがその場で元の値から計算する。
 // 合計・小計は Σ 付きの行・列として出し、軸の値としては扱わない。計算された値には ƒ の印を付ける(色だけにしない)。
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Catalog, ProjectionOutput } from "@/fourdb/adapters/postgres/projection";
 import type { SheetSummary } from "@/fourdb/adapters/postgres/import-store";
 import type { ProjCell, ProjectionFn, ProjectionRequest } from "@/fourdb/core/projection/types";
@@ -44,7 +44,8 @@ type Shown = { r: ProjectionOutput; fn: ProjectionFn };
 /** 軸を選んだときの段: いちばん細かい段 */
 const finest = (d: Dim | undefined) => (d && d.levels.length ? d.levels[d.levels.length - 1].level : null);
 
-export function ProjectedSheet() {
+/** initialDefinitionId = /table?def=<id> で指された保存した表。選べるもの(カタログ)を読んだあと、その表を開く */
+export function ProjectedSheet({ initialDefinitionId }: { initialDefinitionId: string | null }) {
   const [cat, setCat] = useState<Catalog | null>(null);
   const [measureId, setMeasureId] = useState("");
   const [fn, setFn] = useState<ProjectionFn>("SUM");
@@ -218,6 +219,14 @@ export function ProjectedSheet() {
       await loadSaved();
     });
 
+  // /table?def=<id>: 選べるもの(カタログ)を読み終えてから、その表を一度だけ開く(先に開くと、初めの組み方に上書きされる)
+  const initialOpened = useRef(false);
+  useEffect(() => {
+    if (!initialDefinitionId || !cat || initialOpened.current) return;
+    initialOpened.current = true;
+    void open(initialDefinitionId);
+  });
+
   const rowDim = dimOf(rows?.dimensionId);
   const colDim = dimOf(cols?.dimensionId);
 
@@ -368,7 +377,8 @@ export function ProjectedSheet() {
 
       <div className={s.result}>
         {missing && current && <p className="error" role="alert">{measureMissingMessage(current.name)}</p>}
-        {gone && <p className="error" role="alert">{measureGoneMessage(goneName)}</p>}
+        {/* 表にできるデータがそもそもないとき(保存した表のシートがすべてなくなった)は、選びようがないので、この文は出さず、上の「まだ表にできるデータがありません」に任せる */}
+        {gone && cat && cat.measures.length > 0 && <p className="error" role="alert">{measureGoneMessage(goneName)}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         {loading && <p className="muted" aria-live="polite"><span className="spin" aria-hidden="true" />集計しています…</p>}
         {request && shown && <Result shown={shown} />}

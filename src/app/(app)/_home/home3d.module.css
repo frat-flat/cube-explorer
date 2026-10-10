@@ -1,0 +1,921 @@
+/* ホーム(/)の舞台。試作 home-3d の css/home3d.css と、W4 の確かめ用ページ(立体のモジュールが前提にしている所)から写したもの。
+   色は tokens.css の変数だけ(ここに色を直書きしない。立体の色も、モジュールが同じ変数を読む)。
+   立体のモジュール(src/fourdb/ui/home3d)が書くもの: root の data-label(below|front|float)・data-mode(3d)・data-motion(still|live)・data-ready、
+   札の入れ物(li)の style.transform と --k、.others の style.top、.canvasHost の中の <canvas>、.backdrop の中の <svg>。
+   画面(React)が付けるもの: root の data-mode・data-bg・data-base・data-layout・.many(単位が 4 つ以上)・.panelOpen、札の .hot と aria-expanded。 */
+
+/* ---------- 本文(main.content)を、舞台でいっぱいにする(ホームのときだけ) ---------- */
+:global(.content):has(> .home) {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+}
+
+.home {
+  position: absolute;
+  inset: 0;
+}
+
+/* 読み上げだけ(見出し「ホーム」) */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.n {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---------- 舞台 ---------- */
+.stage3d {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(70% 62% at 24% 16%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    radial-gradient(60% 55% at 80% 92%, color-mix(in srgb, var(--hl) 8%, transparent), transparent 70%),
+    var(--bg);
+}
+
+/* 背景の飾り(ロゴの細い十字の線と点線の軌道)。モジュールが大きさに合わせて SVG を描く */
+.backdrop,
+.canvasHost {
+  position: absolute;
+  inset: 0;
+}
+
+.backdrop {
+  z-index: 0;
+  pointer-events: none;
+}
+
+.backdrop svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 十字の線と点線の軌道は「ロゴの線」のときだけ */
+.stage3d:not([data-bg="logo"]) .backdrop {
+  display: none;
+}
+
+.canvasHost {
+  z-index: 1;
+}
+
+/* 舞台の見出し(左上)。モジュールは上の 66px をあけて立体を置く */
+.cap {
+  position: absolute;
+  z-index: 3;
+  top: 18px;
+  left: 24px;
+  pointer-events: none;
+}
+
+.cap h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15.5px;
+  letter-spacing: 0.03em;
+  color: var(--ink-strong);
+}
+
+.cap h2::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+}
+
+.capSub {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* 読み込み中・読めなかったときの文(見出しの下) */
+.status {
+  position: absolute;
+  z-index: 3;
+  top: 56px;
+  left: 24px;
+  right: 24px;
+  margin: 0;
+}
+
+.loadingText {
+  color: var(--muted);
+}
+
+/* ---------- 単位の札(モジュールが 3D の位置から置く) ---------- */
+.ulabels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 最初の絵を描くまで(札の位置が決まるまで)は札を出さない。大きさは計れるように visibility で隠す */
+.stage3d:not([data-ready="true"]) .ulabels,
+.stage3d:not([data-ready="true"]) .others {
+  visibility: hidden;
+}
+
+/* 位置を決める入れ物(モジュールが transform を書く)。札の基準の点は data-label で中の札を寄せて合わせる。
+   --k は札の大きさの倍率(モジュールが style で上書きする。ここは書かれる前の値) */
+.ulabels > li {
+  --k: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+
+.ulabel {
+  pointer-events: auto;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: calc(132px * var(--k, 1));
+  padding: calc(6px * var(--k, 1)) calc(14px * var(--k, 1)) calc(9px * var(--k, 1));
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background: transparent;
+  color: var(--ink);
+  text-align: center;
+  transform: translateX(-50%); /* below: 札の上の中央 */
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+
+.ulabel:hover:not(:disabled),
+.ulabel.hot {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--ink);
+}
+
+.ulabel[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 85%, transparent);
+  box-shadow: var(--glow-ac);
+}
+
+.un {
+  font-size: calc(14px * var(--k, 1));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-strong);
+}
+
+.un.unitNone {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.uc {
+  font-family: var(--font-num);
+  font-weight: 300;
+  font-size: calc(34px * var(--k, 1));
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--ink-strong);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* 4 つ以上並ぶときは小さく */
+.stage3d.many .ulabel {
+  min-width: calc(112px * var(--k, 1));
+  padding: calc(5px * var(--k, 1)) calc(10px * var(--k, 1)) calc(8px * var(--k, 1));
+}
+
+.stage3d.many .uc {
+  font-size: calc(28px * var(--k, 1));
+}
+
+/* ひな壇に多く並ぶときは、札の上下の余白を詰める(後ろの列の札と、前の列の札が上下で重ならないように) */
+.stage3d.many[data-layout="stage"][data-label="below"] .ulabel {
+  padding-top: calc(3px * var(--k, 1));
+  padding-bottom: calc(4px * var(--k, 1));
+}
+
+/* 台の正面: 台に刻んだ文字のように。--k は台の正面の大きさに合わせた倍率 */
+.stage3d[data-label="front"] .ulabel {
+  display: flex;
+  align-items: baseline;
+  gap: calc(8px * var(--k, 1));
+  min-width: 0;
+  padding: calc(1px * var(--k, 1)) calc(8px * var(--k, 1));
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  font-size: calc(12.5px * var(--k, 1));
+  line-height: 1.2;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--ink) 80%, var(--muted));
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--raised) 85%, transparent);
+  transform: translate(-50%, -50%); /* front: 札の中央 */
+}
+
+:global(:root[data-theme="dark"]) .stage3d[data-label="front"] .ulabel {
+  color: color-mix(in srgb, var(--ink) 88%, transparent);
+  text-shadow: 0 -1px 0 color-mix(in srgb, var(--bg) 80%, transparent);
+}
+
+.stage3d[data-label="front"] .un {
+  font-size: 1em;
+  color: inherit;
+}
+
+.stage3d[data-label="front"] .uc {
+  font-size: 1.85em;
+  line-height: 1;
+  color: inherit;
+}
+
+.stage3d[data-label="front"] .ulabel:hover:not(:disabled),
+.stage3d[data-label="front"] .ulabel.hot,
+.stage3d[data-label="front"] .ulabel[aria-expanded="true"] {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--accent);
+}
+
+/* 暗い見た目でも、指を乗せた・開いている札は accent の色にする(上の暗い見た目の決まりが強いので、ここで重ねる) */
+:global(:root[data-theme="dark"]) .stage3d[data-label="front"] .ulabel:hover:not(:disabled),
+:global(:root[data-theme="dark"]) .stage3d[data-label="front"] .ulabel.hot,
+:global(:root[data-theme="dark"]) .stage3d[data-label="front"] .ulabel[aria-expanded="true"] {
+  color: var(--accent);
+}
+
+/* 開いている Box: 色に加えて、名前に下線 */
+.stage3d[data-label="front"] .ulabel[aria-expanded="true"] .un {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+/* 石の台は正面が広いので、名前と数を縦に積む(展示台の札のように) */
+.stage3d[data-label="front"][data-base="stone"] .ulabel {
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4px * var(--k, 1));
+}
+
+.stage3d[data-label="front"][data-base="stone"] .uc {
+  font-size: 2.5em;
+}
+
+/* Box の上: 縦の細い線の先に下がる、小さな札 */
+.stage3d[data-label="float"] .ulabel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: calc(7px * var(--k, 1));
+  row-gap: 1px;
+  min-width: 0;
+  max-width: calc(190px * var(--k, 1));
+  padding: calc(4px * var(--k, 1)) calc(12px * var(--k, 1)) calc(5px * var(--k, 1));
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  box-shadow: var(--card-shadow);
+  transform: translate(-50%, -100%); /* float: 札の下の中央 */
+}
+
+/* Box の上の札にも、ほかの置き方と同じ「指を乗せた」「開いている」の見た目を付ける(上の決まりが強いので、ここで重ねる) */
+.stage3d[data-label="float"] .ulabel:hover:not(:disabled),
+.stage3d[data-label="float"] .ulabel.hot {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.stage3d[data-label="float"] .ulabel[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 85%, var(--surface));
+  box-shadow: var(--glow-ac);
+}
+
+.stage3d[data-label="float"] .un {
+  font-size: calc(12.5px * var(--k, 1));
+}
+
+.stage3d[data-label="float"] .uc {
+  font-size: calc(21px * var(--k, 1));
+  line-height: 1.1;
+}
+
+.stage3d.many[data-label="float"] .uc {
+  font-size: calc(19px * var(--k, 1));
+}
+
+/* ほかの単位(7 つ目から)。モジュールが style.top を書く */
+.others {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  margin: 0;
+  padding: 4px 14px;
+  transform: translateX(-50%);
+  border-top: 1px dashed var(--line-strong);
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.others b,
+.fothers b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.others b.unitNone,
+.fothers b.unitNone {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* 右の欄が開いているときは、ほかの単位を欄の左へ寄せる */
+.stage3d.panelOpen .others {
+  left: calc((100% - 392px) / 2);
+}
+
+/* ---------- 右の欄(Box の中身) ---------- */
+.bpanel {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 392px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: -18px 0 40px -28px color-mix(in srgb, var(--ink) 40%, transparent);
+  transform: translateX(104%);
+  visibility: hidden;
+  transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.42s;
+}
+
+.bpanel.open {
+  transform: none;
+  visibility: visible;
+  transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s;
+}
+
+/* 欄の上の細い線: 金から青へ(上の帯と同じ) */
+.bpanel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hl) 65%, transparent), color-mix(in srgb, var(--accent) 40%, transparent) 40%, transparent);
+}
+
+.bphead {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.kicker {
+  grid-column: 1 / -1;
+  font-family: var(--font-num);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* 見出し: 単位の名前と、その下に数 */
+.bphead h2 {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+  font-size: 19px;
+  letter-spacing: 0.04em;
+  color: var(--ink-strong);
+}
+
+.bphead h2:focus {
+  outline: none;
+}
+
+.bphead h2:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.bpname {
+  overflow-wrap: anywhere;
+}
+
+.bpname.unitNone {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.big {
+  font-family: var(--font-num);
+  font-weight: 300;
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--ink-strong);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.bphead .big {
+  margin-top: 2px;
+}
+
+.close {
+  grid-row: 2;
+  grid-column: 2;
+  align-self: start;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--raised);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.bpbody {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 20px 18px;
+}
+
+.stagekey {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* 段階の札(【P8】など)。将来のものは、灰色・点線の枠・札の 3 つで見分ける */
+.phase {
+  display: inline-block;
+  padding: 0 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- 欄(右の欄と平らなタイルで同じ) ---------- */
+.secs {
+  margin: 0;
+}
+
+.sec {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  margin-top: 5px;
+  padding: 8px 0 9px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+}
+
+.bpbody .sec:first-child {
+  border-top: 0;
+}
+
+.lbl {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.val {
+  min-width: 0;
+  margin: 0;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.more,
+.none {
+  color: var(--muted);
+}
+
+/* 「ほか 1,195」は途中で折り返さない */
+.more {
+  white-space: nowrap;
+}
+
+.nm {
+  white-space: nowrap;
+}
+
+.sec :global(.mark) {
+  width: auto;
+  margin-left: 3px;
+}
+
+/* まだ作っていない欄: 点線の枠 + 薄い地 + 札(灰色の置き場所) */
+.sec.fut {
+  margin: 6px -8px 0;
+  padding: 7px 8px 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
+  background: var(--sunken);
+}
+
+.sec.fut,
+.sec.fut .lbl,
+.sec.fut .val {
+  color: var(--muted);
+}
+
+/* ---------- 3D を作れなかったとき: 平らなタイル ---------- */
+.flat {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: auto;
+  padding: 64px 24px 28px;
+}
+
+.fnote {
+  margin: 0 0 14px;
+  padding: 7px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.fothers {
+  margin-top: 14px;
+  color: var(--muted);
+}
+
+.btiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.btile {
+  min-width: 0;
+  padding: 14px 16px 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--card-shadow);
+}
+
+.bhead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 5px;
+}
+
+.bhead h3 {
+  margin: 0;
+  min-width: 0;
+  font-size: 15.5px;
+  color: var(--ink-strong);
+  overflow-wrap: anywhere;
+}
+
+.bhead h3.unitNone {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.bhead .big {
+  font-size: 32px;
+}
+
+/* ---------- Box がないとき ---------- */
+.empty {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 64px 24px 28px;
+}
+
+.empty > section {
+  width: min(560px, 100%);
+}
+
+/* ---------- Visual(見た目の欄)。右下のボタンと、その上に開く欄 ---------- */
+.visual {
+  position: absolute;
+  z-index: 6;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-height: calc(100% - 36px);
+  transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* 右の欄が開いている間は、その左へ寄る(両方を同時に開ける) */
+.stage3d.panelOpen .visual {
+  transform: translateX(-392px);
+}
+
+.vbtn,
+.vpanel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 93%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 32px -20px color-mix(in srgb, var(--ink) 55%, transparent), var(--card-shadow);
+  font-size: 12px;
+}
+
+.vbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 14px;
+  text-align: left;
+  color: var(--ink);
+}
+
+.vbtn:hover:not(:disabled) {
+  border-color: var(--line);
+  color: var(--ink-strong);
+}
+
+.vbtn[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.tt,
+.vhead h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-strong);
+  white-space: nowrap;
+}
+
+.tt::before,
+.vhead h2::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--hl);
+  box-shadow: var(--glow-hl);
+}
+
+.tsub {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chev {
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+
+.vbtn[aria-expanded="true"] .chev {
+  transform: rotate(180deg);
+}
+
+.vpanel {
+  width: 384px;
+  max-width: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+.vhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 14px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.vhead h2 {
+  margin: 0;
+}
+
+.vhead h2 small {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.tcur {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.vclose {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--raised);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.tbody {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px 10px;
+}
+
+/* パターン: 名前の長さに合わせて並べ、収まらなければ次の行へ */
+.tpre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.pre {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  line-height: 17px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pn {
+  font-family: var(--font-num);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* 選んでいるパターン: 色に加えて、太字と枠 */
+.pre[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.pre[aria-pressed="true"] .pn {
+  color: var(--accent);
+}
+
+/* 部品ごとの切り替え(押したままのボタンの並び) */
+.seg {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.sl {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.opts {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--sunken);
+}
+
+.opts button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1px 5px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  font-size: 11.5px;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.opts button:first-child {
+  border-left: 0;
+}
+
+.opts button:hover:not(:disabled) {
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+/* 選んでいるもの: 地の色・文字の色・太字(色だけにしない) */
+.opts button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+}
+
+.opts button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* 選んだ組み合わせで出せないときの説明 */
+.tnote {
+  margin: 3px 0 0;
+  padding: 3px 9px;
+  border: 1px dashed color-mix(in srgb, var(--hl) 60%, transparent);
+  border-radius: 7px;
+  background: var(--hl-soft);
+  color: var(--hl-text);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.tnote:empty {
+  display: none;
+}
+
+/* 保存の状態 */
+.vsave {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.vsave .vsaveError {
+  color: var(--danger);
+}
+
+/* ---------- 動きを減らす設定 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ulabel,
+  .bpanel,
+  .bpanel.open,
+  .visual,
+  .chev {
+    transition: none;
+  }
+}

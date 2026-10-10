@@ -1,5 +1,5 @@
 // Google スプレッドシートを読む(つなぎ)。システム用アカウント(閲覧のみ)で、タブを分割して全行読む。
-// 今の画面用の src/lib/google/sheets.ts と同じ鍵・同じ認証を使う。
+// 鍵・認証・リンクの読み方・API の呼び出しは、src/lib/google/sheets.ts のものを使う。
 import { accessToken, get, serviceAccount, SheetsError, spreadsheetId } from "@/lib/google/sheets";
 import { a1Range } from "@/fourdb/core/import/a1";
 import type { Merge, SourceCell } from "@/fourdb/core/import/types";

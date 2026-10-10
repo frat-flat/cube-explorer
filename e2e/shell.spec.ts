@@ -46,15 +46,20 @@ test.describe("枠: ロゴの帯と左のメニュー", () => {
     await page.getByRole("button", { name: "メニューを開く" }).click();
     await expect(nav).toBeVisible();
     const links = nav.getByRole("link");
-    await expect(links).toHaveText([/Import/, /Table/, /設定/, /旧ダッシュボード/]);
-    await expect(links.nth(0)).toHaveAttribute("href", "/migrate");
-    await expect(links.nth(1)).toHaveAttribute("href", "/table");
-    await expect(links.nth(2)).toHaveAttribute("href", "/settings");
-    await expect(links.nth(3)).toHaveAttribute("href", "/");
+    // 並び: ホーム / Task / 取り込む › Import / 見る › Table / 履歴 / 設定。旧ダッシュボードはない
+    await expect(links).toHaveText([/ホーム/, /Task/, /Import/, /Table/, /履歴/, /設定/]);
+    await expect(links.nth(0)).toHaveAttribute("href", "/");
+    await expect(links.nth(1)).toHaveAttribute("href", "/tasks");
+    await expect(links.nth(2)).toHaveAttribute("href", "/migrate");
+    await expect(links.nth(3)).toHaveAttribute("href", "/table");
+    await expect(links.nth(4)).toHaveAttribute("href", "/history");
+    await expect(links.nth(5)).toHaveAttribute("href", "/settings");
+    // 区切りの見出しは「取り込む」「見る」の 2 つだけ(ホーム・Task・履歴・設定には付かない)
+    await expect(nav.locator(".ngh")).toHaveText(["取り込む", "見る"]);
     await expect(nav.getByText("ファイルから取り込む")).toBeVisible();
     await expect(nav.getByText("表で見る")).toBeVisible();
-    // まだない画面はメニューに出さない
-    for (const absent of ["Saving", "照合", "Column Registry", "Library", "World", "履歴", "ホーム"]) await expect(nav.getByText(absent)).toHaveCount(0);
+    // まだない画面と、外した旧ダッシュボードはメニューに出さない
+    for (const absent of ["Saving", "照合", "Column Registry", "Library", "World", "旧ダッシュボード"]) await expect(nav.getByText(absent)).toHaveCount(0);
 
     // 今の画面だけに aria-current。設定
     await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
@@ -87,7 +92,80 @@ test.describe("枠: ロゴの帯と左のメニュー", () => {
     await page.keyboard.press("Tab");
     await expect(logout).toBeFocused();
     await page.keyboard.press("Tab");
-    await expect(nav.getByRole("link", { name: /Import/ })).toBeFocused();
+    await expect(nav.getByRole("link", { name: /ホーム/ })).toBeFocused();
+  });
+
+  test("Task: ホームの次。今の画面に印が付き、題は「Task | 4DB」、今いる場所は「Task」。メニューから移れる", async ({ page }) => {
+    await page.goto("/");
+    await hydrated(page);
+    await page.getByRole("button", { name: "メニューを開く" }).click();
+    const nav = page.getByRole("navigation", { name: "画面" });
+    const top = page.getByRole("banner");
+    await nav.getByRole("link", { name: /Task/ }).click();
+    await expect(page).toHaveURL(/\/tasks$/);
+    await expect(page).toHaveTitle("Task | 4DB");
+    await expect(top.getByText("Task", { exact: true })).toBeVisible();
+    await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+    await expect(nav.getByRole("link", { name: /Task/ })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: /ホーム/ })).not.toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Task");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("やること");
+  });
+
+  test("ホームと履歴: 今の画面に印が付き(ホームは / だけ)、今いる場所が出る。メニューから移れる", async ({ page }) => {
+    await page.goto("/");
+    await hydrated(page);
+    await page.getByRole("button", { name: "メニューを開く" }).click();
+    const nav = page.getByRole("navigation", { name: "画面" });
+    const top = page.getByRole("banner");
+    await expect(page).toHaveTitle("ホーム | 4DB");
+    await expect(top.getByText("ホーム", { exact: true })).toBeVisible();
+    await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+    await expect(nav.getByRole("link", { name: /ホーム/ })).toHaveAttribute("aria-current", "page");
+    // 履歴へ
+    await nav.getByRole("link", { name: /履歴/ }).click();
+    await expect(page).toHaveURL(/\/history$/);
+    await expect(page).toHaveTitle("履歴 | 4DB");
+    await expect(top.getByText("履歴", { exact: true })).toBeVisible();
+    await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+    await expect(nav.getByRole("link", { name: /履歴/ })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: /ホーム/ })).not.toHaveAttribute("aria-current", "page");
+    // ホームへ戻る
+    await nav.getByRole("link", { name: /ホーム/ }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(nav.getByRole("link", { name: /ホーム/ })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("設定: 画面の見た目に加えて、ログイン中のメールとログアウトがある(ログアウトは POST のボタン)", async ({ page }) => {
+    await page.goto("/settings");
+    await hydrated(page);
+    const account = page.locator("main").getByRole("region", { name: "アカウント" });
+    await expect(account.getByRole("heading", { name: "アカウント" })).toBeVisible();
+    await expect(account.getByTestId("account-email")).toHaveText("local-dev"); // ログインなしの開発用の利用者(ログインしていれば、そのメール)
+    const logout = account.getByRole("button", { name: "ログアウト" });
+    await expect(logout.locator("xpath=ancestor::form")).toHaveAttribute("method", "post");
+    await expect(logout.locator("xpath=ancestor::form")).toHaveAttribute("action", "/auth/signout");
+    await expect(page.getByRole("radiogroup", { name: "画面の見た目" })).toBeVisible();
+    // アカウントへ送っていない変更(localStorage の fourdb.prefs.pending)は、ログアウトで消える。明暗のクッキーは残る(セキュリティ L-1)
+    await page.getByRole("radio", { name: "暗い", exact: true }).check();
+    await page.waitForLoadState("networkidle"); // データベースにつながる開発サーバーでは、この間にアカウントへ送り終わる
+    await page.evaluate(() => window.localStorage.setItem("fourdb.prefs.pending", JSON.stringify({ theme: "dark" }))); // 送れなかった変更が残っている状態
+    await logout.click();
+    await expect(page).toHaveURL(/\/login$/);
+    expect(await page.evaluate(() => window.localStorage.getItem("fourdb.prefs.pending"))).toBeNull();
+    expect((await page.context().cookies()).find((c) => c.name === "fourdb_theme")?.value).toBe("dark");
+  });
+
+  test("枠の帯のログアウトも、送っていない設定の変更を消してから送る(明暗のクッキーは残る)", async ({ page }) => {
+    await page.goto("/settings");
+    await hydrated(page);
+    await page.getByRole("radio", { name: "明るい", exact: true }).check();
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => window.localStorage.setItem("fourdb.prefs.pending", JSON.stringify({ theme: "light" })));
+    await page.getByRole("banner").getByRole("button", { name: "ログアウト" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    expect(await page.evaluate(() => window.localStorage.getItem("fourdb.prefs.pending"))).toBeNull();
+    expect((await page.context().cookies()).find((c) => c.name === "fourdb_theme")?.value).toBe("light");
   });
 
   test("login は枠の外(帯もメニューもない)", async ({ page }) => {
@@ -157,7 +235,7 @@ test.describe("枠: ロゴの帯と左のメニュー", () => {
       expect((await context.request.get("/auth/signout", { headers: { "sec-fetch-site": site }, maxRedirects: 0 })).status(), `GET ${site}`).toBe(403);
     }
     expect((await context.request.post("/auth/signout", { headers: { origin: "https://evil.example" }, maxRedirects: 0 })).status()).toBe(403);
-    // 同じサイトの GET(ログインの「許可がありません」の画面・旧ダッシュボードのリンク)と、同じサイトの POST は通る
+    // 同じサイトの GET(ログインの「許可がありません」の画面のリンク)と、同じサイトの POST は通る
     for (const method of ["get", "post"] as const) {
       const ok = await context.request[method]("/auth/signout", { headers: { "sec-fetch-site": "same-origin" }, maxRedirects: 0 });
       expect(ok.status(), method).toBe(303);
@@ -173,6 +251,21 @@ test.describe("枠: ロゴの帯と左のメニュー", () => {
     await page.getByRole("navigation", { name: "画面" }).getByRole("link", { name: /Import/ }).click();
     await expect(page).toHaveURL(/\/migrate$/);
     expect(await page.evaluate(() => (window as unknown as { __kept?: boolean }).__kept)).toBe(true);
+  });
+});
+
+test.describe("旧ダッシュボードは外れた(D-013・P2)", () => {
+  test("旧ダッシュボード・旧データの API は 404。入口(/)は新しいホーム", async ({ page, request }) => {
+    for (const path of ["/sheets/axes.html", "/sheets/", "/api/workspace", "/api/sheets/read", "/api/sheets/read?url=x", "/api/4db/summary"]) {
+      expect((await request.get(path)).status(), `GET ${path}`).toBe(404);
+    }
+    expect((await request.put("/api/workspace", { data: { state: {} } })).status(), "PUT /api/workspace").toBe(404);
+    await page.goto("/");
+    await expect(page).toHaveTitle("ホーム | 4DB");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("ホーム");
+    await expect(page.locator("#crumb")).toHaveCount(0); // 旧ダッシュボードの部品はない
+    // 旧データ(ブラウザの axis-boxes-v2*)は、読みも書きもしない
+    expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("axis-boxes")))).toEqual([]);
   });
 });
 
@@ -315,7 +408,7 @@ test.describe("書体: ビルド時に取り込み、実行中に外へ通信し
       // /__nextjs_font/ は開発サーバーの画面(エラー表示など)が使う書体。アプリの書体ではないので数えない
       if (r.resourceType() === "font" && !u.pathname.startsWith("/__nextjs_font/")) fontFiles.push(u.pathname);
     });
-    for (const path of ["/settings", "/migrate", "/table", "/login"]) {
+    for (const path of ["/", "/history", "/settings", "/migrate", "/table", "/login"]) {
       await page.goto(path);
       await page.evaluate(() => document.fonts.ready);
     }
@@ -348,7 +441,7 @@ test.describe("コンソール", () => {
     page.on("console", (m) => m.type() === "error" && problems.push(`console: ${m.text()}`));
     page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
     // 取り込み・Table は、データベースにつながる開発サーバー(E2E_4DB_URL)のときだけ(つながらないと API が失敗して、その分のエラーが出るため)
-    const paths = ["/settings", "/login", ...(process.env.E2E_4DB_URL ? ["/migrate", "/table"] : [])];
+    const paths = ["/settings", "/login", ...(process.env.E2E_4DB_URL ? ["/", "/tasks", "/history", "/migrate", "/table"] : [])];
     for (const path of paths) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
