@@ -1,5 +1,6 @@
 import { copyFile, readFile, rm, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
+import { hydrated } from "./support";
 
 // Table の画面(/table。以前は /sheet。中の名前は Projected Sheet)。e2e/migrate.spec.ts と同じく、手元のデータベースと試験用のスプシで動いている画面を相手にする:
 //   E2E_4DB_URL=http://localhost:3100 npx playwright test e2e/sheet.spec.ts
@@ -115,6 +116,7 @@ test.describe("Table(Projected Sheet)", () => {
     await expect(page.getByText(`「${name}」を保存しました(版 1)`)).toBeVisible();
 
     await page.reload();
+    await hydrated(page); // 画面の準備が終わる前の選択は効かない(開発サーバーが混んでいると、選んだのに「開きました」が出ないことがあった)
     await page.getByLabel("保存した表を開く").selectOption({ label: `${name}(版 1)` });
     await expect(page.getByText(`「${name}」を開きました(版 1)`)).toBeVisible();
     await expect(page.getByRole("heading", { name: "売上 の合計" })).toBeVisible();
@@ -333,6 +335,24 @@ test.describe("Table(Projected Sheet)", () => {
     await expect(page.getByText("「消えた表」を開きました(版 1)")).toBeVisible(); // 開く処理は終わっている
     await expect(page.getByText("数値を選び直してください")).toHaveCount(0);
     await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  });
+
+  // M-4: 集計の要求が取りやめられた直後など、成功(200)なのに本文が読めない返事を、null のまま成功として画面に渡し、
+  // 画面が壊れた(Cannot read properties of null (reading 'subtotals'))。失敗として知らせ、画面は壊さない(返事は差し替えて作る)
+  test("集計の返事が 200 なのに本文が空でも、画面は壊れず、うまくいかなかったと知らせる", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const measureId = "33333333-4444-4555-8666-777777777777";
+    await page.route("**/api/4db/catalog", (route) => route.fulfill({ json: { measures: [{ id: measureId, name: "売上", sheets: 1, sheetIds: [measureId] }], dimensions: [] } }));
+    await page.route("**/api/4db/sheets", (route) => route.fulfill({ json: { sheets: [] } }));
+    await page.route("**/api/4db/sheet-definitions", (route) => route.fulfill({ json: { definitions: [] } }));
+    await page.route("**/api/4db/projection", (route) => route.fulfill({ status: 200, body: "" }));
+    await page.goto(`${BASE}/table`);
+    await expect(page.locator("main").getByRole("alert").filter({ hasText: "うまくいきませんでした(200)" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Table", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /の合計$/ })).toHaveCount(0);
+    await expect(page.getByText("This page couldn’t load")).toHaveCount(0);
+    expect(errors).toEqual([]);
   });
 });
 

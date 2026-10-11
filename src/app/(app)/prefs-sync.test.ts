@@ -1,5 +1,5 @@
 // アカウントに覚える設定の、画面側の覚え方と送り方(prefs-sync.ts)。通信・保存・クッキーは作り物を渡して、
-// 突き合わせの決まり・まとめて送る・同時に 1 つ・失敗して残す・保存できないときを確かめる。
+// 突き合わせの決まり・まとめて送る・同時に 1 つ・失敗して残す・保存できないとき・送り先のアカウントを取り違えない決まり(L-4)を確かめる。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LOOK, DEFAULT_PATTERN_ID, defaultPrefs, PATTERNS, type Look, type PrefsPatch, type Theme } from "@/fourdb/core/prefs";
 import {
@@ -17,6 +17,10 @@ import {
   type StoreDeps,
   type StoreOptions,
 } from "./prefs-sync";
+
+// 画面のアカウントの指紋(形だけ正しい作り物。計算は src/lib/owner-fingerprint.test.ts)。OTHER = 別のアカウントの画面の指紋
+const OWNER = "AAAAAAAAAAAAAAAAAAAAAA";
+const OTHER = "BBBBBBBBBBBBBBBBBBBBBB";
 
 // 「変えた見た目」に使う i 番目のパターン。既定のパターンは除く(既定と同じ見た目は、変えたことにならないので)
 const CHANGED = PATTERNS.filter((p) => p.id !== DEFAULT_PATTERN_ID);
@@ -69,12 +73,40 @@ describe("変更(PrefsPatch)の扱い", () => {
     expect(sameLook({ ...lookOf(0), layout: "arc" }, lookOf(0))).toBe(false);
   });
 
-  it("parseStoredPending: 正しい形だけ読む。壊れた文字・知らない欄・空・__proto__ は {}", () => {
-    expect(parseStoredPending(JSON.stringify({ theme: "dark", look: lookOf(0) }))).toEqual({ theme: "dark", look: lookOf(0) });
-    expect(parseStoredPending(JSON.stringify({ theme: null }))).toEqual({ theme: null });
-    for (const bad of [null, undefined, "", "not json", "[]", "null", "{}", '{"theme":"blue"}', '{"x":1}', '{"look":{"shape":"glass"}}', '{"__proto__":{"theme":"dark"}}', '{"world":"nowhere"}']) {
-      expect(parseStoredPending(bad as string | null | undefined), String(bad)).toEqual({});
-    }
+  it("parseStoredPending: { owner, patch } の正しい形だけ読む。owner は指紋の形か null", () => {
+    expect(parseStoredPending(JSON.stringify({ owner: OWNER, patch: { theme: "dark", look: lookOf(0) } }))).toEqual({ owner: OWNER, patch: { theme: "dark", look: lookOf(0) } });
+    expect(parseStoredPending(JSON.stringify({ owner: OWNER, patch: { theme: null } }))).toEqual({ owner: OWNER, patch: { theme: null } });
+    expect(parseStoredPending(JSON.stringify({ owner: null, patch: { world: "plain" } }))).toEqual({ owner: null, patch: { world: "plain" } });
+  });
+
+  it("parseStoredPending: 壊れた文字・知らない欄・空・__proto__・owner のない古い形(変更だけ)・指紋の形でない owner・余計な欄は null", () => {
+    const bads: (string | null | undefined)[] = [
+      null,
+      undefined,
+      "",
+      "not json",
+      "[]",
+      "null",
+      "{}",
+      '{"theme":"blue"}',
+      '{"x":1}',
+      '{"look":{"shape":"glass"}}',
+      '{"__proto__":{"theme":"dark"}}',
+      '{"world":"nowhere"}',
+      JSON.stringify({ theme: "dark", look: lookOf(0) }), // 古い形(変更だけ)は、どのアカウントのものか分からないので読まない
+      JSON.stringify({ owner: "short", patch: { theme: "dark" } }),
+      JSON.stringify({ owner: `${OWNER}x`, patch: { theme: "dark" } }),
+      JSON.stringify({ owner: 7, patch: { theme: "dark" } }),
+      JSON.stringify({ patch: { theme: "dark" } }),
+      JSON.stringify({ owner: OWNER }),
+      JSON.stringify({ owner: OWNER, patch: {} }),
+      JSON.stringify({ owner: OWNER, patch: { theme: "blue" } }),
+      JSON.stringify({ owner: OWNER, patch: { theme: "dark", other: 1 } }),
+      JSON.stringify({ owner: OWNER, patch: { theme: "dark" }, extra: true }),
+      `{"owner":"${OWNER}","patch":{"theme":"dark"},"__proto__":{}}`,
+      JSON.stringify([OWNER, { theme: "dark" }]),
+    ];
+    for (const bad of bads) expect(parseStoredPending(bad), String(bad)).toBeNull();
   });
 });
 
@@ -148,30 +180,49 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
-/** 流れを見るための作り物。put は、既定ではすぐ ok。outcomes に積むと、その結果を順に返す */
-function harness(opts: Partial<StoreOptions> = {}, over: Partial<StoreDeps> = {}, init: { server?: ServerPrefs | Error; stored?: PrefsPatch; cookie?: Theme | null } = {}) {
+/**
+ * 流れを見るための作り物。put は、既定ではすぐ ok。outcomes に積むと、その結果を順に返す。
+ * 画面のアカウントの指紋は既定で OWNER。localStorage の送っていない変更は stored(変更)と storedOwner(残したアカウントの指紋。既定は OWNER)。
+ * state.server を書き換えると、次の GET から別の答えを返す(アカウントが替わったあとの読み直しを作る)
+ */
+function harness(
+  opts: Partial<StoreOptions> = {},
+  over: Partial<StoreDeps> = {},
+  init: { server?: ServerPrefs | Error; stored?: PrefsPatch; storedOwner?: string | null; cookie?: Theme | null } = {},
+) {
   const puts: { patch: PrefsPatch; keepalive: boolean }[] = [];
+  const putOwners: string[] = [];
   const applied: (Theme | null)[] = [];
   const writes: (PrefsPatch | null)[] = [];
-  const state = { stored: init.stored ?? {}, cookie: init.cookie ?? null, loads: 0 };
+  const writeOwners: (string | null)[] = [];
+  const state = {
+    stored: init.stored ?? {},
+    storedOwner: init.storedOwner === undefined ? OWNER : init.storedOwner,
+    cookie: init.cookie ?? null,
+    loads: 0,
+    server: init.server ?? server(),
+  };
   const outcomes: (PutOutcome | Deferred<PutOutcome> | Error)[] = [];
   const deps: StoreDeps = {
     load: async () => {
       state.loads += 1;
-      const s = init.server ?? server();
+      const s = state.server;
       if (s instanceof Error) throw s;
       return s;
     },
-    put: async (patch, keepalive) => {
+    put: async (patch, keepalive, owner) => {
       puts.push({ patch, keepalive });
+      putOwners.push(owner);
       const o = outcomes.shift() ?? "ok";
       if (o instanceof Error) throw o;
       return typeof o === "string" ? o : o.promise;
     },
-    readStored: () => state.stored,
-    writeStored: (p) => {
-      writes.push(p);
-      state.stored = p ?? {};
+    readStored: () => (isEmptyPatch(state.stored) ? null : { owner: state.storedOwner, patch: state.stored }),
+    writeStored: (s) => {
+      writes.push(s ? s.patch : null);
+      writeOwners.push(s ? s.owner : null);
+      state.stored = s ? s.patch : {};
+      if (s) state.storedOwner = s.owner;
     },
     readCookieTheme: () => state.cookie,
     applyTheme: (t) => {
@@ -180,8 +231,8 @@ function harness(opts: Partial<StoreOptions> = {}, over: Partial<StoreDeps> = {}
     },
     ...over,
   };
-  const store = new PrefsStore(deps, { enabled: true, initialTheme: init.cookie ?? null, ...opts });
-  return { store, puts, applied, writes, state, outcomes, snap: () => store.getSnapshot() };
+  const store = new PrefsStore(deps, { enabled: true, initialTheme: init.cookie ?? null, owner: OWNER, ...opts });
+  return { store, puts, putOwners, applied, writes, writeOwners, state, outcomes, snap: () => store.getSnapshot() };
 }
 
 const tick = () => vi.advanceTimersByTimeAsync(0);
@@ -697,5 +748,391 @@ describe("PrefsStore: アカウントへ保存できないとき(DB がない・
     expect(h.snap().look).toEqual(lookOf(6));
     expect(h.writes).toEqual([{ look: lookOf(6) }]);
     expect(h.state.stored).toEqual({ look: lookOf(6) });
+  });
+});
+
+// ---------- 送り先のアカウントを取り違えない(L-4) ----------
+// 前のアカウントの画面・変更が、いまのアカウントへ送られない:
+//   (1) 残した変更に付いた指紋が違えば捨てる (2) PUT のたびに指紋を送る (3) 409(別のアカウントになった)は残さず・読み直して・もう送らない
+//   (4) 401・403 は残さず・もう送らない
+
+describe("PrefsStore: 残した変更のアカウント(指紋)が違えば捨てる", () => {
+  it("別のアカウントの画面が残した変更は、送らず、捨てる(localStorage からも消す)。画面はいまのアカウントの値", async () => {
+    const h = harness({}, {}, { server: server({ theme: "light" }), cookie: "light", stored: { theme: "dark", look: lookOf(4) }, storedOwner: OTHER });
+    h.store.start();
+    await tick();
+    expect(h.puts).toEqual([]);
+    expect(h.writes).toEqual([null]);
+    expect(h.state.stored).toEqual({});
+    expect(h.snap()).toMatchObject({ theme: "light", look: DEFAULT_LOOK, loaded: true, saveState: "idle" });
+  });
+
+  it("アカウントを特定できなかった画面(owner: null)が残した変更は、アカウントのある画面は捨てる。逆も同じ", async () => {
+    const a = harness({}, {}, { stored: { theme: "dark" }, storedOwner: null });
+    a.store.start();
+    await tick();
+    expect(a.puts).toEqual([]);
+    expect(a.writes).toEqual([null]);
+    // アカウントのない画面(owner: null)は、アカウントの画面が残した変更を使わない
+    const b = harness({ enabled: false, owner: null }, {}, { stored: { look: lookOf(1) }, storedOwner: OWNER });
+    b.store.start();
+    await tick();
+    expect(b.snap().look).toEqual(DEFAULT_LOOK);
+    expect(b.writes).toEqual([null]);
+  });
+
+  it("同じアカウントの画面が残した変更は、これまでどおり先に送る(この端末が勝つ)。送る PUT には、このアカウントの指紋が付く", async () => {
+    const h = harness({}, {}, { server: server({ theme: "light" }), cookie: "light", stored: { theme: "dark", look: lookOf(4) }, storedOwner: OWNER });
+    h.store.start();
+    await tick();
+    expect(h.puts).toEqual([{ patch: { theme: "dark", look: lookOf(4) }, keepalive: false }]);
+    expect(h.putOwners).toEqual([OWNER]);
+    expect(h.snap()).toMatchObject({ theme: "dark", look: lookOf(4), saveState: "saved" });
+    expect(h.state.stored).toEqual({});
+  });
+
+  it("前のアカウントの画面が送れなくて残した変更は、次のアカウントの画面が読み込んでも送られない(アカウントの切り替え)", async () => {
+    // 前のアカウント(OWNER)の画面: 送れなくて残す
+    const prev = harness();
+    prev.store.start();
+    await tick();
+    prev.outcomes.push("error");
+    prev.store.setTheme("dark");
+    await tick();
+    expect(prev.state.stored).toEqual({ theme: "dark" });
+    expect(prev.state.storedOwner).toBe(OWNER); // 残した変更に、画面のアカウントの指紋が付く
+    // 同じブラウザで、次のアカウント(OTHER)の画面が読み込む
+    const next = harness({ owner: OTHER }, {}, { server: server({ saved: true }), stored: prev.state.stored, storedOwner: prev.state.storedOwner });
+    next.store.start();
+    await tick();
+    expect(next.puts).toEqual([]);
+    expect(next.snap().theme).toBeNull();
+    expect(next.state.stored).toEqual({});
+  });
+
+  it("始める・やめる・始める(開発の StrictMode)でも、別のアカウントの変更は 1 回捨てるだけで、送らない", async () => {
+    const h = harness({}, {}, { stored: { theme: "dark" }, storedOwner: OTHER });
+    const stop = h.store.start();
+    stop();
+    h.store.start();
+    await tick();
+    expect(h.puts).toEqual([]);
+    expect(h.writes).toEqual([null]);
+  });
+
+  it("残す変更には、画面のアカウントの指紋が付く(失敗して残す・表が使えないとき・DB がないときも)", async () => {
+    const failing = harness({ owner: OTHER });
+    failing.store.start();
+    await tick();
+    failing.outcomes.push("error");
+    failing.store.setTheme("dark");
+    await tick();
+    expect(failing.writeOwners).toEqual([OTHER]);
+    const unavailable = harness();
+    unavailable.store.start();
+    await tick();
+    unavailable.outcomes.push("unavailable");
+    unavailable.store.setTheme("light");
+    await tick();
+    expect(unavailable.writeOwners).toEqual([OWNER]);
+    const nodb = harness({ enabled: false, owner: null });
+    nodb.store.start();
+    await tick();
+    nodb.store.setLook(lookOf(2));
+    expect(nodb.writeOwners).toEqual([null]);
+    expect(nodb.state.stored).toEqual({ look: lookOf(2) });
+  });
+});
+
+describe("PrefsStore: PUT のたびに画面のアカウントの指紋を送る", () => {
+  it("明暗・まとめて送る見た目・失敗のあとの retry・離れるときの keepalive、どの PUT にも付く", async () => {
+    const h = harness({ owner: OTHER });
+    h.store.start();
+    await tick();
+    h.store.setTheme("dark"); // 1: 明暗はすぐ
+    await tick();
+    h.store.setLook(lookOf(1));
+    await vi.advanceTimersByTimeAsync(LOOK_DEBOUNCE_MS); // 2: 見た目は 800ms まとめて
+    h.outcomes.push("error");
+    h.store.setTheme("light"); // 3: 失敗する
+    await tick();
+    h.store.retry(); // 4: 送り直し
+    await tick();
+    h.store.setLook(lookOf(2));
+    h.store.flush(true); // 5: 離れるとき(keepalive)
+    await tick();
+    expect(h.puts).toHaveLength(5);
+    expect(h.puts.map((p) => p.keepalive)).toEqual([false, false, false, false, true]);
+    expect(h.putOwners).toEqual([OTHER, OTHER, OTHER, OTHER, OTHER]);
+  });
+
+  it("アカウントを特定できない(owner: null・指紋の形でない)ときは、DB があってもアカウントへ送らない・読み込まない。local", async () => {
+    for (const owner of [null, "short", "", "!".repeat(22)]) {
+      const h = harness({ owner });
+      expect(h.snap(), String(owner)).toMatchObject({ available: false, saveState: "local" });
+      h.store.start();
+      await tick();
+      h.store.setTheme("dark");
+      h.store.setLook(lookOf(1));
+      h.store.flush(true);
+      await vi.advanceTimersByTimeAsync(LOOK_DEBOUNCE_MS * 2);
+      expect(h.puts, String(owner)).toEqual([]);
+      expect(h.state.loads, String(owner)).toBe(0);
+      expect(h.snap(), String(owner)).toMatchObject({ theme: "dark", saveState: "local", loaded: true });
+    }
+  });
+});
+
+describe("PrefsStore: 409(別のアカウントになった)", () => {
+  async function started(init: Parameters<typeof harness>[2] = {}) {
+    const h = harness({}, {}, init);
+    h.store.start();
+    await tick();
+    h.applied.length = 0;
+    h.writes.length = 0;
+    return h;
+  }
+
+  it("その変更は捨てる(localStorage に残さない)。いまのログインの設定を GET で読み直して画面に出す。このタブは local になる", async () => {
+    const h = await started();
+    expect(h.state.loads).toBe(1);
+    // このタブを開いたあとで、別のアカウント(明暗は明るい・別の見た目)になった
+    const next = server({ theme: "light" });
+    next.prefs.look = lookOf(3);
+    h.state.server = next;
+    h.outcomes.push("owner_mismatch");
+    h.store.setTheme("dark"); // 画面の操作。アカウントには書かれない(409)
+    await tick();
+    expect(h.puts).toEqual([{ patch: { theme: "dark" }, keepalive: false }]);
+    expect(h.writes).toEqual([]); // 残さない
+    expect(h.state.stored).toEqual({});
+    expect(h.state.loads).toBe(2); // GET で読み直した
+    expect(h.snap()).toMatchObject({ theme: "light", look: lookOf(3), world: "plain", saveState: "local", available: false });
+    expect(h.applied).toEqual(["dark", "light"]); // 操作で暗いにし、読み直して、いまのアカウントの明るいに合わせた
+    expect(h.state.cookie).toBe("light");
+  });
+
+  it("読み直した設定は、画面に出すだけ。送らない(アカウントに保存がなくクッキーの明暗を移す決まりも、ここでは動かない)", async () => {
+    const h = await started({ server: server({ theme: "dark" }), cookie: "dark" });
+    h.state.server = server({ saved: false });
+    h.outcomes.push("owner_mismatch");
+    h.store.setLook(lookOf(1));
+    h.store.setTheme("light"); // 見た目と一緒に、すぐ送る
+    await tick();
+    expect(h.puts).toEqual([{ patch: { look: lookOf(1), theme: "light" }, keepalive: false }]);
+    await vi.advanceTimersByTimeAsync(LOOK_DEBOUNCE_MS * 3);
+    expect(h.puts).toHaveLength(1);
+    expect(h.state.stored).toEqual({});
+    expect(h.writes).toEqual([]);
+  });
+
+  it("このタブはもう送らない: 変えても・retry・flush(keepalive)・時間がたっても PUT しない・読み直さない。何も残さない。画面の値は変わる", async () => {
+    const h = await started();
+    h.outcomes.push("owner_mismatch");
+    h.store.setTheme("dark");
+    await tick();
+    expect(h.puts).toHaveLength(1);
+    expect(h.state.loads).toBe(2);
+    h.store.setTheme("light");
+    h.store.setWorld("plain");
+    h.store.setLook(lookOf(5));
+    h.store.retry();
+    h.store.flush(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.puts).toHaveLength(1);
+    expect(h.state.loads).toBe(2);
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({});
+    expect(h.snap()).toMatchObject({ theme: "light", look: lookOf(5), saveState: "local", available: false });
+  });
+
+  it("送っている間に変えた分・まとめ待ちの見た目も、捨てる(残さない・送らない)", async () => {
+    const h = await started();
+    const first = deferred<PutOutcome>();
+    h.outcomes.push(first);
+    h.store.setTheme("dark");
+    h.store.setLook(lookOf(1)); // 800ms まとめる待ち
+    h.store.setTheme("light"); // 飛んでいる間の変更
+    expect(h.puts).toHaveLength(1);
+    first.resolve("owner_mismatch");
+    await tick();
+    await vi.advanceTimersByTimeAsync(LOOK_DEBOUNCE_MS * 2);
+    expect(h.puts).toHaveLength(1);
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({});
+    expect(h.snap().saveState).toBe("local");
+  });
+
+  it("以前に失敗してこのタブが残していた分の localStorage は、409 で消す(このタブのアカウントの指紋の分だけ)", async () => {
+    const h = await started();
+    h.outcomes.push("error");
+    h.store.setTheme("dark");
+    await tick();
+    expect(h.state.stored).toEqual({ theme: "dark" });
+    expect(h.state.storedOwner).toBe(OWNER);
+    h.writes.length = 0;
+    h.outcomes.push("owner_mismatch");
+    h.store.retry();
+    await tick();
+    expect(h.writes).toEqual([null]);
+    expect(h.state.stored).toEqual({});
+  });
+
+  it("ほかのアカウントの画面が残した分(指紋が違う)は、このタブの 409 では消さない・書き換えない", async () => {
+    const h = await started();
+    h.state.stored = { theme: "light" }; // 書いたのは別のアカウントのタブ(読み込みのあと)
+    h.state.storedOwner = OTHER;
+    h.outcomes.push("owner_mismatch");
+    h.store.setTheme("dark");
+    await tick();
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({ theme: "light" });
+    expect(h.state.storedOwner).toBe(OTHER);
+  });
+
+  it("読み直し(GET)が失敗しても落ちない。画面はそのまま・もう送らない", async () => {
+    const h = await started();
+    h.state.server = new Error("network");
+    h.outcomes.push("owner_mismatch");
+    h.store.setTheme("dark");
+    await tick();
+    expect(h.state.loads).toBe(2);
+    expect(h.snap()).toMatchObject({ theme: "dark", saveState: "local", available: false });
+    h.store.setTheme("light");
+    await tick();
+    expect(h.puts).toHaveLength(1);
+  });
+
+  it("タブをやめる(start が返す関数)と、読み直しの結果は画面に出さない", async () => {
+    const d = deferred<ServerPrefs>();
+    const load = vi.fn().mockResolvedValueOnce(server()).mockImplementationOnce(() => d.promise);
+    const h = harness({}, { load });
+    const stop = h.store.start();
+    await tick();
+    h.outcomes.push("owner_mismatch");
+    h.store.setTheme("dark");
+    await tick();
+    expect(load).toHaveBeenCalledTimes(2); // 読み直しが始まっている(答え待ち)
+    stop();
+    d.resolve(server({ theme: "light" }));
+    await tick();
+    expect(h.snap().theme).toBe("dark");
+  });
+});
+
+describe("PrefsStore: 401・403(ログインが切れた・断られた)", () => {
+  async function started(init: Parameters<typeof harness>[2] = {}) {
+    const h = harness({}, {}, init);
+    h.store.start();
+    await tick();
+    h.writes.length = 0;
+    return h;
+  }
+
+  it("残さない(localStorage に書かない)。このタブはもう送らない。画面の値はそのまま・local。読み直さない", async () => {
+    const h = await started({ cookie: "light" });
+    h.outcomes.push("denied");
+    h.store.setTheme("dark");
+    await tick();
+    expect(h.puts).toEqual([{ patch: { theme: "dark" }, keepalive: false }]);
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({});
+    expect(h.state.loads).toBe(1);
+    expect(h.snap()).toMatchObject({ theme: "dark", saveState: "local", available: false });
+    expect(h.state.cookie).toBe("dark"); // 画面とクッキーの明暗は変わったまま(クッキーはこれまでどおり)
+  });
+
+  it("このあと変えても・retry・flush(keepalive)・時間がたっても、PUT しない・残さない。画面の値は変わる", async () => {
+    const h = await started();
+    h.outcomes.push("denied");
+    h.store.setTheme("dark");
+    await tick();
+    h.store.setTheme("light");
+    h.store.setWorld("plain");
+    h.store.setLook(lookOf(2));
+    h.store.retry();
+    h.store.flush(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(h.puts).toHaveLength(1);
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({});
+    expect(h.snap()).toMatchObject({ theme: "light", look: lookOf(2), saveState: "local" });
+  });
+
+  it("start の返す関数(やめる)で、止めたあとに変えた見た目を送ろうとしない・残さない", async () => {
+    const h = harness();
+    const stop = h.store.start();
+    await tick();
+    h.outcomes.push("denied");
+    h.store.setTheme("dark");
+    await tick();
+    h.store.setLook(lookOf(1));
+    stop();
+    expect(h.puts).toHaveLength(1);
+    expect(h.writes).toEqual([]);
+  });
+
+  it("送っている間に変えた分・まとめ待ちの見た目も、残さない・送り直さない", async () => {
+    const h = await started();
+    const first = deferred<PutOutcome>();
+    h.outcomes.push(first);
+    h.store.setTheme("dark");
+    h.store.setTheme("light");
+    h.store.setLook(lookOf(3));
+    first.resolve("denied");
+    await tick();
+    await vi.advanceTimersByTimeAsync(LOOK_DEBOUNCE_MS * 2);
+    expect(h.puts).toHaveLength(1);
+    expect(h.writes).toEqual([]);
+  });
+
+  it("同時に飛んでいた別の要求(離れるときの keepalive)が遅れて失敗しても、止めたあとは残さない", async () => {
+    const h = await started();
+    const normal = deferred<PutOutcome>();
+    const keep = deferred<PutOutcome>();
+    h.outcomes.push(normal, keep);
+    h.store.setTheme("dark"); // 1 つ目が飛ぶ
+    h.store.setLook(lookOf(1)); // 送っていない分ができる
+    h.store.flush(true); // 離れるとき。飛んでいる最中でも keepalive は送る
+    expect(h.puts).toHaveLength(2);
+    keep.resolve("denied");
+    await tick();
+    normal.resolve("error"); // 遅れて失敗しても、止めたあとは残さない
+    await tick();
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({});
+    expect(h.snap().saveState).toBe("local");
+  });
+
+  it("失敗のあとの変更で change() が残した分(PUT の前に書いた分)は、401・403 で止めたときに消す(QA L-1)", async () => {
+    const h = await started();
+    h.outcomes.push("error");
+    h.store.setTheme("dark"); // 失敗: 残す
+    await tick();
+    expect(h.state.stored).toEqual({ theme: "dark" });
+    h.outcomes.push("denied");
+    h.store.setTheme("light"); // 失敗の状態での変更: PUT の前に残す(change)→ PUT が 401
+    expect(h.state.stored).toEqual({ theme: "light" });
+    await tick();
+    expect(h.puts).toHaveLength(2);
+    expect(h.state.stored).toEqual({});
+    expect(h.writes.at(-1)).toBeNull();
+    // 止めたあとは、変えても残さない
+    h.store.setLook(lookOf(4));
+    await vi.advanceTimersByTimeAsync(LOOK_DEBOUNCE_MS * 2);
+    expect(h.state.stored).toEqual({});
+    expect(h.puts).toHaveLength(2);
+  });
+
+  it("このタブの localStorage への書き込みも削除もしない: ほかのアカウントの画面が残した分に触らない", async () => {
+    const h = await started();
+    h.state.stored = { theme: "light" }; // 書いたのは別のタブ(読み込みのあと)
+    h.state.storedOwner = OTHER;
+    h.outcomes.push("denied");
+    h.store.setTheme("dark");
+    await tick();
+    expect(h.writes).toEqual([]);
+    expect(h.state.stored).toEqual({ theme: "light" });
+    expect(h.state.storedOwner).toBe(OTHER);
   });
 });

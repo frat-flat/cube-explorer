@@ -2,6 +2,7 @@
 // 取り込み元(スプシ)を選ぶ。API の入口で使う。
 import { connection } from "next/server";
 import { auth, authBypassed, isAllowedEmail } from "@/lib/auth";
+import { ownerFingerprint } from "@/lib/owner-fingerprint";
 import { sameOrigin } from "@/lib/same-origin";
 import { fixtureReader } from "@/fourdb/adapters/google-sheets/fixture";
 import { googleSheetsReader } from "@/fourdb/adapters/google-sheets/reader";
@@ -49,8 +50,18 @@ function databaseProblem(principal: string): "not_configured" | "local_only" | n
  * 画面の枠が、使えない所(ログインなしで FOURDB_LOCAL_DEV もない開発サーバーなど)で、必ず失敗する要求を出さないために使う。
  */
 export async function fourdbUsable(): Promise<boolean> {
+  return (await fourdbAccess()).usable;
+}
+
+/**
+ * fourdbUsable の答え(usable)と、ログイン中の人の指紋(owner。ログインの人がいなければ null)を、1 回のログインの確認で返す。
+ * 画面の枠が、設定の送り先を取り違えないために、画面を作るときの指紋を画面へ渡すのに使う(src/lib/owner-fingerprint.ts)。
+ * owner は principal から作った一方向の値で、メールアドレスも principal も分からない。
+ */
+export async function fourdbAccess(): Promise<{ usable: boolean; owner: string | null }> {
   const principal = await currentPrincipal();
-  return principal !== null && databaseProblem(principal) === null;
+  if (principal === null) return { usable: false, owner: null };
+  return { usable: databaseProblem(principal) === null, owner: ownerFingerprint(principal) };
 }
 
 /**

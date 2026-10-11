@@ -3,7 +3,8 @@
 import { readFile as readFileText, rm, writeFile } from "node:fs/promises";
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import type { HomeOverview, HomeUnit } from "@/fourdb/core/home";
-import { DEFAULT_LOOK, type Look, type PrefsPatch } from "@/fourdb/core/prefs";
+import { DEFAULT_LOOK, OWNER_HEADER, type Look, type PrefsPatch } from "@/fourdb/core/prefs";
+import { ownerFingerprint } from "@/lib/owner-fingerprint";
 
 export const FIXTURES = "e2e/fixtures/sheets";
 export const LINK = "ファイル(Google スプレッドシート)のリンク";
@@ -121,11 +122,34 @@ export type PrefsState = { available: boolean; saved: boolean; prefs: { theme: "
 
 export const getPrefs = async (request: APIRequestContext) => (await (await request.get("/api/4db/prefs")).json()) as PrefsState;
 
+/**
+ * 手元の開発用の利用者(ログインなし・FOURDB_LOCAL_DEV=1 の local-dev)の指紋。PUT /api/4db/prefs は、いまのログインの指紋をヘッダーに付けないと 409(L-4)。
+ * 開発サーバー(scripts/dev-fourdb.mjs)は NEON_AUTH_COOKIE_SECRET を空にして動くので、サーバーも決まった鍵で計算する。
+ * この試験を流すシェルに NEON_AUTH_COOKIE_SECRET が入っていると、ここの計算がサーバーと食い違う(409 になる)ので、止めて知らせる
+ */
+export function localDevOwner(): string {
+  if (process.env.NEON_AUTH_COOKIE_SECRET) throw new Error("e2e: NEON_AUTH_COOKIE_SECRET が入っています。開発サーバーは空で動くので、指紋が合いません。空にして流してください");
+  return ownerFingerprint("local-dev");
+}
+
+/** 別のアカウント(ログインし直した別の人)の指紋。local-dev の指紋とは必ず違う */
+export const otherOwner = (): string => ownerFingerprint("neon:other");
+
+/** PUT /api/4db/prefs の要求ヘッダー(local-dev の指紋つき)。extra で足す・上書きする。owner を null にすると指紋を付けない */
+export function ownerHeaders(extra: Record<string, string> = {}, owner: string | null = localDevOwner()): Record<string, string> {
+  return { ...(owner === null ? {} : { [OWNER_HEADER]: owner }), ...extra };
+}
+
+/** 画面の外から設定を書く(local-dev の指紋つき)。headers で指紋を取り替える・別のサイトのふりをする。data は本文(形の違うものも渡せる) */
+export const putPrefs = (request: APIRequestContext, data: unknown, headers: Record<string, string> = {}) =>
+  request.put("/api/4db/prefs", { data: data as never, headers: ownerHeaders(headers) });
+
+/** localStorage の fourdb.prefs.pending に入れる文字(残す形は { owner, patch }。owner は残した画面のアカウントの指紋) */
+export const pendingText = (patch: unknown, owner: string | null = localDevOwner()): string => JSON.stringify({ owner, patch });
+
 /** アカウントの設定を、何も変えていない状態(パソコンの設定に合わせる・無地・既定の見た目)にする */
 export async function resetPrefs(request: APIRequestContext, look?: Look) {
-  const res = await request.put("/api/4db/prefs", {
-    data: { theme: null, world: "plain", look: look ?? { ...DEFAULT_LOOK } } satisfies PrefsPatch,
-  });
+  const res = await putPrefs(request, { theme: null, world: "plain", look: look ?? { ...DEFAULT_LOOK } } satisfies PrefsPatch);
   expect(res.ok(), "設定をもとに戻す").toBe(true);
 }
 

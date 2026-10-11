@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LOOK_OPTIONS, type Look } from "@/fourdb/core/prefs";
 import {
+  ARC_K,
   BAND_CLEARANCE,
   BASES,
   BOB_AMPLITUDE,
@@ -9,15 +10,24 @@ import {
   bandGap,
   boxHalfHeight,
   boxSide,
+  cameraElevation,
   circumRadius,
   dishHeight,
+  formationRows,
+  frameHalfWidth,
   hasFace,
   isMany,
   layoutExtent,
   orbitRadius,
   overlappingPairs,
+  PERSPECTIVE,
+  ROW_DEPTH,
+  ROW_GAP,
   stageRiser,
+  STAGE_FRONT_Z,
   STAGE_RISE,
+  STAGGER,
+  TWO_ROW_ELEVATION,
   unitFootprintRadius,
   unitFootprints,
   unitMetrics,
@@ -61,46 +71,105 @@ describe("unitSlots: 並べる場所", () => {
     }
   });
   it("単位が 1 つなら、どの並べ方でも真ん中の床の上", () => {
-    for (const l of LAYOUTS) expect(unitSlots(1, l)).toEqual([{ x: 0, y: 0, z: 0, tier: 0 }]);
+    for (const l of LAYOUTS) expect(unitSlots(1, l)).toEqual([{ x: 0, y: 0, z: 0, row: 0, tier: 0 }]);
   });
-  it("1 列: 間隔は 2 つまで 2.15、3 つで 1.95、4 つ以上で 1.48。左右対称で、まっすぐ", () => {
-    for (const [n, step] of [[2, 2.15], [3, 1.95], [4, 1.48], [5, 1.48], [6, 1.48]] as const) {
+  it("隊形(formationRows): 1・2・3 は 1 列、4 = 後ろ 2・前 2、5 = 後ろ 2・前 3、6 = 後ろ 3・前 3", () => {
+    expect(COUNTS.map(formationRows)).toEqual([
+      { back: 0, front: 1 },
+      { back: 0, front: 2 },
+      { back: 0, front: 3 },
+      { back: 2, front: 2 },
+      { back: 2, front: 3 },
+      { back: 3, front: 3 },
+    ]);
+    expect(formationRows(0)).toEqual({ back: 0, front: 0 });
+    // どの並べ方でも、列の数は隊形のとおり(ひな壇の 3 つだけは、真ん中を後ろの段に上げる)
+    for (const l of LAYOUTS)
+      for (const n of COUNTS) {
+        const s = unitSlots(n, l);
+        const { back, front } = l === "stage" && n === 3 ? { back: 1, front: 2 } : formationRows(n);
+        expect(s.filter((p) => p.row === 1), `${l} N=${n}`).toHaveLength(back);
+        expect(s.filter((p) => p.row === 0), `${l} N=${n}`).toHaveLength(front);
+      }
+  });
+  it("1 列(2 つ・3 つ): となりどうしの間隔は 2 つも 3 つも 1.95(2 つを端まで広げない)。左右対称で、まっすぐ", () => {
+    expect(ROW_GAP).toBe(1.95);
+    for (const n of [2, 3]) {
       const s = unitSlots(n, "row");
       expect(s).toHaveLength(n);
       for (let i = 0; i < n; i++) {
-        expect(near(s[i].x, (i - (n - 1) / 2) * step)).toBe(true);
-        expect(s[i].y).toBe(0);
-        expect(s[i].z).toBe(0);
-        expect(s[i].tier).toBe(0);
+        expect(near(s[i].x, (i - (n - 1) / 2) * ROW_GAP)).toBe(true);
+        expect(s[i]).toMatchObject({ y: 0, z: 0, row: 0, tier: 0 });
       }
     }
   });
-  it("弧: 間隔は 4 つ以上で 1.42(それ以外は 1 列と同じ)。z = 0.085 × x²", () => {
-    for (const n of [2, 3]) expect(unitSlots(n, "arc").map((s) => s.x)).toEqual(unitSlots(n, "row").map((s) => s.x));
-    const s = unitSlots(5, "arc");
-    expect(near(s[1].x - s[0].x, 1.42)).toBe(true);
-    for (const p of s) expect(near(p.z, 0.085 * p.x * p.x)).toBe(true);
-    // 左右の端ほど手前
-    expect(s[0].z).toBeGreaterThan(s[2].z);
-    expect(near(s[0].z, s[4].z)).toBe(true);
-  });
-  it("ひな壇: 偶数番目が後ろの高い段(y 0.5、z -0.85)、奇数番目が前の低い段(y 0、z 0.75 / 多いとき 1.15)で、互い違い", () => {
-    for (const n of [2, 3, 4, 5, 6]) {
-      const s = unitSlots(n, "stage");
-      expect(s).toHaveLength(n);
+  it("2 列(4〜6 つ): 左から 前・後ろ・前… の互い違い(いちばん左は前の列)。前と後ろは横に約 STAGGER ずれる(遠近の直しつき)。床の上でまっすぐ", () => {
+    for (const n of [4, 5, 6]) {
+      const s = unitSlots(n, "row");
+      expect(s.map((p) => p.row)).toEqual(Array.from({ length: n }, (_, i) => i % 2));
+      for (const p of s) {
+        expect(p.y).toBe(0);
+        expect(p.tier).toBe(0);
+        expect(p.z).toBe(p.row === 1 ? -ROW_DEPTH / 2 : ROW_DEPTH / 2);
+      }
+      // 横の位置: (i - 真ん中) × STAGGER を、前の列は (1 - 直し) 倍・後ろの列は (1 + 直し) 倍にして、全体の真ん中を 0 に
+      const raw = s.map((_, i) => (i - (n - 1) / 2) * STAGGER * (i % 2 === 1 ? 1 + PERSPECTIVE : 1 - PERSPECTIVE));
+      const mean = raw.reduce((a, b) => a + b, 0) / n;
+      s.forEach((p, i) => expect(near(p.x, raw[i] - mean)).toBe(true));
+      // となりどうし(前と後ろ)の横のずれは、STAGGER の 0.75〜1.25 倍
+      for (let i = 1; i < n; i++) {
+        const dx = s[i].x - s[i - 1].x;
+        expect(dx).toBeGreaterThan(STAGGER * 0.75);
+        expect(dx).toBeLessThan(STAGGER * 1.25);
+      }
+      // 後ろの立体は、左右の前の立体のあいだ(前の列のすきまから見える)
       s.forEach((p, i) => {
-        const back = i % 2 === 0;
-        expect(p.tier).toBe(back ? 1 : 0);
-        expect(p.y).toBe(back ? STAGE_RISE : 0);
-        expect(p.z).toBe(back ? -0.85 : n > 3 ? 1.15 : 0.75);
+        if (p.row === 1) expect(p.x > s[i - 1].x && (i + 1 >= n || p.x < s[i + 1].x)).toBe(true);
       });
     }
-    // 横の間隔は 段の間隔の半分
-    expect(near(unitSlots(2, "stage")[1].x - unitSlots(2, "stage")[0].x, 1.2)).toBe(true);
-    expect(near(unitSlots(4, "stage")[1].x - unitSlots(4, "stage")[0].x, 1.15)).toBe(true);
-    expect(near(unitSlots(6, "stage")[1].x - unitSlots(6, "stage")[0].x, 1.025)).toBe(true);
+    // 遠近の直し: 前の列は詰め、後ろの列は広げる(5 つは左右対称)
+    const five = unitSlots(5, "row");
+    expect(near(five[0].x, -2 * STAGGER * (1 - PERSPECTIVE))).toBe(true);
+    expect(near(five[1].x, -STAGGER * (1 + PERSPECTIVE))).toBe(true);
+    expect(near(five[2].x, 0)).toBe(true);
+    expect(near(five[0].x, -five[4].x)).toBe(true);
+    expect(near(five[1].x, -five[3].x)).toBe(true);
   });
-  it("どの並べ方・数でも、左から右へ並び、全体の真ん中が x = 0", () => {
+  it("弧: 1 列は z = ARC_K × x²。2 列は列ごとに、その列の真ん中から左右へ手前に曲がる(列ごとに左右対称)。横の位置は 1 列と同じ", () => {
+    for (const n of COUNTS) expect(unitSlots(n, "arc").map((s) => s.x)).toEqual(unitSlots(n, "row").map((s) => s.x));
+    for (const p of unitSlots(3, "arc")) expect(near(p.z, ARC_K * p.x * p.x)).toBe(true);
+    const three = unitSlots(3, "arc");
+    expect(three[0].z).toBeGreaterThan(three[1].z); // 左右の端ほど手前
+    expect(near(three[0].z, three[2].z)).toBe(true);
+    for (const n of [4, 5, 6]) {
+      const s = unitSlots(n, "arc");
+      for (const row of [0, 1] as const) {
+        const own = s.filter((p) => p.row === row);
+        const mid = own.reduce((a, p) => a + p.x, 0) / own.length;
+        const z0 = row === 1 ? -ROW_DEPTH / 2 : ROW_DEPTH / 2;
+        for (const p of own) expect(near(p.z, z0 + ARC_K * (p.x - mid) ** 2)).toBe(true);
+        // 列の両端は同じ奥行き(左右対称の弧)
+        expect(near(own[0].z, own[own.length - 1].z)).toBe(true);
+      }
+    }
+  });
+  it("ひな壇: 1 つ・2 つは 1 列と同じ(段なし)。3 つは真ん中だけを後ろの段に上げる。4〜6 つは後ろの列を段(y 0.5、z -0.85)、前の列を床(z 0.85)に", () => {
+    for (const n of [1, 2]) expect(unitSlots(n, "stage")).toEqual(unitSlots(n, "row"));
+    const three = unitSlots(3, "stage");
+    expect(three.map((p) => p.tier)).toEqual([0, 1, 0]);
+    expect(three[1]).toMatchObject({ y: STAGE_RISE, z: -0.85, row: 1 });
+    expect(near(three[1].x, 0)).toBe(true);
+    for (const p of [three[0], three[2]]) expect(p).toMatchObject({ y: 0, z: STAGE_FRONT_Z, row: 0 });
+    for (const n of [4, 5, 6]) {
+      const s = unitSlots(n, "stage");
+      expect(s.map((p) => p.x)).toEqual(unitSlots(n, "row").map((p) => p.x));
+      s.forEach((p, i) => {
+        const back = i % 2 === 1;
+        expect(p).toMatchObject({ y: back ? STAGE_RISE : 0, z: back ? -0.85 : STAGE_FRONT_Z, row: back ? 1 : 0, tier: back ? 1 : 0 });
+      });
+    }
+  });
+  it("どの並べ方・数でも、左から右へ並び(札の順・キーボードの順は画面の左から右)、全体の真ん中が x = 0", () => {
     for (const l of LAYOUTS)
       for (const n of COUNTS) {
         const xs = unitSlots(n, l).map((s) => s.x);
@@ -149,11 +218,23 @@ describe("立体が重ならない(並べ方 × 単位の数 × 形 × 向き ×
     expect(overlappingPairs([{ x: 0, z: 0, r: 1 }, { x: 1, z: 1, r: 1 }, { x: 5, z: 5, r: 1 }])).toEqual([[0, 1]]);
     expect(overlappingPairs([])).toEqual([]);
   });
-  it("ひな壇: 後ろの段の立体は後ろの箱の上に収まり、前の段の立体は箱の手前にある", () => {
+  it("2 列の隊形(4〜6 つ)は、同じ列のとなりどうしも、前と後ろも、円が 0.1 以上離れる(3 つの形・すべての向きと台座で)", () => {
+    for (const look of looks)
+      for (const n of [4, 5, 6]) {
+        const slots = unitSlots(n, look.layout);
+        const fps = unitFootprints(look, n);
+        for (let i = 0; i < n; i++)
+          for (let j = i + 1; j < n; j++) {
+            const gap = Math.hypot(fps[i].x - fps[j].x, fps[i].z - fps[j].z) - fps[i].r - fps[j].r;
+            expect(gap, `${look.layout}/${look.shape}/${look.tilt}/${look.base} N=${n} ${i}(${slots[i].row})-${j}(${slots[j].row})`).toBeGreaterThanOrEqual(0.1);
+          }
+      }
+  });
+  it("ひな壇: 後ろの段の立体は後ろの箱の上に収まり、前の段の立体は箱の手前にある(3 つ〜6 つ)", () => {
     for (const shape of SHAPES)
       for (const tilt of TILTS)
         for (const base of BASE_IDS)
-          for (const n of [2, 3, 4, 5, 6]) {
+          for (const n of [3, 4, 5, 6]) {
             const look: Look = { shape, tilt, base, label: "below", bg: "logo", layout: "stage" };
             const slots = unitSlots(n, "stage");
             const fps = unitFootprints(look, n);
@@ -173,10 +254,11 @@ describe("立体が重ならない(並べ方 × 単位の数 × 形 × 向き ×
             });
           }
   });
-  it("stageRiser: ひな壇でないか、単位が 1 つなら null。幅は両端の立体のまわり 0.95、高さは STAGE_RISE", () => {
+  it("stageRiser: ひな壇でないか、後ろの段がない(単位が 1 つ・2 つ)なら null。幅は両端の立体のまわり 0.95、高さは STAGE_RISE", () => {
     expect(stageRiser(unitSlots(4, "row"))).toBeNull();
     expect(stageRiser(unitSlots(4, "arc"))).toBeNull();
     expect(stageRiser(unitSlots(1, "stage"))).toBeNull();
+    expect(stageRiser(unitSlots(2, "stage"))).toBeNull();
     expect(stageRiser([])).toBeNull();
     const slots = unitSlots(4, "stage");
     const r = stageRiser(slots);
@@ -188,8 +270,33 @@ describe("立体が重ならない(並べ方 × 単位の数 × 形 × 向き ×
     expect(row.cz).toBe(0);
     expect(near(row.halfX, 1.95)).toBe(true);
     expect(near(row.bigR, 1.95 + 1.45)).toBe(true);
-    const stage = layoutExtent(unitSlots(2, "stage"));
-    expect(near(stage.cz, (-0.85 + 0.75) / 2)).toBe(true);
+    const stage = layoutExtent(unitSlots(4, "stage"));
+    expect(near(stage.cz, (-0.85 + STAGE_FRONT_Z) / 2)).toBe(true);
+    const two = layoutExtent(unitSlots(6, "row"));
+    expect(near(two.cz, 0)).toBe(true);
+  });
+  it("frameHalfWidth: 2 つ以上は 3 つの 1 列(間隔 1.95 + 軌道 0.72)より狭く写さない。1 つは 0。5 つ・6 つは並びのほうが広い", () => {
+    expect(frameHalfWidth(0)).toBe(0);
+    expect(frameHalfWidth(1)).toBe(0);
+    for (const n of [2, 3, 4, 5, 6]) expect(frameHalfWidth(n)).toBe(ROW_GAP + orbitRadius(3));
+    const own = (n: number) => Math.max(...unitSlots(n, "row").map((s) => Math.abs(s.x))) + orbitRadius(n);
+    expect(own(2)).toBeLessThan(frameHalfWidth(2));
+    expect(own(4)).toBeLessThan(frameHalfWidth(4));
+    expect(near(own(3), frameHalfWidth(3))).toBe(true);
+    expect(own(5)).toBeGreaterThan(frameHalfWidth(5));
+    expect(own(6)).toBeGreaterThan(frameHalfWidth(6));
+  });
+  it("cameraElevation: 1 列はふつう 0.15、ひな壇・くぼみの台は 0.27。2 列の隊形は 0.32 以上(後ろの列が前の列の上に見える)", () => {
+    const l = (layout: Look["layout"], base: Look["base"]) => ({ layout, base });
+    for (const n of [1, 2, 3]) {
+      expect(cameraElevation(l("row", "ring"), n)).toBe(0.15);
+      expect(cameraElevation(l("arc", "plinth"), n)).toBe(0.15);
+      expect(cameraElevation(l("stage", "ring"), n)).toBe(0.27);
+      expect(cameraElevation(l("row", "dish"), n)).toBe(0.27);
+    }
+    for (const n of [4, 5, 6])
+      for (const layout of LAYOUTS) for (const base of BASE_IDS) expect(cameraElevation(l(layout, base), n)).toBe(TWO_ROW_ELEVATION);
+    expect(TWO_ROW_ELEVATION).toBeGreaterThanOrEqual(0.27);
   });
 });
 

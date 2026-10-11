@@ -9,17 +9,19 @@ import { PrefsStore, type StoreDeps } from "../prefs-sync";
 import { ThemeSetting } from "./ThemeSetting";
 import { WorldSetting } from "./WorldSetting";
 
+// 画面のアカウントの指紋(形だけ正しい作り物。計算は src/lib/owner-fingerprint.test.ts)
+const OWNER = "AAAAAAAAAAAAAAAAAAAAAA";
 const deps: StoreDeps = {
   load: () => Promise.reject(new Error("not used")),
   put: () => Promise.resolve("ok"),
-  readStored: () => ({}),
+  readStored: () => null,
   writeStored: () => {},
   readCookieTheme: () => null,
   applyTheme: () => {},
 };
 // PrefsProvider は children が必須の型なので、createElement の第 3 引数ではなく props で渡す(.ts の試験で JSX を使わないため)
 // eslint-disable-next-line react/no-children-prop
-const provided = (initialTheme: Theme | null, children: ReactElement) => createElement(PrefsProvider, { initialTheme, enabled: true, children });
+const provided = (initialTheme: Theme | null, children: ReactElement) => createElement(PrefsProvider, { initialTheme, enabled: true, owner: OWNER, children });
 const withStore = (store: PrefsStore, child: ReactElement) => createElement(PrefsContext.Provider, { value: store }, child);
 
 describe("画面の見た目(ThemeSetting)", () => {
@@ -49,7 +51,7 @@ describe("画面の見た目(ThemeSetting)", () => {
   });
 
   it("保存に失敗したとき(error): 「アカウントに保存できませんでした。このブラウザには覚えています。」を role=alert で出す", async () => {
-    const store = new PrefsStore({ ...deps, put: () => Promise.resolve("error") }, { enabled: true, initialTheme: null });
+    const store = new PrefsStore({ ...deps, put: () => Promise.resolve("error") }, { enabled: true, initialTheme: null, owner: OWNER });
     store.start();
     await new Promise((r) => setTimeout(r, 0));
     // 突き合わせは読めなかった扱いで進む(load が reject)。そのあと変えて、送れなかった状態にする
@@ -63,7 +65,7 @@ describe("画面の見た目(ThemeSetting)", () => {
   });
 
   it("保存できない(DB がない・表がまだない)ときは、このパソコンにだけ覚える旨を出す", () => {
-    const store = new PrefsStore(deps, { enabled: false, initialTheme: null });
+    const store = new PrefsStore(deps, { enabled: false, initialTheme: null, owner: OWNER });
     const html = renderToStaticMarkup(withStore(store, createElement(ThemeSetting)));
     expect(html).toContain("いまはこのパソコンにだけ覚えます(アカウントへの保存は準備中です)");
   });

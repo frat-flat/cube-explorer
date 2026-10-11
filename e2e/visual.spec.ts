@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { DEFAULT_LOOK } from "@/fourdb/core/prefs";
-import { getPrefs, manyUnits, openHome, overviewOf, resetPrefs, stage, stubHome, unitOf, watch, type PrefsState } from "./support";
+import { getPrefs, localDevOwner, manyUnits, openHome, overviewOf, putPrefs, resetPrefs, stage, stubHome, unitOf, watch, type PrefsState } from "./support";
 
 // ホームの Visual(見た目の欄)とアカウントへの保存。手元のデータベースで動いている画面を相手にする(home.spec.ts と同じ起動):
 //   E2E_4DB_URL=http://localhost:3200 npx playwright test e2e/visual.spec.ts
@@ -360,7 +360,8 @@ test.describe("見た目の保存(アカウント)", () => {
     await expect(stage(page)).toHaveAttribute("data-layout", "row");
     // この端末に残してある
     const stored = JSON.parse((await pending(page)) ?? "null");
-    expect(stored?.look).toMatchObject({ shape: "glass", base: "dish", layout: "row" });
+    expect(stored?.owner, "残した変更には、この画面のアカウントの指紋が付く").toBe(localDevOwner());
+    expect(stored?.patch?.look).toMatchObject({ shape: "glass", base: "dish", layout: "row" });
     // アカウントはまだ元のまま
     expect((await getPrefs(page.request)).prefs.look.layout).toBe(DEFAULT_LOOK.layout);
     // 直ったあとで試し直す
@@ -406,7 +407,7 @@ test.describe("見た目の保存(アカウント)", () => {
     expect(puts, "送らない").toEqual([]);
     await expect(page.getByText("いまはこのパソコンにだけ覚えます(アカウントへの保存は準備中です)")).toBeVisible();
     await expect(page.getByText("保存できませんでした")).toHaveCount(0);
-    expect(JSON.parse((await pending(page)) ?? "null")).toMatchObject({ theme: "dark", look: { layout: "row" } });
+    expect(JSON.parse((await pending(page)) ?? "null")).toMatchObject({ owner: localDevOwner(), patch: { theme: "dark", look: { layout: "row" } } });
     await page.reload();
     await expect(stage(page)).toHaveAttribute("data-layout", "row");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -433,25 +434,25 @@ test.describe("見た目の保存(アカウント)", () => {
   test("別のサイトからの書き込みは断る(PUT は同じサイトだけ)・不正な本文は 400・4KB を超える本文は 400。GET は読める", async ({ page }) => {
     const req = page.request;
     const look = { ...DEFAULT_LOOK };
-    expect((await req.put("/api/4db/prefs", { data: { theme: "dark" }, headers: { "sec-fetch-site": "cross-site" } })).status()).toBe(403);
-    expect((await req.put("/api/4db/prefs", { data: { theme: "dark" }, headers: { origin: "https://evil.example" } })).status()).toBe(403);
+    expect((await putPrefs(req, { theme: "dark" }, { "sec-fetch-site": "cross-site" })).status()).toBe(403);
+    expect((await putPrefs(req, { theme: "dark" }, { origin: "https://evil.example" })).status()).toBe(403);
     expect((await getPrefs(req)).prefs.theme, "断った書き込みは効いていない").toBeNull();
     // 形の違うもの: 知らないキー・知らない値・欠けた部品・__proto__・constructor・配列・空
     const bads: unknown[] = [
       {}, [], "x", null, { unknown: 1 }, { theme: "blue" }, { theme: 1 }, { world: "modern" }, { look: { ...look, shape: "cube" } },
       { look: { shape: "glass" } }, { look: { ...look, extra: 1 } }, { look: [] }, { look: null }, { theme: "dark", extra: 1 },
     ];
-    for (const b of bads) expect((await req.put("/api/4db/prefs", { data: b as never })).status(), JSON.stringify(b)).toBe(400);
+    for (const b of bads) expect((await putPrefs(req, b)).status(), JSON.stringify(b)).toBe(400);
     for (const raw of ['{"__proto__":{"theme":"dark"}}', '{"constructor":{"x":1}}', `{"look":{"__proto__":{"shape":"glass"},"shape":"glass","tilt":"vertex","base":"dish","label":"below","bg":"logo","layout":"row"}}`, '{"theme":"dark",']) {
-      const res = await req.put("/api/4db/prefs", { data: raw, headers: { "content-type": "application/json" } });
+      const res = await putPrefs(req, raw, { "content-type": "application/json" });
       expect(res.status(), raw).toBe(400);
     }
     // 4KB を超える本文
-    const big = await req.put("/api/4db/prefs", { data: `{"theme":"dark"}${" ".repeat(5000)}`, headers: { "content-type": "application/json" } }); // 中身は正しい。大きさだけが違う
+    const big = await putPrefs(req, `{"theme":"dark"}${" ".repeat(5000)}`, { "content-type": "application/json" }); // 中身は正しい。大きさだけが違う
     expect(big.status()).toBe(400);
     expect((await getPrefs(req)).prefs, "不正な書き込みは何も変えない").toEqual({ theme: null, world: "plain", look });
     // 正しい書き込みは返り値が GET と同じ形。送った欄だけ変わる
-    const ok = await req.put("/api/4db/prefs", { data: { theme: "light" } });
+    const ok = await putPrefs(req, { theme: "light" });
     expect(ok.status()).toBe(200);
     expect(await ok.json()).toEqual({ available: true, saved: true, prefs: { theme: "light", world: "plain", look } });
   });

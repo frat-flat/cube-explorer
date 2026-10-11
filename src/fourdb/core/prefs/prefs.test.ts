@@ -322,6 +322,12 @@ describe("parsePrefsPatch(PUT の本文。厳しく)", () => {
     for (const extra of ["foo", "Theme", "id", "principal", "updated_at", "worlds", "looks"]) expect(typeof parsePrefsPatch({ theme: "dark", [extra]: 1 }), extra).toBe("string");
     expect(typeof parsePrefsPatch({ foo: 1 })).toBe("string");
   });
+  it("アカウントの指紋(owner)は本文では受け付けない(ヘッダー x-4db-owner だけ。本文の厳しい読み方は変えない)", () => {
+    const owner = "AAAAAAAAAAAAAAAAAAAAAA";
+    expect(parsePrefsPatch({ theme: "dark", owner })).toBe("設定の指定に、知らない項目があります");
+    expect(typeof parsePrefsPatch({ owner })).toBe("string");
+    expect(typeof parsePrefsPatch({ theme: "dark", patch: { theme: "dark" }, owner })).toBe("string");
+  });
   it("`__proto__`・`constructor`・`prototype` のキーは通さず、Object.prototype を汚さない", () => {
     for (const p of [
       '{"__proto__": {"theme": "dark"}}',

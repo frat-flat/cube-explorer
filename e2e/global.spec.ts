@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { externalHosts, hydrated, resetPrefs, stage, watch } from "./support";
+import { externalHosts, hydrated, putPrefs, resetPrefs, stage, watch } from "./support";
 
 // 全画面(ホーム・Task・履歴・設定・取り込み・Table)の、見た目(暗い/明るい)・コンソール・外への通信。手元のデータベースで動いている画面を相手にする(home.spec.ts と同じ起動):
 //   E2E_4DB_URL=http://localhost:3200 npx playwright test e2e/global.spec.ts
@@ -17,7 +17,7 @@ for (const theme of ["light", "dark"] as const) {
     const ctx = await browser.newContext({ baseURL, viewport: { width: 1280, height: 800 }, colorScheme: theme });
     await resetPrefs(ctx.request);
     // アカウントの明暗を選んだものにする(アカウントに保存してある値が、クッキーより優先される)
-    expect((await ctx.request.put("/api/4db/prefs", { data: { theme } })).ok()).toBe(true);
+    expect((await putPrefs(ctx.request, { theme })).ok()).toBe(true);
     await ctx.addCookies([{ name: "fourdb_theme", value: theme, url: baseURL! }]);
     const page = await ctx.newPage();
     const w = watch(page);

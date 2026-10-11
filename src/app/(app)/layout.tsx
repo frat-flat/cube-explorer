@@ -2,7 +2,7 @@ import Image from "next/image";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentUserEmail } from "@/lib/auth";
-import { fourdbUsable } from "@/lib/fourdb";
+import { fourdbAccess } from "@/lib/fourdb";
 import { NAV_COOKIE, parseNavOpen, parseTheme, THEME_COOKIE } from "@/lib/prefs";
 import { AppNav, Crumb, NavToggle, ShellFrame } from "./AppShell";
 import { LogoutForm } from "./LogoutForm";
@@ -29,9 +29,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const initialTheme = parseTheme(jar.get(THEME_COOKIE)?.value) ?? null;
   // アカウント向けの API(設定・Task の件数)が、この要求で使えるときだけ true。データベースが設定されていても、
   // ログインなしで FOURDB_LOCAL_DEV もない開発サーバーでは API が 401 になるので、通信しない(false)
-  const enabled = await fourdbUsable();
+  // owner = いまログインしている人の指紋(一方向の値で、メールアドレスも principal も分からない)。設定の送り先のアカウントを取り違えないために、
+  // この画面を作ったときの値を PrefsProvider に渡す(残す変更に付け、PUT のたびに送り、サーバーがいまのログインと照らす。src/lib/owner-fingerprint.ts)
+  const { usable: enabled, owner } = await fourdbAccess();
   return (
-    <PrefsProvider initialTheme={initialTheme} enabled={enabled}>
+    <PrefsProvider initialTheme={initialTheme} enabled={enabled} owner={owner}>
       <ShellFrame initialClosed={navClosed}>
         <header className="top">
           <NavToggle />

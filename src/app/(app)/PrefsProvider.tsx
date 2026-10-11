@@ -1,7 +1,8 @@
 "use client";
 
 // アカウントに覚える設定(明暗・World・立体の見た目)を、画面のどこからでも読み書きできるようにする。
-// 枠(layout.tsx)が包む。layout はクッキーだけを読み(DB は読まない)、最初の明暗(initialTheme)と、DB があるか(enabled)を渡す。
+// 枠(layout.tsx)が包む。layout はクッキーだけを読み(DB は読まない)、最初の明暗(initialTheme)と、DB があるか(enabled)と、
+// この画面のアカウントの指紋(owner。送り先のアカウントを取り違えないため)を渡す。
 // DB がなければ(enabled = false)通信しない。あれば、タブの読み込みごとに 1 回だけ GET して、クッキーとアカウントを突き合わせる。
 // 覚え方と送り方の決まりは prefs-sync.ts(React に依存しない。試験もそこ)。
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -38,8 +39,12 @@ export type PrefsApi = {
 /** 試験が、決まった状態の入れ物を渡すために export している(画面からは PrefsProvider を使う) */
 export const PrefsContext = createContext<PrefsStore | null>(null);
 
-export function PrefsProvider({ initialTheme, enabled, children }: { initialTheme: Theme | null; enabled: boolean; children: ReactNode }) {
-  const [store] = useState(() => new PrefsStore(browserDeps(), { enabled, initialTheme }));
+/**
+ * owner = この画面を作ったときのログイン中のアカウントの指紋(サーバーが layout で作って渡す。src/lib/owner-fingerprint.ts)。
+ * 最初の値のまま使い(あとから変わっても取り替えない)、残す変更に付け、PUT のたびに送る。特定できなければ null(アカウントへは送らない)
+ */
+export function PrefsProvider({ initialTheme, enabled, owner, children }: { initialTheme: Theme | null; enabled: boolean; owner: string | null; children: ReactNode }) {
+  const [store] = useState(() => new PrefsStore(browserDeps(), { enabled, initialTheme, owner }));
   useEffect(() => {
     const stop = store.start();
     // 隠れたとき・ページを離れるときは、送っていない分を keepalive で送る(閉じても要求が切れない)
@@ -61,7 +66,7 @@ export function PrefsProvider({ initialTheme, enabled, children }: { initialThem
 /** Provider の外(設定の画面だけを単独で描く試験など)で使うときの入れ物。アカウントへは何も送らず、クッキーと <html data-theme> だけを変える */
 let fallback: PrefsStore | null = null;
 function fallbackStore(): PrefsStore {
-  fallback ??= new PrefsStore(cookieOnlyDeps(), { enabled: false, initialTheme: typeof document === "undefined" ? null : readCookieTheme() });
+  fallback ??= new PrefsStore(cookieOnlyDeps(), { enabled: false, initialTheme: typeof document === "undefined" ? null : readCookieTheme(), owner: null });
   return fallback;
 }
 

@@ -7,11 +7,11 @@
 // 札(labels[i])は、画面が描いた「位置を決める入れ物」(position: absolute; left: 0; top: 0)。ここは transform で動かすだけ。
 // 札の基準の点は root の data-label で変わる(画面の CSS が中の札を寄せる):
 //   below = 札の上の中央(translateX(-50%))、front = 札の中央(translate(-50%, -50%))、float = 札の下の中央(translate(-50%, -100%))。
-// --k は札の大きさの倍率: front のときは台の正面の大きさに合わせた値(0.42〜1.5)、below・float のときは 1(札が重なるときだけ TIGHT_K)。
+// --k は札の大きさの倍率: front のときは台の正面の大きさに合わせた値(0.42〜1.5)、below・float のときは 1(札が重なるときだけ、LABEL_SCALES の順に小さく)。
 import { PerspectiveCamera, Raycaster, Vector2, WebGLRenderer, sRGBEncoding } from "three";
 import { parseLookLenient, type Look, type WorldId } from "@/fourdb/core/prefs";
 import { clearBackdrop, drawLogoBackdrop } from "./backdrop";
-import { Framer, MARGIN, freeRects, largest, type Fit, type Rect } from "./framing";
+import { Framer, LABEL_SCALES, MARGIN, focusShift, freeRects, type Rect } from "./framing";
 import { readPalette, type Palette } from "./palette";
 import { buildScene, type SceneModel } from "./scene";
 import { createTextures } from "./textures";
@@ -20,8 +20,6 @@ import { createWorld } from "./world";
 
 /** 画角(狭くして、ゆがみの少ない落ち着いた見え方に) */
 const FOV_DEG = 16;
-/** 札が重なるときの、札の大きさの倍率(below・float) */
-export const TIGHT_K = 0.8;
 /** 台の正面の文字の倍率(1 = 名前が 12.5px)。これより小さいと読みにくいので、台の下に出す */
 const KMIN = 0.74;
 /** 単位の数の上限(規則 R) */
@@ -93,7 +91,8 @@ export function mountStage(els: StageElements, unitCount: number, look: Look, wo
     let ready = false;
     let labelMode: Look["label"] = "below";
     let reported: [Look["label"], LabelModeReason] | null = null;
-    let tight = false;
+    /** below・float の札の大きさの倍率(LABEL_SCALES のどれか) */
+    let flatK = 1;
     const kNow: number[] = [];
     // 背景の十字の中心(空いている所の真ん中の横・Box の中心の高さ)。カメラが寄っていく間は、SVG をその差だけずらしてついていく
     let backdropCx = 0;
@@ -111,12 +110,12 @@ export function mountStage(els: StageElements, unitCount: number, look: Look, wo
       kNow[i] = k;
       el.style.setProperty("--k", k.toFixed(3));
     }
-    /** below・float の札の大きさ(1 か TIGHT_K)を、全部の札に */
+    /** below・float の札の大きさ(flatK)を、全部の札に */
     function applyFlatK() {
-      if (labelMode !== "front") labels.forEach((_, i) => setK(i, tight ? TIGHT_K : 1));
+      if (labelMode !== "front") labels.forEach((_, i) => setK(i, flatK));
     }
-    function setTight(v: boolean) {
-      tight = v;
+    function setFlatK(k: number) {
+      flatK = k;
       applyFlatK();
     }
     function setLabelMode(mode: Look["label"], why: LabelModeReason) {
@@ -198,6 +197,8 @@ export function mountStage(els: StageElements, unitCount: number, look: Look, wo
       const occ = occluders();
       const area: Rect = { x0: MARGIN.l, y0: MARGIN.t, x1: W - MARGIN.r, y1: H - MARGIN.b };
       const rects = freeRects(area, occ);
+      // 隊形の枠: 欄のない舞台でも、2 つ・4 つを 3 つの 1 列より大きく写さない(これより近くへ寄らない)
+      framer.floor(area);
       // 「台の正面」は、正面のある台座で、文字が読める大きさのときだけ。小さすぎれば台の下に
       if (current.label === "front" && model.hasFace) {
         framer.labelMode = "front";
@@ -208,29 +209,27 @@ export function mountStage(els: StageElements, unitCount: number, look: Look, wo
         setLabelMode(ok ? "front" : "below", ok ? "" : "too-small");
       }
       const measurable = labelMode !== "front";
-      setTight(false);
+      setFlatK(1);
       if (measurable) measureLabels();
-      let f: Fit = framer.choose(rects);
-      let focus = -1;
-      if (measurable && f.clash) {
-        const fi = view >= 0 ? view : selected;
-        if (fi >= 0 && occ.length) {
-          // 欄が開いていて全部は収まらない: 大きさは欄がないときのまま、選んだ Box(札にフォーカスがあればその Box)を空いている所の真ん中に
-          const full = framer.choose([area]);
-          f = { d: full.d, r: largest(rects), clash: full.clash };
-          focus = fi;
-        } else {
-          // 札が重ならない収め方がない: 札を小さめにして収め直す
-          setTight(true);
+      // 札が重なれば、札を読める大きさまで段々に小さくして、全部を空いている所に収め直す。それでも収まらず、欄が開いていれば、
+      // 選んだ Box(札にフォーカスがあればその Box)とそのとなりが空いている所に入るよう寄せる(Framer.plan。台の正面の札は重なりを見ないので、ここは通らない)
+      const scales = labelMode === "float" ? LABEL_SCALES.float : LABEL_SCALES.below;
+      const { fit: f, focus } = framer.plan(
+        area,
+        rects,
+        occ.length > 0,
+        view >= 0 ? view : selected,
+        (k) => {
+          setFlatK(k);
           measureLabels();
-          f = framer.choose(rects);
-        }
-      }
+        },
+        scales,
+      );
       const b = framer.bounds(f.d);
       const cx = (f.r.x0 + f.r.x1) / 2;
       const cy = (f.r.y0 + f.r.y1) / 2;
       goal.d = f.d;
-      goal.ox = (focus >= 0 && model.units[focus] ? framer.labelAt(model.units[focus]).px : (b.x0 + b.x1) / 2) - cx;
+      goal.ox = focusShift(b, f.r, focus >= 0 && model.units[focus] ? framer.labelAt(model.units[focus]).px : null);
       goal.oy = (b.y0 + b.y1) / 2 - cy;
       backdropCx = cx;
       backdropCy = model.units.reduce((a, u) => a + framer.proj(u, 0, u.m.yC, 0)[1], 0) / n - goal.oy;

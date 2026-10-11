@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ownerFingerprint } from "@/lib/owner-fingerprint";
 
 // 読み取りの 6 つの API(home・tasks・tasks/count・prefs の GET・history・boxes)と、prefs の PUT の入口:
 // ログインしていなければ 401、データベースが未設定なら 503、PUT は別のサイトからなら 403。
@@ -15,6 +16,8 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/fourdb/adapters/postgres/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/fourdb/adapters/postgres/db")>()),
   withScope: withScopeSpy,
+  // requireScope が Scope を返すところ(指紋の確かめ)まで進めるための作り物。データベースには触れない
+  personalWorkspace: async () => "00000000-0000-4000-8000-000000000001",
 }));
 
 const routes = {
@@ -130,5 +133,78 @@ describe("PUT /api/4db/prefs の入口", () => {
     session.data = { user: { id: "u-owner", email: "owner@example.invalid" } };
     expect((await put("not json")).status).toBe(503);
     expect(withScopeSpy).not.toHaveBeenCalled();
+  });
+});
+
+// 画面が持っているアカウントの指紋(x-4db-owner)と、いまのログインのアカウントの指紋が違えば、何も書かずに 409(L-4)。
+// 本物の requireScope と本物の指紋の計算を通す。データベースには触れない(触れたら withScopeSpy が記録して失敗させる)
+describe("PUT /api/4db/prefs のアカウントの取り違え(指紋)", () => {
+  const BODY = JSON.stringify({ theme: "dark" });
+  const OWNER_USER = { user: { id: "u-owner", email: "owner@example.invalid" } };
+  const DB = "postgres://fourdb_app_local@localhost:55432/fourdb_dev";
+  const fpOf = (userId: string) => ownerFingerprint(`neon:${userId}`);
+
+  beforeEach(() => {
+    vi.stubEnv("FOURDB_DATABASE_URL", DB);
+    vi.stubEnv("NEON_AUTH_COOKIE_SECRET", "test-secret-0123456789abcdef0123456789abcdef");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("別のアカウントの指紋(前のアカウントの画面・開いたままの画面)は 409 と code: owner_mismatch。データベースには触れない", async () => {
+    session.data = OWNER_USER; // いまのログインは u-owner。画面は、前にログインしていた u-previous の画面
+    const res = await put(BODY, { "x-4db-owner": fpOf("u-previous"), "sec-fetch-site": "same-origin" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "owner_mismatch" });
+    expect(withScopeSpy).not.toHaveBeenCalled();
+  });
+
+  it("指紋のない要求(古い画面・ヘッダーの付け忘れ)も 409。データベースには触れない", async () => {
+    session.data = OWNER_USER;
+    for (const headers of [{}, { "x-4db-owner": "" }, { "x-4db-owner": "short" }] as Record<string, string>[]) {
+      const res = await put(BODY, headers);
+      expect(res.status, JSON.stringify(headers)).toBe(409);
+      expect(await res.json()).toMatchObject({ code: "owner_mismatch" });
+    }
+    expect(withScopeSpy).not.toHaveBeenCalled();
+  });
+
+  it("いまのログインのアカウントの指紋なら、指紋の確かめを通って、つなぎ(データベース)まで進む", async () => {
+    session.data = OWNER_USER;
+    const res = await put(BODY, { "x-4db-owner": fpOf("u-owner"), "sec-fetch-site": "same-origin" });
+    expect(res.status).not.toBe(409);
+    expect(withScopeSpy).toHaveBeenCalled(); // 作り物の withScope が失敗させる(500)ところまで来た
+    expect(res.status).toBe(500);
+  });
+
+  it("確かめる順番は変わらない: 別のサイト(403)→ ログイン(401)→ データベース未設定(503)→ 指紋(409)。指紋が違っても、先の確かめの答えを返す", async () => {
+    const wrong = { "x-4db-owner": fpOf("u-previous") };
+    session.data = OWNER_USER;
+    expect((await put(BODY, { ...wrong, "sec-fetch-site": "cross-site" })).status).toBe(403);
+    expect((await put(BODY, { ...wrong, origin: "http://evil.example.invalid" })).status).toBe(403);
+    session.data = null;
+    expect((await put(BODY, wrong)).status).toBe(401);
+    session.data = { user: { id: "u-other", email: "other@example.invalid" } }; // 見てよい人でない
+    expect((await put(BODY, { "x-4db-owner": fpOf("u-other") })).status).toBe(401);
+    session.data = OWNER_USER;
+    vi.stubEnv("FOURDB_DATABASE_URL", "");
+    expect((await put(BODY, wrong)).status).toBe(503);
+    vi.stubEnv("FOURDB_DATABASE_URL", DB);
+    expect((await put(BODY, wrong)).status).toBe(409);
+    expect(withScopeSpy).not.toHaveBeenCalled();
+  });
+
+  it("ログインしていない人には、指紋が合っているかも教えない(401 の文も同じ)", async () => {
+    session.data = null;
+    const res = await put(BODY, { "x-4db-owner": fpOf("u-owner") });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "ログインが必要です" });
+  });
+
+  it("GET は指紋を見ない(読むだけ。設定の読み直しに使う)", async () => {
+    session.data = OWNER_USER;
+    const res = await call("prefs"); // 指紋なし。データベースに触れて、作り物が失敗させる(500)ところまで進む
+    expect(res.status).toBe(500);
+    expect(withScopeSpy).toHaveBeenCalled();
   });
 });

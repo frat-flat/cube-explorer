@@ -151,7 +151,10 @@
   display: grid;
   justify-items: center;
   gap: 2px;
-  min-width: calc(132px * var(--k, 1));
+  /* 札の最小の幅は、元の大きさ(--k = 1)のときだけ。札が重なって小さくする(--k < 1)ときは、名前と数の幅だけにする(0.8 で 0 になる) */
+  min-width: max(0px, calc(132px * var(--k, 1) - (1 - var(--k, 1)) * 660px));
+  /* 長い名前でも、となりの立体まで広がらない幅まで(名前は 2 行まで折り返す。.un)。単位が多いときは間隔が狭いので、もっと狭く(.many) */
+  max-width: calc(200px * var(--k, 1));
   padding: calc(6px * var(--k, 1)) calc(14px * var(--k, 1)) calc(9px * var(--k, 1));
   border: 1px solid transparent;
   border-radius: var(--r-lg);
@@ -175,7 +178,15 @@
   box-shadow: var(--glow-ac);
 }
 
+/* 名前は札の幅で 2 行まで折り返し、それより長ければ「…」で切る(全文は札の読み上げの名前と、名前の title に残る) */
 .un {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
   font-size: calc(14px * var(--k, 1));
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -199,7 +210,8 @@
 
 /* 4 つ以上並ぶときは小さく */
 .stage3d.many .ulabel {
-  min-width: calc(112px * var(--k, 1));
+  min-width: max(0px, calc(112px * var(--k, 1) - (1 - var(--k, 1)) * 560px));
+  max-width: calc(150px * var(--k, 1));
   padding: calc(5px * var(--k, 1)) calc(10px * var(--k, 1)) calc(8px * var(--k, 1));
 }
 
@@ -236,8 +248,14 @@
   text-shadow: 0 -1px 0 color-mix(in srgb, var(--bg) 80%, transparent);
 }
 
+.stage3d[data-label="front"] .ulabel {
+  /* 長い名前は台の正面の幅ほどで折り返す(--k は台の正面の大きさに合わせてあるので、幅も台に合う) */
+  max-width: calc(150px * var(--k, 1));
+}
+
 .stage3d[data-label="front"] .un {
   font-size: 1em;
+  white-space: normal;
   color: inherit;
 }
 

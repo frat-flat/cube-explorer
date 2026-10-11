@@ -296,7 +296,10 @@ export function HomeStage() {
                       stageRef.current?.setView(-1);
                     }}
                   >
-                    <span className={cx(s.un, u.unitType === null && s.unitNone)}>{unitLabel(u.unitType)}</span>{" "}
+                    {/* 名前は 2 行までで「…」に切ることがある(CSS)。全文は札の読み上げの名前に入り、指を乗せると title で出る */}
+                    <span className={cx(s.un, u.unitType === null && s.unitNone)} title={unitLabel(u.unitType)}>
+                      {unitLabel(u.unitType)}
+                    </span>{" "}
                     <span className={s.uc}>
                       <span className={s.n}>{fmt(u.count)}</span>
                     </span>

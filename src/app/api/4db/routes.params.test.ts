@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ImportError } from "@/fourdb/adapters/postgres/import-store";
 import { PrefsUnavailable } from "@/fourdb/adapters/postgres/prefs";
 import { DEFAULT_LOOK, defaultPrefs } from "@/fourdb/core/prefs";
+import { ownerFingerprint } from "@/lib/owner-fingerprint";
 
 // 読み取りの API(home・tasks・tasks/count・prefs・history・boxes)の、問い合わせの読み方と、結果・失敗の返し方。
 // prefs の PUT は、本文の読み方(形の違うもの・4KB を超えるもの)も確かめる。
@@ -133,20 +134,66 @@ describe("GET /api/4db/prefs", () => {
 });
 
 describe("PUT /api/4db/prefs", () => {
+  // 画面は、このアカウント(scope.principal)の指紋を x-4db-owner に付けて送る。headers で上書き・足せる(owner を渡さないと、このアカウントの指紋)
+  const OWNER_FP = ownerFingerprint(scope.principal);
   const put = (body: string, headers: Record<string, string> = {}) =>
-    prefs.PUT(new Request("http://localhost/api/4db/prefs", { method: "PUT", body, headers: { "content-type": "application/json", ...headers } }));
+    prefs.PUT(new Request("http://localhost/api/4db/prefs", { method: "PUT", body, headers: { "content-type": "application/json", "x-4db-owner": OWNER_FP, ...headers } }));
   const saved = { available: true, saved: true, prefs: { ...defaultPrefs(), theme: "dark" as const } };
 
   it("入口(requireScope)には request を渡す(別のサイトからの書き込みを断るため)", async () => {
     spies.putPrefs.mockResolvedValue(saved);
-    const request = new Request("http://localhost/api/4db/prefs", { method: "PUT", body: JSON.stringify({ theme: "dark" }) });
+    const request = new Request("http://localhost/api/4db/prefs", { method: "PUT", body: JSON.stringify({ theme: "dark" }), headers: { "x-4db-owner": OWNER_FP } });
     await prefs.PUT(request);
     expect(spies.requireScope).toHaveBeenCalledWith(request);
   });
-  it("入口が返した Response(403・401・503)は、そのまま返して、つなぎを呼ばない", async () => {
-    spies.requireScope.mockResolvedValue(Response.json({ error: "この画面からの操作だけを受け付けます" }, { status: 403 }));
-    expect((await put(JSON.stringify({ theme: "dark" }))).status).toBe(403);
+  it("入口が返した Response(403・401・503)は、そのまま返して、つなぎを呼ばない(指紋の確かめより先)", async () => {
+    for (const status of [403, 401, 503]) {
+      spies.requireScope.mockResolvedValue(Response.json({ error: "x" }, { status }));
+      // 指紋が合っていても、なくても、違っても、入口の答えが先
+      expect((await put(JSON.stringify({ theme: "dark" }))).status, String(status)).toBe(status);
+      expect((await put(JSON.stringify({ theme: "dark" }), { "x-4db-owner": "" })).status, String(status)).toBe(status);
+      expect((await put(JSON.stringify({ theme: "dark" }), { "x-4db-owner": ownerFingerprint("test:other") })).status, String(status)).toBe(status);
+    }
     expect(spies.putPrefs).not.toHaveBeenCalled();
+  });
+  it("このアカウントの指紋なら通す。別のアカウントの指紋(アカウントを替えた画面)は 409 と code: owner_mismatch で、つなぎを呼ばない", async () => {
+    spies.putPrefs.mockResolvedValue(saved);
+    expect((await put(JSON.stringify({ theme: "dark" }))).status).toBe(200);
+    expect(spies.putPrefs).toHaveBeenCalledTimes(1);
+    const res = await put(JSON.stringify({ theme: "dark" }), { "x-4db-owner": ownerFingerprint("test:other") });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "owner_mismatch" });
+    expect(spies.putPrefs).toHaveBeenCalledTimes(1);
+  });
+  it("指紋がない・空・形の違うもの・長さの違うものも 409(指紋のない要求は通さない)。つなぎを呼ばない", async () => {
+    const headers: Record<string, string>[] = [{ "x-4db-owner": "" }, { "x-4db-owner": "short" }, { "x-4db-owner": `${OWNER_FP}x` }, { "x-4db-owner": OWNER_FP.slice(1) }, { "x-4db-owner": `${OWNER_FP.slice(0, 21)}!` }, { "x-4db-owner": "!".repeat(22) }];
+    for (const h of headers) {
+      const res = await put(JSON.stringify({ theme: "dark" }), h);
+      expect(res.status, JSON.stringify(h)).toBe(409);
+      expect(await res.json(), JSON.stringify(h)).toMatchObject({ code: "owner_mismatch" });
+    }
+    // ヘッダーそのものがない
+    const noHeader = await prefs.PUT(new Request("http://localhost/api/4db/prefs", { method: "PUT", body: JSON.stringify({ theme: "dark" }), headers: { "content-type": "application/json" } }));
+    expect(noHeader.status).toBe(409);
+    expect(spies.putPrefs).not.toHaveBeenCalled();
+  });
+  it("指紋は本文では受け付けない: 本文に owner を入れても 400(ヘッダーだけ)。ヘッダーがなければ、本文に入れても 409", async () => {
+    expect((await put(JSON.stringify({ theme: "dark", owner: OWNER_FP }))).status).toBe(400);
+    const bodyOnly = await prefs.PUT(new Request("http://localhost/api/4db/prefs", { method: "PUT", body: JSON.stringify({ theme: "dark", owner: OWNER_FP }), headers: { "content-type": "application/json" } }));
+    expect(bodyOnly.status).toBe(409);
+    expect(spies.putPrefs).not.toHaveBeenCalled();
+  });
+  it("409 のときは、本文の確かめより先に断る(本文が 4KB を超えていても形が違っていても 409。つなぎを呼ばない)", async () => {
+    const other = { "x-4db-owner": ownerFingerprint("test:other") };
+    for (const b of ["not json", "x".repeat(10_000), JSON.stringify({ other: 1 })]) expect((await put(b, other)).status, b.slice(0, 20)).toBe(409);
+    expect(spies.putPrefs).not.toHaveBeenCalled();
+  });
+  it("409 の本文に、指紋・principal・メールアドレスは入らない", async () => {
+    const res = await put(JSON.stringify({ theme: "dark" }), { "x-4db-owner": ownerFingerprint("test:other") });
+    const text = JSON.stringify(await res.json());
+    expect(text).not.toContain(OWNER_FP);
+    expect(text).not.toContain(ownerFingerprint("test:other"));
+    expect(text).not.toContain(scope.principal);
   });
   it("送った欄だけをつなぎに渡し(新しいオブジェクト)、保存後の設定を 200 で返す", async () => {
     spies.putPrefs.mockResolvedValue(saved);

@@ -33,7 +33,7 @@ describe("LogoutForm", () => {
   });
 
   it("送る前(submit)に、送っていない設定の変更を消す。送るのは止めない(preventDefault しない)。ほかのキーと明暗のクッキーは残す", () => {
-    const ls = fakeStorage({ [PENDING_KEY]: JSON.stringify({ theme: "dark", look: PATTERNS[1].look }), other: "x" });
+    const ls = fakeStorage({ [PENDING_KEY]: JSON.stringify({ owner: "AAAAAAAAAAAAAAAAAAAAAA", patch: { theme: "dark", look: PATTERNS[1].look } }), other: "x" });
     const doc = { cookie: "fourdb_theme=dark" };
     vi.stubGlobal("window", { localStorage: ls });
     vi.stubGlobal("document", doc);

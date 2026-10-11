@@ -24,7 +24,8 @@ vi.mock("@/fourdb/adapters/postgres/db", async (importOriginal) => ({
   personalWorkspace: async () => "00000000-0000-4000-8000-000000000001",
 }));
 
-const { fourdbUsable, readJson, requireScope } = await import("./fourdb");
+const { fourdbAccess, fourdbUsable, readJson, requireScope } = await import("./fourdb");
+const { ownerFingerprint, ownerMatches } = await import("./owner-fingerprint");
 
 const LOCAL_URL = "postgres://fourdb_app_local@localhost:55432/fourdb_dev";
 const REMOTE_URL = "postgres://app@db.example.invalid:5432/fourdb";
@@ -122,8 +123,67 @@ describe("fourdbUsable(画面の枠が、アカウント向けの API を使う�
   });
 });
 
+describe("fourdbAccess(画面の枠が受け取る: 使えるか + ログイン中の人の指紋)", () => {
+  it("usable は fourdbUsable と同じ答え。owner はログインの人がいるときの指紋で、requireScope が返す principal の指紋と同じ", async () => {
+    vi.stubEnv("NEON_AUTH_COOKIE_SECRET", "test-secret-0123456789abcdef0123456789abcdef");
+    vi.stubEnv("FOURDB_DATABASE_URL", REMOTE_URL);
+    state.session = { user: { id: "u-owner", email: "owner@example.invalid" } };
+    const access = await fourdbAccess();
+    expect(access.usable).toBe(await fourdbUsable());
+    expect(access.usable).toBe(true);
+    expect(access.owner).toBe(ownerFingerprint("neon:u-owner"));
+    const scope = await requireScope();
+    expect(ownerMatches((scope as { principal: string }).principal, access.owner)).toBe(true);
+    // メールアドレスもユーザー ID も、指紋には出ない
+    expect(access.owner).not.toContain("u-owner");
+    expect(access.owner).not.toContain("owner@example");
+  });
+
+  it("別のユーザーは別の指紋(同じブラウザで別のアカウントに替わると、画面の指紋と合わなくなる)", async () => {
+    vi.stubEnv("NEON_AUTH_COOKIE_SECRET", "test-secret-0123456789abcdef0123456789abcdef");
+    vi.stubEnv("FOURDB_DATABASE_URL", REMOTE_URL);
+    state.session = { user: { id: "u-owner", email: "owner@example.invalid" } };
+    const first = await fourdbAccess();
+    state.session = { user: { id: "u-owner-2", email: "owner@example.invalid" } };
+    const second = await fourdbAccess();
+    expect(first.owner).not.toBeNull();
+    expect(second.owner).not.toBeNull();
+    expect(second.owner).not.toBe(first.owner);
+  });
+
+  it("データベースが未設定でも、ログインの人がいれば owner はある(usable だけ false。送らずに「このパソコンにだけ」残す変更の持ち主を決めるため)", async () => {
+    vi.stubEnv("NEON_AUTH_COOKIE_SECRET", "test-secret-0123456789abcdef0123456789abcdef");
+    vi.stubEnv("FOURDB_DATABASE_URL", "");
+    state.session = { user: { id: "u-owner", email: "owner@example.invalid" } };
+    const access = await fourdbAccess();
+    expect(access.usable).toBe(false);
+    expect(access.owner).toBe(ownerFingerprint("neon:u-owner"));
+  });
+
+  it("ログインしていない・見てよい人でない・本番ビルドで開発用の利用者もない: owner は null、usable は false", async () => {
+    vi.stubEnv("FOURDB_DATABASE_URL", REMOTE_URL);
+    state.session = null;
+    expect(await fourdbAccess()).toEqual({ usable: false, owner: null });
+    state.session = { user: { id: "u-other", email: "other@example.invalid" } };
+    expect(await fourdbAccess()).toEqual({ usable: false, owner: null });
+    state.bypassed = true;
+    state.authed = false;
+    vi.stubEnv("FOURDB_LOCAL_DEV", "");
+    expect(await fourdbAccess()).toEqual({ usable: false, owner: null });
+  });
+
+  it("ログインなしの開発用の利用者(FOURDB_LOCAL_DEV=1 の local-dev)にも指紋がある", async () => {
+    state.bypassed = true;
+    state.authed = false;
+    vi.stubEnv("NEON_AUTH_COOKIE_SECRET", "");
+    vi.stubEnv("FOURDB_LOCAL_DEV", "1");
+    vi.stubEnv("FOURDB_DATABASE_URL", LOCAL_URL);
+    expect(await fourdbAccess()).toEqual({ usable: true, owner: ownerFingerprint("local-dev") });
+  });
+});
+
 describe("readJson", () => {
-  const req = (body: BodyInit | null, headers: Record<string, string> = {}) =>
+  const req =(body: BodyInit | null, headers: Record<string, string> = {}) =>
     new Request("http://localhost/api/4db/prefs", { method: "PUT", body, headers });
 
   it("{ … } の形の JSON を読む", async () => {

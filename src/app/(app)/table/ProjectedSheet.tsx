@@ -7,6 +7,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { Catalog, ProjectionOutput } from "@/fourdb/adapters/postgres/projection";
 import type { SheetSummary } from "@/fourdb/adapters/postgres/import-store";
 import type { ProjCell, ProjectionFn, ProjectionRequest } from "@/fourdb/core/projection/types";
+import { api } from "../api";
 import { measureGoneMessage, measureLabel, measureMissingMessage, measuresIn } from "./measures";
 import s from "./sheet.module.css";
 
@@ -19,19 +20,6 @@ const FNS: [ProjectionFn, string][] = [
 ];
 const fnName = (f: ProjectionFn) => FNS.find(([k]) => k === f)?.[1] ?? f;
 const fmt = (n: number) => n.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
-
-async function api<T>(path: string, init?: { method?: string; body?: unknown; signal?: AbortSignal }): Promise<T> {
-  const res = await fetch(path, {
-    method: init?.method ?? "GET",
-    headers: init?.body !== undefined ? { "content-type": "application/json" } : undefined,
-    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
-    credentials: "same-origin",
-    signal: init?.signal,
-  });
-  const j = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((j as { error?: string } | null)?.error ?? `うまくいきませんでした(${res.status})`);
-  return j as T;
-}
 
 type Dim = Catalog["dimensions"][number];
 type Axis = { dimensionId: string; level: number | null };
@@ -124,6 +112,7 @@ export function ProjectedSheet({ initialDefinitionId }: { initialDefinitionId: s
       setLoading(true);
       try {
         const r = await api<ProjectionOutput>("/api/4db/projection", { method: "POST", body: { request: req }, signal: ctrl.signal });
+        if (ctrl.signal.aborted) return; // 取りやめた(組み方が変わった・画面を離れた)要求の答えは捨てる
         setShown({ r, fn: req.fn });
         setError("");
       } catch (e) {

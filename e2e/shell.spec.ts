@@ -149,7 +149,7 @@ test.describe("枠: ロゴの帯と左のメニュー", () => {
     // アカウントへ送っていない変更(localStorage の fourdb.prefs.pending)は、ログアウトで消える。明暗のクッキーは残る(セキュリティ L-1)
     await page.getByRole("radio", { name: "暗い", exact: true }).check();
     await page.waitForLoadState("networkidle"); // データベースにつながる開発サーバーでは、この間にアカウントへ送り終わる
-    await page.evaluate(() => window.localStorage.setItem("fourdb.prefs.pending", JSON.stringify({ theme: "dark" }))); // 送れなかった変更が残っている状態
+    await page.evaluate(() => window.localStorage.setItem("fourdb.prefs.pending", JSON.stringify({ owner: "AAAAAAAAAAAAAAAAAAAAAA", patch: { theme: "dark" } }))); // 送れなかった変更が残っている状態(残す形は { owner, patch })
     await logout.click();
     await expect(page).toHaveURL(/\/login$/);
     expect(await page.evaluate(() => window.localStorage.getItem("fourdb.prefs.pending"))).toBeNull();
@@ -161,7 +161,7 @@ test.describe("枠: ロゴの帯と左のメニュー", () => {
     await hydrated(page);
     await page.getByRole("radio", { name: "明るい", exact: true }).check();
     await page.waitForLoadState("networkidle");
-    await page.evaluate(() => window.localStorage.setItem("fourdb.prefs.pending", JSON.stringify({ theme: "light" })));
+    await page.evaluate(() => window.localStorage.setItem("fourdb.prefs.pending", JSON.stringify({ owner: "AAAAAAAAAAAAAAAAAAAAAA", patch: { theme: "light" } })));
     await page.getByRole("banner").getByRole("button", { name: "ログアウト" }).click();
     await expect(page).toHaveURL(/\/login$/);
     expect(await page.evaluate(() => window.localStorage.getItem("fourdb.prefs.pending"))).toBeNull();

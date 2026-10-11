@@ -86,10 +86,15 @@ export type UnitContext = {
   palette(): Palette;
 };
 
-export function buildUnit(i: number, slot: Slot, m: UnitMetrics, c: UnitContext): Unit {
-  const g = new Group();
+/** 単位の足もと(g)を並べる場所に置き、台の正面をこちらへ向ける(弧・2 列・ひな壇で効く) */
+export function placeUnit(g: Group, slot: Slot): Group {
   g.position.set(slot.x, slot.y, slot.z);
-  g.rotation.y = Math.atan2(-slot.x, 9 - slot.z); // 台の正面をこちらへ向ける(弧・ひな壇で効く)
+  g.rotation.y = Math.atan2(-slot.x, 9 - slot.z);
+  return g;
+}
+
+export function buildUnit(i: number, slot: Slot, m: UnitMetrics, c: UnitContext): Unit {
+  const g = placeUnit(new Group(), slot);
   const u: Unit = {
     i,
     slot,

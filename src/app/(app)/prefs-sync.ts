@@ -8,10 +8,15 @@
 //   送る要求は同時に 1 つ。終わったら、その間に変わった最新を送る。隠れたとき・ページを離れるときは、送っていない分を keepalive で送る。
 // - 送れなかった分は、ブラウザの localStorage(fourdb.prefs.pending)に残し、次のタブの読み込みで先に送る。
 //   アカウントへ保存できない(表がない・DB がない)ときは送らず、「このパソコンにだけ」覚える(同じ場所に残す)。
+// - 送り先のアカウントを取り違えない(L-4): 残す変更には、画面を作ったときのアカウントの指紋(owner。サーバーが渡す)を付ける。
+//   読み込みのとき、いまの指紋と違う変更は、送らずに捨てる。PUT には毎回その指紋を付け、サーバーが、いまのログインと違えば 409 で断る。
+//   409(別のアカウントになった)は、その変更を捨て(残さず)、GET で読み直した設定を画面に出して、このタブはもう送らない。
+//   401・403(ログインが切れた・断られた)も、残さず、このタブはもう送らない(画面の値はそのまま)。
 import {
   DEFAULT_LOOK,
   DEFAULT_WORLD,
   defaultPrefs,
+  isOwnerFingerprint,
   isTheme,
   isWorldId,
   LOOK_KEYS,
@@ -27,8 +32,12 @@ import {
 /** 保存の状態。idle = まだ変えていない / saving = 送っている(または送る待ち) / saved = 送れた / error = 送れなかった / local = このパソコンにだけ覚えている */
 export type SaveState = "idle" | "saving" | "saved" | "error" | "local";
 
-/** 送った結果。unavailable = アカウントの設定の表がまだ使えない(503 prefs_unavailable) */
-export type PutOutcome = "ok" | "unavailable" | "error";
+/**
+ * 送った結果。unavailable = アカウントの設定の表がまだ使えない(503 prefs_unavailable)/
+ * denied = ログインが切れた・断られた(401・403)。残さず、このタブはもう送らない /
+ * owner_mismatch = この画面を開いたときと別のアカウントになっている(409 owner_mismatch)。残さず、GET で読み直し、このタブはもう送らない
+ */
+export type PutOutcome = "ok" | "unavailable" | "denied" | "owner_mismatch" | "error";
 
 /** GET /api/4db/prefs の中身 */
 export type ServerPrefs = { available: boolean; saved: boolean; prefs: Prefs };
@@ -86,14 +95,27 @@ export function subtractSent(pending: PrefsPatch, sent: PrefsPatch): PrefsPatch 
   return out;
 }
 
-/** localStorage の文字から、送っていない変更を読む。読めない・形が違う・空のときは何もないもの({})にする(落ちない) */
-export function parseStoredPending(text: string | null | undefined): PrefsPatch {
-  if (!text) return {};
+/** localStorage に残す「送っていない変更」。owner = 残したときの画面のアカウントの指紋(特定できなかったときは null) */
+export type StoredPending = { owner: string | null; patch: PrefsPatch };
+
+/**
+ * localStorage の文字から、送っていない変更を読む。読めない・形が違う・空のときは null(落ちない)。
+ * 形は { owner, patch } だけ。owner は指紋の形か null、patch は parsePrefsPatch が通すもの。
+ * owner のない古い形(変更だけ)は、どのアカウントのものか分からないので読まない(null)。
+ */
+export function parseStoredPending(text: string | null | undefined): StoredPending | null {
+  if (!text) return null;
   try {
-    const patch = parsePrefsPatch(JSON.parse(text));
-    return typeof patch === "string" ? {} : patch;
+    const raw: unknown = JSON.parse(text);
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+    const keys = Reflect.ownKeys(raw);
+    if (keys.length !== 2 || !keys.includes("owner") || !keys.includes("patch")) return null;
+    const { owner, patch } = raw as { owner: unknown; patch: unknown };
+    if (owner !== null && !isOwnerFingerprint(owner)) return null;
+    const parsed = parsePrefsPatch(patch);
+    return typeof parsed === "string" ? null : { owner, patch: parsed };
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -127,11 +149,11 @@ export function reconcile(server: ServerPrefs | null, cookieTheme: Theme | null,
 export type StoreDeps = {
   /** GET /api/4db/prefs。失敗したら throw */
   load(signal: AbortSignal): Promise<ServerPrefs>;
-  /** PUT /api/4db/prefs。keepalive は、ページを離れるときの送り方 */
-  put(patch: PrefsPatch, keepalive: boolean): Promise<PutOutcome>;
-  /** 送っていない変更を localStorage から読む・書く(null で消す)。どちらも落ちない */
-  readStored(): PrefsPatch;
-  writeStored(patch: PrefsPatch | null): void;
+  /** PUT /api/4db/prefs。keepalive は、ページを離れるときの送り方。owner は、この画面のアカウントの指紋(毎回付けて送る) */
+  put(patch: PrefsPatch, keepalive: boolean, owner: string): Promise<PutOutcome>;
+  /** 送っていない変更を localStorage から読む(なければ・読めなければ null)・書く(null で消す)。どちらも落ちない */
+  readStored(): StoredPending | null;
+  writeStored(stored: StoredPending | null): void;
   /** いまのクッキーの明暗 */
   readCookieTheme(): Theme | null;
   /** クッキーと <html data-theme> を書く(null は「パソコンの設定に合わせる」=クッキーと印を消す) */
@@ -143,6 +165,12 @@ export type StoreOptions = {
   enabled: boolean;
   /** サーバーがクッキーから読んだ明暗(最初の画面と同じにする) */
   initialTheme: Theme | null;
+  /**
+   * この画面を作ったときのログイン中のアカウントの指紋(サーバーが渡す。メールアドレスも principal も分からない)。
+   * 残す変更に付け、読み込みで違うものを捨て、PUT のたびに送る。アカウントを特定できない(null・形が違う)ときは、アカウントへは送らない。
+   * 画面を作ってから変えない(GET の答えなどで取り替えない。取り替えると、別のアカウントの画面が、新しいアカウントとして送ってしまう)
+   */
+  owner: string | null;
   debounceMs?: number;
 };
 
@@ -153,6 +181,8 @@ export type StoreOptions = {
 export class PrefsStore {
   private readonly deps: StoreDeps;
   private readonly enabled: boolean;
+  /** この画面のアカウントの指紋(特定できなければ null) */
+  private readonly owner: string | null;
   private readonly debounceMs: number;
   private readonly initial: PrefsSnapshot;
   private snap: PrefsSnapshot;
@@ -170,18 +200,23 @@ export class PrefsStore {
   private failed = false;
   private everSaved = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** このタブはもう送らない(401・403・409 のあと。読み込み直すまで戻らない)。残す・送るをしない */
+  private halted = false;
+  private resyncCtrl: AbortController | null = null;
 
   constructor(deps: StoreDeps, opts: StoreOptions) {
     this.deps = deps;
-    this.enabled = opts.enabled;
+    this.owner = isOwnerFingerprint(opts.owner) ? opts.owner : null;
+    // アカウントを特定できなければ、アカウントへは送らない(指紋のない PUT はサーバーが 409 で断るので、出さない)
+    this.enabled = opts.enabled && this.owner !== null;
     this.debounceMs = opts.debounceMs ?? LOOK_DEBOUNCE_MS;
-    this.availableNow = opts.enabled;
+    this.availableNow = this.enabled;
     this.initial = {
       theme: opts.initialTheme,
       look: { ...DEFAULT_LOOK },
       world: DEFAULT_WORLD,
-      available: opts.enabled,
-      saveState: opts.enabled ? "idle" : "local",
+      available: this.enabled,
+      saveState: this.enabled ? "idle" : "local",
       loaded: false,
     };
     this.snap = this.initial;
@@ -244,10 +279,15 @@ export class PrefsStore {
   start = (): (() => void) => {
     const ctrl = new AbortController();
     const stored = this.deps.readStored();
-    this.pending = mergePatch(stored, this.pending); // すでにこのタブで変えた分が勝つ
+    if (stored !== null) {
+      // 同じアカウントの画面が残した変更だけを使う。違うアカウントのものは、送らずに捨てる(前の人の変更を、いまの人のアカウントへ送らない)
+      if (stored.owner === this.owner) this.pending = mergePatch(stored.patch, this.pending); // すでにこのタブで変えた分が勝つ
+      else this.deps.writeStored(null);
+    }
     void this.boot(ctrl.signal);
     return () => {
       ctrl.abort();
+      this.resyncCtrl?.abort();
       this.flush(true);
     };
   };
@@ -255,7 +295,7 @@ export class PrefsStore {
   // ----- 中身 -----
 
   private canSend(): boolean {
-    return this.enabled && this.ready && this.availableNow;
+    return this.enabled && this.ready && this.availableNow && !this.halted;
   }
 
   private async boot(signal: AbortSignal): Promise<void> {
@@ -282,7 +322,7 @@ export class PrefsStore {
     this.set({ theme: plan.prefs.theme, look: plan.prefs.look, world: plan.prefs.world, loaded: true });
     if (!this.availableNow) {
       this.needsSend = false;
-      if (!isEmptyPatch(this.pending)) this.deps.writeStored(this.pending); // このパソコンにだけ覚える
+      if (!isEmptyPatch(this.pending)) this.persist(this.pending); // このパソコンにだけ覚える
       this.refreshState();
       return;
     }
@@ -291,16 +331,26 @@ export class PrefsStore {
     else this.refreshState();
   }
 
+  /** 送っていない変更を、このタブのアカウントの指紋を付けて localStorage に残す(空なら消す) */
+  private persist(patch: PrefsPatch): void {
+    this.deps.writeStored(isEmptyPatch(patch) ? null : { owner: this.owner, patch: mergePatch({}, patch) });
+  }
+
   private change(patch: PrefsPatch): void {
+    if (this.halted) {
+      // もう送らない(ログインが切れた・別のアカウントになった)。画面の値だけ変わる。残さない(次にこのブラウザでログインする人に渡さない)
+      this.refreshState();
+      return;
+    }
     this.pending = mergePatch(this.pending, patch);
     this.needsSend = true;
     if (!this.enabled || !this.availableNow) {
       this.needsSend = false;
-      this.deps.writeStored(this.pending);
+      this.persist(this.pending);
       this.refreshState();
       return;
     }
-    if (this.failed) this.deps.writeStored(this.pending); // 失敗して残っている分と一緒に残す
+    if (this.failed) this.persist(this.pending); // 失敗して残っている分と一緒に残す
     if (this.ready) {
       if (patch.theme !== undefined || patch.world !== undefined) this.send(false);
       else this.schedule();
@@ -325,7 +375,8 @@ export class PrefsStore {
 
   private send(keepalive: boolean): void {
     this.clearTimer();
-    if (!this.canSend()) {
+    const owner = this.owner;
+    if (!this.canSend() || owner === null) {
       this.refreshState();
       return;
     }
@@ -345,13 +396,54 @@ export class PrefsStore {
     this.flying += 1;
     this.refreshState();
     this.deps
-      .put(sent, keepalive)
+      .put(sent, keepalive, owner)
       .catch((): PutOutcome => "error")
       .then((outcome) => this.done(sent, outcome));
   }
 
+  /**
+   * このタブはもう送らない。送っていない変更・まとめ待ちは捨て(残さない)、保存先は「このパソコンにだけ」の表示にする。画面の値は変えない。
+   * このタブのアカウントが localStorage に残した変更(失敗のあとに change() が残した分)も消す(止めたあとに、同じアカウントで開いた画面が古い変更を送らないように)。
+   * ほかのアカウントの画面が残した分(指紋が違う)には触らない
+   */
+  private halt(): void {
+    this.halted = true;
+    this.availableNow = false;
+    this.needsSend = false;
+    this.failed = false;
+    this.pending = {};
+    this.clearTimer();
+    const stored = this.deps.readStored();
+    if (stored !== null && stored.owner === this.owner) this.deps.writeStored(null);
+  }
+
+  /**
+   * 409(別のアカウントになった)のあと、いまのログインの設定を GET で読み直して画面に出す(送らない)。
+   * 読めなければ(ログアウトなど)何もしない。クッキーの明暗は、保存があればその値に合わせる(タブの読み込みごとの突き合わせと同じ決まり)
+   */
+  private async resync(): Promise<void> {
+    this.resyncCtrl?.abort();
+    const ctrl = new AbortController();
+    this.resyncCtrl = ctrl;
+    let server: ServerPrefs;
+    try {
+      server = await this.deps.load(ctrl.signal);
+    } catch {
+      return;
+    }
+    if (ctrl.signal.aborted) return;
+    const plan = reconcile(server, this.deps.readCookieTheme(), {});
+    this.deps.applyTheme(plan.prefs.theme);
+    this.set({ theme: plan.prefs.theme, look: plan.prefs.look, world: plan.prefs.world });
+  }
+
   private done(sent: PrefsPatch, outcome: PutOutcome): void {
     this.flying -= 1;
+    if (this.halted) {
+      // 別の要求の結果ですでに止めている。この結果では何も残さない・送り直さない
+      this.refreshState();
+      return;
+    }
     if (outcome === "ok") {
       this.pending = subtractSent(this.pending, sent);
       this.everSaved = true;
@@ -365,11 +457,16 @@ export class PrefsStore {
     } else if (outcome === "unavailable") {
       this.availableNow = false;
       this.needsSend = false;
-      this.deps.writeStored(this.pending);
+      this.persist(this.pending);
+    } else if (outcome === "denied") {
+      this.halt();
+    } else if (outcome === "owner_mismatch") {
+      this.halt();
+      void this.resync();
     } else {
       this.failed = true;
       this.needsSend = true;
-      this.deps.writeStored(this.pending);
+      this.persist(this.pending);
     }
     this.refreshState();
   }

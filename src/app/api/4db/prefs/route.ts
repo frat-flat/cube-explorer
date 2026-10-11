@@ -1,6 +1,7 @@
 import { getPrefs, PrefsUnavailable, putPrefs } from "@/fourdb/adapters/postgres/prefs";
-import { parsePrefsPatch } from "@/fourdb/core/prefs";
+import { OWNER_HEADER, OWNER_MISMATCH_CODE, parsePrefsPatch } from "@/fourdb/core/prefs";
 import { failure, readJson, requireScope } from "@/lib/fourdb";
+import { ownerMatches } from "@/lib/owner-fingerprint";
 import { bad } from "../params";
 
 /** PUT の本文の大きさの上限(バイト)。設定は数十バイトで、look も 2KB を超えない */
@@ -19,10 +20,16 @@ export async function GET() {
 }
 
 // PUT /api/4db/prefs { theme?, world?, look? } : 送った欄だけを保存し、保存後の設定を GET と同じ形で返す。同じサイトからの要求だけ(別のサイトは 403)。
+//   画面が持っている指紋(x-4db-owner)が、いまのログインのアカウントの指紋と同じでなければ、何も書かずに 409 と code: "owner_mismatch"
+//   (別のアカウントでログインし直した画面・前のアカウントの画面から、いまのアカウントへ書き込まないため。指紋のない要求も同じ)。
 //   本文は 4KB まで。形の違うもの(知らない欄・知らない値)は 400。保存する表が使えなければ 503 と code: "prefs_unavailable"
+//   確かめる順番: 別のサイト(403)→ ログイン(401)・データベース(503・403)→ 指紋(409)→ 本文(400)
 export async function PUT(request: Request) {
   const scope = await requireScope(request);
   if (scope instanceof Response) return scope;
+  if (!ownerMatches(scope.principal, request.headers.get(OWNER_HEADER))) {
+    return Response.json({ error: "ログイン中のアカウントが、この画面を開いたときと違います。画面を読み込み直してください", code: OWNER_MISMATCH_CODE }, { status: 409 });
+  }
   const body = await readJson(request, MAX_BODY_BYTES);
   if (!body) return bad("設定の指定の形が違います");
   const patch = parsePrefsPatch(body);

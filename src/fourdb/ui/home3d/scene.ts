@@ -24,7 +24,7 @@ import {
 } from "three";
 import type { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import type { Look } from "@/fourdb/core/prefs";
-import { BASES, hasFace, layoutExtent, orbitRadius, stageRiser, unitMetrics, unitSlots, type BaseSpec } from "./layout";
+import { BASES, cameraElevation, frameHalfWidth, hasFace, layoutExtent, orbitRadius, stageRiser, unitMetrics, unitSlots, type BaseSpec, type Slot, type UnitMetrics } from "./layout";
 import { lin, mix, type Palette } from "./palette";
 import { blendingFor, circlePts, flat, matteMaterial, points } from "./parts";
 import { gridFS, gridVS } from "./shaders";
@@ -48,6 +48,8 @@ export type SceneModel = {
   target: Vector3;
   /** 枠に収めるときに入れる点(ひな壇の段の角) */
   extraPoints: Vector3[];
+  /** 隊形が決める枠の左右の端。欄のない舞台で、これより近くへは寄らない(Framer.floor) */
+  framePoints: Vector3[];
   /** 縁の線の材質(描く大きさを合わせる) */
   lines: LineMaterial[];
   /** 正面のある台座か(札を台の正面に出せる) */
@@ -63,11 +65,47 @@ export type SceneContext = {
   palette(): Palette;
 };
 
+/** カメラの見る点と見下ろす角度・枠に入れる点。描く物は作らない(three の数の部品だけ。試験でも使う) */
+export type CameraFrame = {
+  slots: Slot[];
+  metrics: UnitMetrics;
+  orbit: number;
+  elevation: number;
+  target: Vector3;
+  extraPoints: Vector3[];
+  framePoints: Vector3[];
+};
+
+export function cameraFrame(look: Look, n: number): CameraFrame {
+  const count = Math.max(0, Math.floor(n));
+  const slots = unitSlots(count, look.layout);
+  const metrics = unitMetrics(look, count);
+  const orbit = orbitRadius(count);
+  const { cz } = layoutExtent(slots);
+  const extraPoints: Vector3[] = [];
+  // ひな壇の段の奥の角と、前の列の床の手前の端
+  const rs = stageRiser(slots);
+  if (rs) {
+    const zNear = Math.max(...slots.map((s) => s.z)) + orbit;
+    extraPoints.push(new Vector3(rs.x0, rs.height, rs.zBack), new Vector3(rs.x1, rs.height, rs.zBack), new Vector3(rs.x0, 0, zNear), new Vector3(rs.x1, 0, zNear));
+  }
+  // 隊形が決める枠の広さ(欄のない舞台で、3 つの 1 列より大きく写さない)。その左右の端を、いちばん手前の列の奥行きで、床と Box の中心の高さに
+  // (2 列の隊形でも、前の列の立体が 3 つのときより大きく写らない)
+  const framePoints: Vector3[] = [];
+  const hw = frameHalfWidth(count);
+  const zFront = Math.max(0, ...slots.map((s) => s.z));
+  if (hw > 0) for (const x of [-hw, hw]) framePoints.push(new Vector3(x, 0, zFront), new Vector3(x, metrics.yC, zFront));
+  // 少し上から(ひな壇は後ろの段が、くぼみの台はくぼみが見えるよう、2 列の隊形は後ろの列が前の列の上に見えるよう高めに)
+  const elevation = cameraElevation(look, count);
+  const yMid = slots.reduce((a, s) => a + s.y, 0) / Math.max(1, count) + metrics.yC * 0.8;
+  return { slots, metrics, orbit, elevation, target: new Vector3(0, yMid, cz), extraPoints, framePoints };
+}
+
 export function buildScene(look: Look, n: number, ctx: SceneContext): SceneModel {
   const scene = new Scene();
   const count = Math.max(0, Math.floor(n));
   const base = BASES[look.base];
-  const orbit = orbitRadius(count);
+  const { slots, metrics, orbit, elevation, target, extraPoints, framePoints } = cameraFrame(look, count);
   const vertex = look.tilt === "vertex";
   // 角を下: 立方体の対角線(1,1,1)を真上に向ける(平らな向きから約 54.7° 傾ける)。下の角が台の真ん中を指す
   const orient = vertex ? new Quaternion().setFromUnitVectors(new Vector3(1, 1, 1).normalize(), new Vector3(0, 1, 0)) : new Quaternion();
@@ -81,8 +119,6 @@ export function buildScene(look: Look, n: number, ctx: SceneContext): SceneModel
   scene.add(hemi, key);
 
   // ---- 単位 ----
-  const slots = unitSlots(count, look.layout);
-  const metrics = unitMetrics(look, count);
   const lines: LineMaterial[] = [];
   const units = slots.map((slot, i) => {
     const u = buildUnit(i, slot, metrics, {
@@ -169,7 +205,6 @@ export function buildScene(look: Look, n: number, ctx: SceneContext): SceneModel
   }
 
   // ---- ひな壇の後ろの高い段(前の列は床の上)。背景に近い色で控えめに、前の縁に青の細い線 ----
-  const extraPoints: Vector3[] = [];
   const riserPaint: ((K: Palette) => void)[] = [];
   const rs = stageRiser(slots);
   if (rs) {
@@ -185,7 +220,6 @@ export function buildScene(look: Look, n: number, ctx: SceneContext): SceneModel
     shade.position.set(xc, 0.001, 0.05);
     shade.scale.set(1, 0.5, 1);
     scene.add(riser, edge, shade);
-    extraPoints.push(new Vector3(rs.x0, rs.height, rs.zBack), new Vector3(rs.x1, rs.height, rs.zBack), new Vector3(rs.x0, 0, 1.5), new Vector3(rs.x1, 0, 1.5));
     riserPaint.push((K) => {
       mat.uniforms.uLit.value.copy(lin(K.dark ? mix(K.raised, K.line, 0.5) : mix(K.surface, K.bg, 0.25)));
       mat.uniforms.uShade.value.copy(lin(K.dark ? mix(K.bg, K.raised, 0.7) : mix(K.bg, K.line, 0.45)));
@@ -197,11 +231,6 @@ export function buildScene(look: Look, n: number, ctx: SceneContext): SceneModel
     });
   }
 
-  // ---- カメラ: 少し上から(ひな壇は後ろの段が、くぼみの台はくぼみが見えるよう高めに) ----
-  const elevation = look.layout === "stage" || look.base === "dish" ? 0.27 : 0.15;
-  const yMid = (slots.reduce((a, s) => a + s.y, 0) / Math.max(1, count)) + metrics.yC * 0.8;
-  const target = new Vector3(0, yMid, cz);
-
   return {
     look,
     scene,
@@ -212,6 +241,7 @@ export function buildScene(look: Look, n: number, ctx: SceneContext): SceneModel
     elevation,
     target,
     extraPoints,
+    framePoints,
     lines,
     hasFace: hasFace(look.base),
     paint(K) {

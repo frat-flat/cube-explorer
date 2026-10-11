@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { DEFAULT_LOOK } from "@/fourdb/core/prefs";
-import { getPrefs, hydrated, resetPrefs, watch, type PrefsState } from "./support";
+import { getPrefs, hydrated, localDevOwner, pendingText, resetPrefs, watch, type PrefsState } from "./support";
 
 // 設定(/settings)と、アカウントに覚える明暗・World(PrefsProvider)。手元のデータベースで動いている画面を相手にする(home.spec.ts と同じ起動):
 //   E2E_4DB_URL=http://localhost:3200 npx playwright test e2e/prefs.spec.ts
@@ -124,7 +124,7 @@ test.describe("設定の画面", () => {
     await expect(page.locator("main").getByRole("alert")).toHaveText("アカウントに保存できませんでした。このブラウザには覚えています。");
     expect(await bodyBg(page)).toBe(DARK_BG);
     expect(await cookie(page)).toBe("dark");
-    expect(JSON.parse((await pending(page)) ?? "null")).toEqual({ theme: "dark" });
+    expect(JSON.parse((await pending(page)) ?? "null"), "残す形は { owner, patch }(owner = この画面のアカウントの指紋)").toEqual({ owner: localDevOwner(), patch: { theme: "dark" } });
     expect((await getPrefs(page.request)).prefs.theme, "アカウントはまだ元のまま").toBeNull();
     // 直ったあとで読み込み直す: この端末の変更が先に PUT される → アカウントに入り、残りは消える
     fail = false;
@@ -237,7 +237,8 @@ test.describe("読み込みごとの突き合わせ(GET の答えを差し替え
     await page.goto("/settings");
     await hydrated(page);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light"); // 最初の突き合わせが終わった(アカウントの light)あとで、この端末の変更を作る
-    await page.evaluate((k) => localStorage.setItem(k, JSON.stringify({ theme: "dark", look: { shape: "wire", tilt: "flat", base: "disc", label: "below", bg: "grid", layout: "row" } })), PENDING);
+    const stored = pendingText({ theme: "dark", look: { shape: "wire", tilt: "flat", base: "disc", label: "below", bg: "grid", layout: "row" } }); // 同じアカウントの画面が残した変更
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [PENDING, stored]);
     await page.reload();
     await hydrated(page);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -245,8 +246,15 @@ test.describe("読み込みごとの突き合わせ(GET の答えを差し替え
     expect(puts[0]).toEqual({ theme: "dark", look: { shape: "wire", tilt: "flat", base: "disc", label: "below", bg: "grid", layout: "row" } });
     await expect.poll(() => pending(page)).toBeNull();
     await expect(page.getByRole("radio", { name: "暗い", exact: true })).toBeChecked();
-    // 壊れた pending(形の違う JSON・知らない値・巨大な文字)は無視して、落ちない
-    for (const bad of ["not json", '{"theme":"evil"}', '{"look":{"shape":"x"}}', '{"__proto__":{"theme":"dark"}}', "[]", "null", "x".repeat(50_000)]) {
+    // 壊れた pending(形の違う JSON・知らない値・巨大な文字・古い形〔指紋なし〕・指紋の欄や変更の欄の形が違うもの)は無視して、落ちない
+    test.setTimeout(120_000);
+    const own = localDevOwner();
+    const wrap = (patch: string) => `{"owner":"${own}","patch":${patch}}`;
+    for (const bad of [
+      "not json", '{"theme":"evil"}', '{"look":{"shape":"x"}}', '{"__proto__":{"theme":"dark"}}', "[]", "null", "x".repeat(50_000), // 元からあった分(指紋のない形)
+      wrap('{"theme":"evil"}'), wrap('{"look":{"shape":"x"}}'), wrap('{"__proto__":{"theme":"dark"}}'), wrap("[]"), wrap("null"), // 指紋は合っていて、変更の中身が壊れている
+      `{"owner":"${own}"}`, '{"patch":{"theme":"dark"}}', '{"owner":"short","patch":{"theme":"dark"}}', '{"owner":123,"patch":{"theme":"dark"}}', // 指紋の欄・変更の欄が足りない・形が違う
+    ]) {
       const ctx = await page.context().browser()!.newContext({ baseURL: BASE, colorScheme: "light" });
       const p = await ctx.newPage();
       const problems: string[] = [];

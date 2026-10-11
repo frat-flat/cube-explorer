@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { DEFAULT_PATTERN_ID, PATTERN_LABELS, PATTERNS } from "@/fourdb/core/prefs";
-import { applyImport, copyFixture, openMenu, readFile as readSheetFile, removeFixture, resetPrefs, startImport, stage } from "./support";
+import { applyImport, copyFixture, openMenu, putPrefs, readFile as readSheetFile, removeFixture, resetPrefs, startImport, stage } from "./support";
 
 // オーナーが見る撮影(普段の試験では飛ばす)。本物のアプリ(手元のデータベース・取り込んだ試験用のスプシ・単位 2 つ)の画面を、1280×800 で撮って保存する:
 //   全パターン(8)× 明るい/暗い → <出力>/patterns/P<n>-明るい.png・P<n>-暗い.png、見比べ用の 1 枚 → <出力>/patterns.png(パターンの番号と仮の名前つき)
@@ -51,7 +51,7 @@ test("全パターン × 明るい/暗い(本物のアプリのホーム)と、�
   for (const theme of THEMES) {
     const { ctx, page } = await newThemedPage(browser, baseURL!, theme.key);
     for (const p of PATTERNS) {
-      const put = await request.put("/api/4db/prefs", { data: { theme: theme.key, look: p.look } });
+      const put = await putPrefs(request, { theme: theme.key, look: p.look });
       expect(put.ok()).toBe(true);
       await openHomeSettled(page, p.look.base);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme.key);
@@ -107,7 +107,7 @@ test("Task・設定・右の欄(Box)・Visual の欄(明るい/暗い)", async (
     await startImport(wp);
     for (const theme of THEMES) {
       const { ctx, page } = await newThemedPage(browser, baseURL!, theme.key);
-      await request.put("/api/4db/prefs", { data: { theme: theme.key } });
+      expect((await putPrefs(request, { theme: theme.key })).ok()).toBe(true);
       // Task(メニューを開いて、印も見せる)
       await page.goto("/tasks");
       await expect(page.getByTestId("task-list")).toBeVisible();

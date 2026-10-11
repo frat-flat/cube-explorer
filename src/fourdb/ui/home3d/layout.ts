@@ -3,11 +3,14 @@
 // 単位は台座の足もとの中心を原点(0, 0, 0)とし、y が上。台の正面は +z。長さの単位は three の 1。
 import type { Look } from "@/fourdb/core/prefs";
 
-/** 単位が 4 つ以上のとき「多い」(Box・軌道・間隔を少し小さくする) */
+/** 単位が 4 つ以上のとき「多い」(Box・軌道・帯のすき間の大きさを変える。並べ方は formationRows の 2 列の隊形) */
 export const isMany = (n: number): boolean => n > 3;
 
-/** 並べる場所。tier は ひな壇の段(1 = 後ろの高い段、0 = 前の低い段。ひな壇以外は 0) */
-export type Slot = { x: number; y: number; z: number; tier: 0 | 1 };
+/**
+ * 並べる場所。row = 列(0 = 前の列、1 = 後ろの列。1 列の隊形はすべて 0)、
+ * tier = ひな壇の段(1 = 後ろの高い段、0 = 前の低い段。ひな壇以外は 0)
+ */
+export type Slot = { x: number; y: number; z: number; row: 0 | 1; tier: 0 | 1 };
 
 /** ひな壇の後ろの段の高さ。前の段は床の上 */
 export const STAGE_RISE = 0.5;
@@ -15,27 +18,88 @@ export const STAGE_STEP = 0;
 /** ひな壇の後ろの段の箱: 後ろの段の中心 z = -0.85、奥の端 zBack と手前の端 zFront(奥行き 1.5)、両端の立体から横へ margin だけ広げる */
 const RISER = { zCenter: -0.85, zBack: -1.6, zFront: -0.1, margin: 0.95 } as const;
 
-/** n 個の単位を並べる場所(左から)。n が 0 なら空。ひな壇も n = 1 なら 1 列と同じ */
+/**
+ * 単位の数ごとの隊形(後ろの列と前の列の数。単位は 6 つまで〔規則 R〕)。
+ * 1 = 真ん中に 1 つ、2 = 横に 2 つ、3 = 1 列に 3 つ、4 = 後ろ 2・前 2、5 = 後ろ 2・前 3、6 = 後ろ 3・前 3。
+ * 2 列の隊形は、前の列と後ろの列を半分ずつずらす(後ろの立体が、前の立体のあいだから見える)。
+ */
+export function formationRows(n: number): { back: number; front: number } {
+  const count = Math.max(0, Math.floor(n));
+  if (count <= 3) return { back: 0, front: count };
+  return { back: Math.floor(count / 2), front: Math.ceil(count / 2) };
+}
+
+/** 1 列の隊形の、となりどうしの間隔(2 つも 3 つと同じ間隔。端まで広げない) */
+export const ROW_GAP = 1.95;
+/** 2 列の隊形の、前の立体と後ろの立体の横のずれ(同じ列のとなりどうしは、この 2 倍) */
+export const STAGGER = 1.2;
+/** 2 列の隊形の奥行き(1 列・弧: 後ろの列 z = -ROW_DEPTH / 2、前の列 z = ROW_DEPTH / 2) */
+export const ROW_DEPTH = 1.8;
+/** ひな壇の前の段の z(後ろの段の箱の手前の端 -0.1 より、立体の広さ + すき間だけ手前) */
+export const STAGE_FRONT_Z = 0.85;
+/** 弧の曲がり方: z = ARC_K × x²(左右の端ほど手前) */
+export const ARC_K = 0.085;
+/**
+ * 2 列の隊形の遠近の直し: 前の列は手前にあるので画面では広がって見える。前の列の横の位置を (1 - PERSPECTIVE) 倍に詰め、後ろの列を (1 + PERSPECTIVE) 倍に広げて、
+ * 画面の上で互い違いの間隔がそろうようにする(前と後ろの数が同じ隊形で、片側だけ詰まって見えないように)
+ */
+export const PERSPECTIVE = 0.055;
+
+/**
+ * n 個の単位を並べる場所(隊形は formationRows)。n が 0 なら空。
+ * 添え字の順(規則 R の順)は左から右: 2 列の隊形は、前・後ろ・前… と互い違いに左から並ぶ(いちばん左は前の列)。
+ * キーボードの順・札の順は、画面の左から右と同じになる。
+ * 並べ方は隊形の中の見え方だけを変える: row = 床にまっすぐ、arc = 列を手前へゆるく曲げる、stage = 後ろの列を段に上げる。
+ * ひな壇は、2 列の隊形と 3 つ(真ん中を後ろの段に上げる)で使う。1 つ・2 つは 1 列と同じ。
+ */
 export function unitSlots(n: number, layout: Look["layout"]): Slot[] {
   const count = Math.max(0, Math.floor(n));
-  const many = isMany(count);
+  if (count === 0) return [];
   const mid = (count - 1) / 2;
-  if (layout === "stage" && count > 1) {
-    // 偶数番目を後ろの高い段、奇数番目を前の低い段に、互い違いに。多いときは前の列を手前に(後ろの札と前の札が上下で重ならないように)
-    const step = count <= 2 ? 2.4 : count <= 4 ? 2.3 : 2.05;
+  // ひな壇の 3 つは、真ん中だけを後ろの段に上げる(前・後ろ・前)。ほかの 1 列の隊形には段がない
+  const podium = layout === "stage" && count === 3;
+  if (formationRows(count).back === 0 && !podium) {
     return Array.from({ length: count }, (_, i): Slot => {
-      const back = i % 2 === 0;
-      return { x: (i - mid) * (step / 2), y: back ? STAGE_RISE : STAGE_STEP, z: back ? RISER.zCenter : many ? 1.15 : 0.75, tier: back ? 1 : 0 };
+      const x = (i - mid) * ROW_GAP;
+      return { x, y: 0, z: layout === "arc" ? ARC_K * x * x : 0, row: 0, tier: 0 };
     });
   }
-  const step = count <= 2 ? 2.15 : count === 3 ? 1.95 : layout === "arc" ? 1.42 : 1.48;
-  return Array.from({ length: count }, (_, i): Slot => {
-    const x = (i - mid) * step;
-    return { x, y: 0, z: layout === "arc" ? 0.085 * x * x : 0, tier: 0 };
+  // 2 列: 左から 前・後ろ・前… の互い違い(前の列の数 ≥ 後ろの列の数なので、左の端はいつも前の列)。遠近の分だけ前の列を詰め、後ろの列を広げる
+  const shift = podium ? ROW_GAP : STAGGER;
+  const raw = Array.from({ length: count }, (_, i) => (i - mid) * shift * (i % 2 === 1 ? 1 + PERSPECTIVE : 1 - PERSPECTIVE));
+  const mean = raw.reduce((a, b) => a + b, 0) / count;
+  const xs = raw.map((x) => x - mean); // 全体の真ん中を x = 0 に(前と後ろの数が同じ隊形で、直しの分だけずれないように)
+  // 弧は列ごとに、その列の真ん中から左右へ手前に曲げる(前と後ろの数が同じ隊形でも、列ごとに左右対称の弧になる)
+  const rowMid = (back: boolean) => {
+    const own = xs.filter((_, i) => i % 2 === (back ? 1 : 0));
+    return own.reduce((a, b) => a + b, 0) / own.length;
+  };
+  const mids = [rowMid(false), rowMid(true)];
+  return xs.map((x, i): Slot => {
+    const back = i % 2 === 1;
+    if (layout === "stage") return { x, y: back ? STAGE_RISE : STAGE_STEP, z: back ? RISER.zCenter : STAGE_FRONT_Z, row: back ? 1 : 0, tier: back ? 1 : 0 };
+    const z0 = back ? -ROW_DEPTH / 2 : ROW_DEPTH / 2;
+    const dx = x - mids[back ? 1 : 0];
+    return { x, y: 0, z: layout === "arc" ? z0 + ARC_K * dx * dx : z0, row: back ? 1 : 0, tier: 0 };
   });
 }
 
-/** ひな壇の後ろの段の箱(x0〜x1 の幅、奥 zBack〜手前 zFront、高さ height)。ひな壇でない・単位が 1 つなら null */
+/**
+ * カメラの枠に必ず入れる、横の半分の幅(並びの真ん中から)。単位が 2 つ以上なら、3 つの 1 列より狭く写さない
+ * (2 つ・4 つが画面いっぱいに大きくならず、3 つと同じ大きさ・間隔で真ん中に寄る。5 つ・6 つは並びのほうが広い)。1 つなら 0
+ */
+export function frameHalfWidth(n: number): number {
+  return Math.floor(n) >= 2 ? ROW_GAP + orbitRadius(3) : 0;
+}
+
+/** 見下ろす角度(rad)。ふつうは 0.15。ひな壇・くぼみの台は 0.27(後ろの段・くぼみが見えるよう)。2 列の隊形は TWO_ROW_ELEVATION 以上(後ろの列が前の列の上に見えるよう) */
+export const TWO_ROW_ELEVATION = 0.32;
+export function cameraElevation(look: Pick<Look, "layout" | "base">, n: number): number {
+  const base = look.layout === "stage" || look.base === "dish" ? 0.27 : 0.15;
+  return formationRows(n).back > 0 ? Math.max(base, TWO_ROW_ELEVATION) : base;
+}
+
+/** ひな壇の後ろの段の箱(x0〜x1 の幅、奥 zBack〜手前 zFront、高さ height)。ひな壇でない・後ろの段がなければ null */
 export function stageRiser(slots: readonly Slot[]): { x0: number; x1: number; zBack: number; zFront: number; height: number } | null {
   const back = slots.filter((s) => s.tier === 1);
   const front = slots.filter((s) => s.tier === 0);
