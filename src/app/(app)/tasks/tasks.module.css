@@ -1,0 +1,92 @@
+/* Task(/tasks)の置き方。札・カード・リンクは、共通の部品(src/styles/components.css)と色の道具(tokens.css) */
+
+.list,
+.files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* やること 1 件: 種類の札 | ファイル › シート | 始めた日時 | Import で開く */
+.item {
+  display: grid;
+  grid-template-columns: 9.5em minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.kind {
+  justify-self: start;
+}
+
+/* 種類は札の文字でも分かる。色は補助(承認待ち = 金、失敗 = 赤、途中 = 青) */
+.item[data-kind="approval"] .kind {
+  color: var(--hl-text);
+}
+
+.item[data-kind="failed"] .kind {
+  color: var(--danger);
+}
+
+.what {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.at {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ファイルごとの進み具合: ファイル名 / 始めたシートの内訳 / まだのシート */
+.file {
+  padding: 10px 2px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.file:last-child {
+  border-bottom: 0;
+}
+
+.fileName {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--ink-strong);
+}
+
+.file p {
+  margin: 4px 0 0;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 18px;
+  font-size: 13px;
+}
+
+.counts b {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  margin-left: 2px;
+}
+
+.zero {
+  color: var(--muted);
+}
+
+.failedCount {
+  color: var(--danger);
+}

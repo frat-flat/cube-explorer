@@ -20,18 +20,18 @@
     "next": "16.3.8",
     "postgres": "3.4.9",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "^0.128.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
     "@types/node": "^22.20.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.128.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "leaflet": "^1.9.4",
-    "supabase": "^2.119.0",
-    "three": "^0.128.0",
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vite": "^8.3.2",

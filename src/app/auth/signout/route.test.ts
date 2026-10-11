@@ -38,7 +38,7 @@ describe("ログアウト POST(枠のボタン)", () => {
 });
 
 describe("ログアウト GET(同じサイトのリンクなどは今までどおり。別のサイトからは拒む)", () => {
-  it("同じサイトのリンク(旧ダッシュボード・許可がない人の画面)と、アドレスを直接入れた場合(none)は、ログアウトして /login へ", async () => {
+  it("同じサイトのリンク(許可がない人の画面)と、アドレスを直接入れた場合(none)は、ログアウトして /login へ", async () => {
     for (const site of ["same-origin", "none"]) {
       const res = await GET(req("GET", { "sec-fetch-site": site }));
       expect(res.status, site).toBe(303);

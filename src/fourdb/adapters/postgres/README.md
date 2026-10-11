@@ -15,7 +15,18 @@ psql -h localhost -p <port> -U <user> -d <使い捨てのDB> -v ON_ERROR_STOP=1 
 
 `0005_value_rules.check.sql` は、0001〜0005 をすべて流したあとに superuser で流します(1つの文でたくさん入れたときの値・スプシの合計の決まりと、統計がいちばん悪い状態でも 2 万個が 20 秒以内に入るか)。統計の状態はこの中で作るので、データベースの来歴によらず同じ結果になります(rollback で元に戻る)。止めるときの文が 0001・0002 とまったく同じかも見ます。`NOTICE: OK` が 20 行出れば通過です。表の大きさの記録と列の統計を書き換え、自動の vacuum を止めるので、名前が `fourdb_it…` か `test`・`check`・`perf` を含むデータベースか、workspace が1つもないデータベースでしか流れません(それ以外では最初に止まります)。
 
+`0006_principal_pref.check.sql` は、0001〜0006 を流したあとに superuser で流します(アカウントごとの設定の表の RLS の強制・方針・表の決まり・権限と、元に戻す `0006_principal_pref.down.sql` を、この中で本物のファイルのまま流して確かめる)。最後に rollback するので何も残りません。`NOTICE: OK` が 48 行出れば通過です(down が止まる確かめで、行の数だけを含む ERROR が 2 回出ます。想定どおり)。0005 の確かめと同じく、試験用の名前のデータベースでしか流れません。
+
 規模の確認は `test/scale.sql`(superuser で。架空のデータ 288 万個を入れ、測る用の役割 `fourdb_scale_app` を作る。数分かかる)のあとに `test/scale_queries.sql`(その役割で、行ごとの権限がかかった状態で測る)。
+ホームと Task の規模は、`test/scale.sql` のあとに `test/scale_home.sql`(`-v variant=V1` か `V2`。Box・行の結び・計算された値・予算のシート・取り込みの記録を足す)を流し、`home.scale.test.ts` で測ります(`FOURDB_SCALE_APP_URL` に手元の `fourdb_scale_app` の接続先を入れたときだけ動く)。SQL の下書きと測った結果は `test/home.sql.md`。
+
+## アカウントごとの設定(0006)と、計算された値の索引(0007)
+
+- `0006_principal_pref.sql` は、アカウント(principal)ごとに 1 行の設定(明暗・World・ホームの見た目)の表 `fourdb.principal_pref` を作ります。行ごとの権限を強制し、「今の処理の利用者」(`fourdb.current_principal()`。withScope が入れる `fourdb.principal`)の行だけを読み書きできます。読み書きは `prefs.ts`(principal をパラメータでも絞る)。
+  - 表がない・実行用の役割に権限がないとき、アプリは止まらず、設定の GET は `available: false` と既定の設定、PUT は「使えない」(API は 503)になります。権限は `fourdb:setup-remote`(`grantApp`)で渡ります。流したあとに権限を渡すまでは「使えない」のままです。
+  - 元に戻す `0006_principal_pref.down.sql` は、表に行(利用者が保存した設定)があれば消さずに止まり、行の数を知らせます。消すと決めたときだけ、1 つの取引の中で `begin; set local fourdb.discard_principal_pref = '<その数>'; <この down の SQL>; commit;` の形で流し直します(数が今の行の数と同じときだけ通る。`local` を付けない set は、接続に残るので使いません)。down の SQL 自体は 1 つの DO 文だけでできています。流したあとは `fourdb_migrations.applied` から `0006_principal_pref.sql` の行を消します。
+- `0007_value_calculated_index.sql` は、計算された値の今の版だけの部分索引 `value_calculated`(`value (column_id) where kind = 'calculated' and system_to is null`)を作ります。ホームの「数値」の欄の ƒ の判定に使います(ないと、規模の確認で 1〜2 秒かかる)。
+  **流す(0007)のも元に戻す(down)のも、取り込み(反映)をしていない時間に行います。** 作る間は `value` 表への書き込みが待たされ(読むのは止まらない)、外すときは一瞬すべて押さえます。どちらも待ちが 5 秒を超えたら止まります(`lock_timeout`。止まっても何も変わらない)。作る時間が 60 秒を超えても止まり、取引ごと元に戻ります(0007 の `statement_timeout`)。元に戻したあとは `fourdb_migrations.applied` から `0007_value_calculated_index.sql` の行を消します。
 
 元に戻すときは `migrations/0001_core.down.sql`(fourdb の表とデータがすべて消える)。
 

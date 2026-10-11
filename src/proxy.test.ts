@@ -22,12 +22,16 @@ describe("ログインの入口(proxy)が動く URL", () => {
     for (const url of brandFiles) expect(runsOn(url), url).toBe(false);
   });
 
-  it("Next の配る部品・favicon・explorer にも動かない", () => {
-    for (const url of ["/_next/static/chunks/a.js", "/_next/image?url=%2Fa.png&w=64&q=75", "/favicon.ico", "/explorer/index.html"]) expect(runsOn(url), url).toBe(false);
+  it("Next の配る部品・favicon にも動かない", () => {
+    for (const url of ["/_next/static/chunks/a.js", "/_next/image?url=%2Fa.png&w=64&q=75", "/favicon.ico"]) expect(runsOn(url), url).toBe(false);
   });
 
   it("画面には動く(ログインしていなければ /login へ送る)", () => {
-    for (const url of ["/", "/migrate", "/table", "/settings", "/sheet", "/sheets/axes.html"]) expect(runsOn(url), url).toBe(true);
+    for (const url of ["/", "/migrate", "/table", "/history", "/settings", "/sheet"]) expect(runsOn(url), url).toBe(true);
+  });
+
+  it("explorer/ は、もう外さない(public/explorer はなくなった。旧ダッシュボードの跡の URL も、ログインを確かめてから 404 になる)", () => {
+    for (const url of ["/explorer/index.html", "/sheets/axes.html"]) expect(runsOn(url), url).toBe(true);
   });
 
   it("/login と API にも動くが、中で素通しする(PUBLIC_PATHS。API は各ルートが自分で確かめる)", () => {

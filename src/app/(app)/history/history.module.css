@@ -1,0 +1,28 @@
+/* 履歴(/history)の置き方。表・札・ボタンは、共通の部品(src/styles/components.css) */
+
+.at {
+  white-space: nowrap;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+/* 内容の欄: 題と、その下の内訳(取り込みの行・値の数など)。長い題は折り返す */
+.what {
+  white-space: normal !important;
+  min-width: 280px;
+}
+
+.lines {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.more {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}

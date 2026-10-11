@@ -4,7 +4,7 @@ import { sameOrigin } from "@/lib/same-origin";
 
 // ログアウト。枠の「ログアウト」ボタンは POST のフォーム。別のサイトのページから、利用者のブラウザでログアウトさせられないよう、
 // どちらの方法でも、同じサイトからの要求だけを受け付ける(src/lib/same-origin.ts)。
-// GET は、同じサイトのリンク(ログインの「許可がありません」の画面・旧ダッシュボードの「ログアウト」)と、アドレスを直接入れた場合(Sec-Fetch-Site: none)だけ
+// GET は、同じサイトのリンク(ログインの「許可がありません」の画面。src/app/login/LoginForm.tsx)と、アドレスを直接入れた場合(Sec-Fetch-Site: none)だけ
 const refused = () => Response.json({ error: "この画面からの操作だけを受け付けます" }, { status: 403 });
 
 async function signOutAndGoToLogin(request: NextRequest) {

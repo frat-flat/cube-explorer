@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
-import { parseTheme, THEME_COOKIE } from "@/lib/prefs";
+import { redirect } from "next/navigation";
+import { currentUserEmail } from "@/lib/auth";
+import { LogoutForm } from "../LogoutForm";
+import s from "./settings.module.css";
 import { ThemeSetting } from "./ThemeSetting";
+import { WorldSetting } from "./WorldSetting";
 
 export const metadata: Metadata = { title: "設定 | 4DB" };
 
-// 設定(P1 は「画面の見た目」だけ。ほかの設定は P2 で新しいデータの上に作る)。ログインの確認は src/proxy.ts と枠(layout.tsx)
+// 設定: 画面の見た目(暗い・明るい)・World(まわりの世界)と、ログイン中のメール・ログアウト。見た目と World はアカウントに覚える。
+// ログインの確認は src/proxy.ts と枠(layout.tsx)に加えて、ここでも行う(メールを出すため。layout だけに頼らない)
 export default async function SettingsPage() {
-  const saved = parseTheme((await cookies()).get(THEME_COOKIE)?.value);
+  const email = await currentUserEmail();
+  if (!email) redirect("/login");
   return (
     <div className="view">
       <header className="vhead">
@@ -15,7 +20,14 @@ export default async function SettingsPage() {
           <h1>設定</h1>
         </div>
       </header>
-      <ThemeSetting initial={saved ?? "auto"} />
+      <ThemeSetting />
+      <WorldSetting />
+      <section className="card" aria-labelledby="account-heading">
+        <h2 id="account-heading">アカウント</h2>
+        <p>ログイン中のメールアドレス: <b data-testid="account-email">{email}</b></p>
+        {/* ログアウトは POST のフォーム(リンクで GET にすると、別のサイトからも、先読みでも、ログアウトできてしまう。上の帯のボタンと同じ) */}
+        <LogoutForm className={s.logout} />
+      </section>
     </div>
   );
 }

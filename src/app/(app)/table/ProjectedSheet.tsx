@@ -3,10 +3,11 @@
 // 取り込んだデータを表で見る画面(Projected Sheet。画面の名前は Table)。数値・集計のしかた・行・列・段・小計・絞り込みを選ぶと、サーバーがその場で元の値から計算する。
 // 合計・小計は Σ 付きの行・列として出し、軸の値としては扱わない。計算された値には ƒ の印を付ける(色だけにしない)。
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Catalog, ProjectionOutput } from "@/fourdb/adapters/postgres/projection";
 import type { SheetSummary } from "@/fourdb/adapters/postgres/import-store";
 import type { ProjCell, ProjectionFn, ProjectionRequest } from "@/fourdb/core/projection/types";
+import { api } from "../api";
 import { measureGoneMessage, measureLabel, measureMissingMessage, measuresIn } from "./measures";
 import s from "./sheet.module.css";
 
@@ -20,19 +21,6 @@ const FNS: [ProjectionFn, string][] = [
 const fnName = (f: ProjectionFn) => FNS.find(([k]) => k === f)?.[1] ?? f;
 const fmt = (n: number) => n.toLocaleString("ja-JP", { maximumFractionDigits: 2 });
 
-async function api<T>(path: string, init?: { method?: string; body?: unknown; signal?: AbortSignal }): Promise<T> {
-  const res = await fetch(path, {
-    method: init?.method ?? "GET",
-    headers: init?.body !== undefined ? { "content-type": "application/json" } : undefined,
-    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
-    credentials: "same-origin",
-    signal: init?.signal,
-  });
-  const j = await res.json().catch(() => null);
-  if (!res.ok) throw new Error((j as { error?: string } | null)?.error ?? `うまくいきませんでした(${res.status})`);
-  return j as T;
-}
-
 type Dim = Catalog["dimensions"][number];
 type Axis = { dimensionId: string; level: number | null };
 type Member = { id: string; name: string };
@@ -44,7 +32,8 @@ type Shown = { r: ProjectionOutput; fn: ProjectionFn };
 /** 軸を選んだときの段: いちばん細かい段 */
 const finest = (d: Dim | undefined) => (d && d.levels.length ? d.levels[d.levels.length - 1].level : null);
 
-export function ProjectedSheet() {
+/** initialDefinitionId = /table?def=<id> で指された保存した表。選べるもの(カタログ)を読んだあと、その表を開く */
+export function ProjectedSheet({ initialDefinitionId }: { initialDefinitionId: string | null }) {
   const [cat, setCat] = useState<Catalog | null>(null);
   const [measureId, setMeasureId] = useState("");
   const [fn, setFn] = useState<ProjectionFn>("SUM");
@@ -123,6 +112,7 @@ export function ProjectedSheet() {
       setLoading(true);
       try {
         const r = await api<ProjectionOutput>("/api/4db/projection", { method: "POST", body: { request: req }, signal: ctrl.signal });
+        if (ctrl.signal.aborted) return; // 取りやめた(組み方が変わった・画面を離れた)要求の答えは捨てる
         setShown({ r, fn: req.fn });
         setError("");
       } catch (e) {
@@ -217,6 +207,14 @@ export function ProjectedSheet() {
       setSaveMsg({ ok: true, text: `「${n}」を保存しました(版 ${r.version})` });
       await loadSaved();
     });
+
+  // /table?def=<id>: 選べるもの(カタログ)を読み終えてから、その表を一度だけ開く(先に開くと、初めの組み方に上書きされる)
+  const initialOpened = useRef(false);
+  useEffect(() => {
+    if (!initialDefinitionId || !cat || initialOpened.current) return;
+    initialOpened.current = true;
+    void open(initialDefinitionId);
+  });
 
   const rowDim = dimOf(rows?.dimensionId);
   const colDim = dimOf(cols?.dimensionId);
@@ -368,7 +366,8 @@ export function ProjectedSheet() {
 
       <div className={s.result}>
         {missing && current && <p className="error" role="alert">{measureMissingMessage(current.name)}</p>}
-        {gone && <p className="error" role="alert">{measureGoneMessage(goneName)}</p>}
+        {/* 表にできるデータがそもそもないとき(保存した表のシートがすべてなくなった)は、選びようがないので、この文は出さず、上の「まだ表にできるデータがありません」に任せる */}
+        {gone && cat && cat.measures.length > 0 && <p className="error" role="alert">{measureGoneMessage(goneName)}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         {loading && <p className="muted" aria-live="polite"><span className="spin" aria-hidden="true" />集計しています…</p>}
         {request && shown && <Result shown={shown} />}

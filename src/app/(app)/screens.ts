@@ -1,4 +1,4 @@
-// 1つのアプリの枠(上の帯と左のメニュー)に出す画面の一覧。まだない画面(Saving・照合・Column Registry・Library・World・履歴・ホーム)は出さない(P1)。
+// 1つのアプリの枠(上の帯と左のメニュー)に出す画面の一覧。まだない画面(Saving・照合・Column Registry・Library・World)は出さない(P1・P2)。
 // 見出しや考え方の名前は英語、添え書きと操作は日本語(D-015)。
 
 export type Screen = {
@@ -12,16 +12,16 @@ export type Screen = {
 };
 
 export const SCREENS: Screen[] = [
+  { href: "/", label: "ホーム", icon: "⌂" },
+  { href: "/tasks", label: "Task", icon: "✓" },
   { href: "/migrate", group: "取り込む", label: "Import", note: "ファイルから取り込む", icon: "⇪" },
   { href: "/table", group: "見る", label: "Table", note: "表で見る", icon: "▦" },
+  { href: "/history", label: "履歴", icon: "↺" },
   { href: "/settings", label: "設定", icon: "⚙" },
 ];
 
-/** 旧ダッシュボード(public/sheets/axes.html)。P2 で外すまで、メニューの下に置く */
-export const LEGACY: Screen = { href: "/", label: "旧ダッシュボード", icon: "↩" };
-
-/** いま開いている画面か(/table?def=x や /table/… も /table とみなす) */
-export const isCurrent = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
+/** いま開いている画面か(/table?def=x や /table/… も /table とみなす。/ はそれだけ) */
+export const isCurrent = (pathname: string, href: string) => pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 
 /** 今いる場所(「見る › Table」)。一覧にない画面なら null */
 export function placeOf(pathname: string): string | null {

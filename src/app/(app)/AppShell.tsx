@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, Fragment, useContext, useState, type ReactNode } from "react";
 import { NAV_COOKIE, writeCookie } from "@/lib/prefs";
-import { isCurrent, LEGACY, placeOf, SCREENS, type Screen } from "./screens";
+import { isCurrent, placeOf, SCREENS, type Screen } from "./screens";
+import { badgeText, useTaskCount } from "./task-count";
 
 const NavContext = createContext<{ closed: boolean; toggle: () => void } | null>(null);
 
@@ -40,35 +41,42 @@ export function Crumb() {
   return place ? <span className="crumb">{place}</span> : null;
 }
 
-function NavLink({ screen, pathname, sub }: { screen: Screen; pathname: string; sub?: boolean }) {
+/** Task の件数の印(メニューの中の Task の横だけ。0 のときは出さない)。読み上げは「N 件」 */
+export function CountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
   return (
-    <Link href={screen.href} className={sub ? "nv sub" : "nv top-gap"} aria-current={isCurrent(pathname, screen.href) ? "page" : undefined}>
+    <span className="nvbadge" role="img" aria-label={`${count} 件`}>
+      {badgeText(count)}
+    </span>
+  );
+}
+
+function NavLink({ screen, pathname, sub, gap, badge }: { screen: Screen; pathname: string; sub?: boolean; gap?: boolean; badge?: number }) {
+  return (
+    <Link href={screen.href} className={sub ? "nv sub" : gap ? "nv top-gap" : "nv"} aria-current={isCurrent(pathname, screen.href) ? "page" : undefined}>
       <span className="ic" aria-hidden="true">{screen.icon}</span>
       <span className="lb">
         {screen.label}
         {screen.note && <small>{screen.note}</small>}
       </span>
+      {badge !== undefined && <CountBadge count={badge} />}
     </Link>
   );
 }
 
-/** 左のメニュー。今いる画面に aria-current="page"(見た目の印もこれで付く) */
-export function AppNav() {
+/** 左のメニュー。今いる画面に aria-current="page"(見た目の印もこれで付く)。tasksEnabled(DB がある)ときだけ、Task の横にやることの件数を出す */
+export function AppNav({ tasksEnabled }: { tasksEnabled: boolean }) {
   const pathname = usePathname();
+  const taskCount = useTaskCount(tasksEnabled, pathname);
   return (
     <nav className="side" id="app-nav" aria-label="画面">
       {SCREENS.map((s, i) => (
         <Fragment key={s.href}>
           {s.group && s.group !== SCREENS[i - 1]?.group && <span className="ngh">{s.group}</span>}
-          <NavLink screen={s} pathname={pathname} sub={Boolean(s.group)} />
+          {/* 区切りの見出しのない項目は、区切りの見出しのある項目のあとに続くとき、上に少しあける */}
+          <NavLink screen={s} pathname={pathname} sub={Boolean(s.group)} gap={!s.group && Boolean(SCREENS[i - 1]?.group)} badge={s.href === "/tasks" ? taskCount : undefined} />
         </Fragment>
       ))}
-      <div className="hair" aria-hidden="true" />
-      {/* 旧ダッシュボードは中身が静的な HTML(rewrite)なので、アプリの中の遷移ではなく普通のリンクで開く */}
-      <a href={LEGACY.href} className="nv">
-        <span className="ic" aria-hidden="true">{LEGACY.icon}</span>
-        <span className="lb">{LEGACY.label}</span>
-      </a>
     </nav>
   );
 }

@@ -63,3 +63,8 @@
   border-radius: 50%;
   background: var(--hl);
 }
+
+/* アカウントのログアウトのボタン: 上の文との間をあける */
+.logout {
+  margin: 12px 0 0;
+}
